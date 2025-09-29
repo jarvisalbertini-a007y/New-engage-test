@@ -42,7 +42,7 @@ export async function improveEmail(emailContent: string): Promise<{
   improved: { subject: string; body: string; };
   improvements: string[];
 }> {
-  const improved = await improveEmailDraft(emailContent);
+  const result = await improveEmailDraft(emailContent);
   
   // Generate list of improvements made
   const improvements = [
@@ -54,7 +54,10 @@ export async function improveEmail(emailContent: string): Promise<{
   ];
   
   return {
-    improved,
+    improved: {
+      subject: result.improvedSubject,
+      body: result.improvedBody
+    },
     improvements
   };
 }

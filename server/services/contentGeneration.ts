@@ -22,10 +22,10 @@ export interface GeneratedContent {
 
 export async function generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
   // Get context data
-  const persona = request.personaId ? await storage.getPersona(request.personaId) : null;
-  const contact = request.contactId ? await storage.getContact(request.contactId) : null;
-  const company = request.companyId ? await storage.getCompany(request.companyId) : null;
-  const insight = request.insightId ? await storage.getInsight(request.insightId) : null;
+  const persona = request.personaId ? (await storage.getPersona(request.personaId)) ?? null : null;
+  const contact = request.contactId ? (await storage.getContact(request.contactId)) ?? null : null;
+  const company = request.companyId ? (await storage.getCompany(request.companyId)) ?? null : null;
+  const insight = request.insightId ? (await storage.getInsight(request.insightId)) ?? null : null;
   
   if (request.type === 'email') {
     return await generateEmailContent(request, persona, contact, company, insight);
@@ -48,8 +48,8 @@ async function generateEmailContent(
   const context = {
     firstName: contact?.firstName || 'there',
     company: company?.name || 'your company',
-    industry: company?.industry,
-    title: contact?.title,
+    industry: company?.industry || undefined,
+    title: contact?.title || undefined,
     insight: insight?.description,
     valueProposition: persona?.valuePropositions ? 
       JSON.stringify(persona.valuePropositions) : 
@@ -86,8 +86,8 @@ async function generateLinkedInContent(
   const context = {
     firstName: contact?.firstName || 'there',
     company: company?.name || 'your company',
-    industry: company?.industry,
-    title: contact?.title,
+    industry: company?.industry || undefined,
+    title: contact?.title || undefined,
     insight: insight?.description,
     valueProposition: persona?.valuePropositions ? 
       JSON.stringify(persona.valuePropositions) : 

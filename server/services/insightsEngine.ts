@@ -234,7 +234,7 @@ export async function generateInsightRecommendations(insightId: string): Promise
 }
 
 function getOptimalTiming(insightType: string): string {
-  const timingMap = {
+  const timingMap: Record<string, string> = {
     funding: 'Within 2-4 weeks of announcement (gives time to settle, shows you\'re informed)',
     leadership_change: 'Within 1-2 weeks (new leaders are evaluating vendors)',
     product_launch: 'Within 1 week (momentum is high, infrastructure needs immediate)',
@@ -247,7 +247,7 @@ function getOptimalTiming(insightType: string): string {
 }
 
 function getRecommendedChannels(insightType: string): string[] {
-  const channelMap = {
+  const channelMap: Record<string, string[]> = {
     funding: ['email', 'linkedin', 'phone'],
     leadership_change: ['linkedin', 'email', 'phone'],
     product_launch: ['email', 'linkedin'],

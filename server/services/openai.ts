@@ -28,7 +28,7 @@ export async function analyzeEmailDraft(emailText: string): Promise<{
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    throw new Error("Failed to analyze email: " + error.message);
+    throw new Error("Failed to analyze email: " + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -65,7 +65,7 @@ export async function generatePersonalizedEmail(context: {
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    throw new Error("Failed to generate email: " + error.message);
+    throw new Error("Failed to generate email: " + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -88,7 +88,7 @@ export async function improveEmailDraft(emailText: string): Promise<{ improvedSu
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    throw new Error("Failed to improve email: " + error.message);
+    throw new Error("Failed to improve email: " + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -122,7 +122,7 @@ export async function generateInsightMessage(insight: {
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    throw new Error("Failed to generate insight message: " + error.message);
+    throw new Error("Failed to generate insight message: " + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -149,6 +149,6 @@ export async function categorizeEmailResponse(emailContent: string): Promise<{
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    throw new Error("Failed to categorize email: " + error.message);
+    throw new Error("Failed to categorize email: " + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
