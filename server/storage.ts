@@ -7,9 +7,23 @@ import {
   type Email, type InsertEmail,
   type Insight, type InsertInsight,
   type Persona, type InsertPersona,
-  type Task, type InsertTask
+  type Task, type InsertTask,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
+
+// Helper to filter out undefined values from partial updates
+function cleanPartial<T extends Record<string, any>>(obj: Partial<T>): Partial<T> {
+  const cleaned: any = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined) {
+      cleaned[key] = obj[key];
+    }
+  }
+  return cleaned;
+}
 
 export interface IStorage {
   // Users
@@ -547,4 +561,275 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Company methods
+  async getCompany(id: string): Promise<Company | undefined> {
+    const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCompanies(limit = 50): Promise<Company[]> {
+    return await db.select().from(companies).limit(limit);
+  }
+
+  async getCompaniesByDomain(domain: string): Promise<Company[]> {
+    return await db.select().from(companies).where(eq(companies.domain, domain));
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const result = await db.insert(companies).values(insertCompany).returning();
+    return result[0];
+  }
+
+  async updateCompany(id: string, updates: Partial<Company>): Promise<Company | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getCompany(id);
+    const result = await db.update(companies).set(cleaned).where(eq(companies.id, id)).returning();
+    return result[0];
+  }
+
+  // Contact methods
+  async getContact(id: string): Promise<Contact | undefined> {
+    const result = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getContacts(filters?: { companyId?: string; limit?: number }): Promise<Contact[]> {
+    let query = db.select().from(contacts);
+    
+    if (filters?.companyId) {
+      query = query.where(eq(contacts.companyId, filters.companyId)) as any;
+    }
+    
+    return await query.limit(filters?.limit || 50);
+  }
+
+  async createContact(insertContact: InsertContact): Promise<Contact> {
+    const result = await db.insert(contacts).values(insertContact).returning();
+    return result[0];
+  }
+
+  async updateContact(id: string, updates: Partial<Contact>): Promise<Contact | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getContact(id);
+    const result = await db.update(contacts).set(cleaned).where(eq(contacts.id, id)).returning();
+    return result[0];
+  }
+
+  // Visitor session methods
+  async getVisitorSession(id: string): Promise<VisitorSession | undefined> {
+    const result = await db.select().from(visitorSessions).where(eq(visitorSessions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getActiveVisitorSessions(): Promise<VisitorSession[]> {
+    return await db.select().from(visitorSessions).where(eq(visitorSessions.isActive, true));
+  }
+
+  async getVisitorSessionsByCompany(companyId: string): Promise<VisitorSession[]> {
+    return await db.select().from(visitorSessions).where(eq(visitorSessions.companyId, companyId));
+  }
+
+  async createVisitorSession(insertSession: InsertVisitorSession): Promise<VisitorSession> {
+    const result = await db.insert(visitorSessions).values(insertSession).returning();
+    return result[0];
+  }
+
+  async updateVisitorSession(id: string, updates: Partial<VisitorSession>): Promise<VisitorSession | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getVisitorSession(id);
+    const result = await db.update(visitorSessions).set(cleaned).where(eq(visitorSessions.id, id)).returning();
+    return result[0];
+  }
+
+  // Sequence methods
+  async getSequence(id: string): Promise<Sequence | undefined> {
+    const result = await db.select().from(sequences).where(eq(sequences.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSequences(filters?: { createdBy?: string; status?: string }): Promise<Sequence[]> {
+    let query = db.select().from(sequences);
+    const conditions = [];
+    
+    if (filters?.createdBy) {
+      conditions.push(eq(sequences.createdBy, filters.createdBy));
+    }
+    
+    if (filters?.status) {
+      conditions.push(eq(sequences.status, filters.status));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query;
+  }
+
+  async createSequence(insertSequence: InsertSequence): Promise<Sequence> {
+    const result = await db.insert(sequences).values(insertSequence).returning();
+    return result[0];
+  }
+
+  async updateSequence(id: string, updates: Partial<Sequence>): Promise<Sequence | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getSequence(id);
+    const result = await db.update(sequences).set(cleaned).where(eq(sequences.id, id)).returning();
+    return result[0];
+  }
+
+  // Email methods
+  async getEmail(id: string): Promise<Email | undefined> {
+    const result = await db.select().from(emails).where(eq(emails.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getEmails(filters?: { contactId?: string; status?: string; limit?: number }): Promise<Email[]> {
+    let query = db.select().from(emails);
+    const conditions = [];
+    
+    if (filters?.contactId) {
+      conditions.push(eq(emails.contactId, filters.contactId));
+    }
+    
+    if (filters?.status) {
+      conditions.push(eq(emails.status, filters.status));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.limit(filters?.limit || 50);
+  }
+
+  async createEmail(insertEmail: InsertEmail): Promise<Email> {
+    const result = await db.insert(emails).values(insertEmail).returning();
+    return result[0];
+  }
+
+  async updateEmail(id: string, updates: Partial<Email>): Promise<Email | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getEmail(id);
+    const result = await db.update(emails).set(cleaned).where(eq(emails.id, id)).returning();
+    return result[0];
+  }
+
+  // Insight methods
+  async getInsight(id: string): Promise<Insight | undefined> {
+    const result = await db.select().from(insights).where(eq(insights.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getInsights(filters?: { companyId?: string; type?: string; limit?: number }): Promise<Insight[]> {
+    let query = db.select().from(insights);
+    const conditions = [];
+    
+    if (filters?.companyId) {
+      conditions.push(eq(insights.companyId, filters.companyId));
+    }
+    
+    if (filters?.type) {
+      conditions.push(eq(insights.type, filters.type));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.limit(filters?.limit || 20);
+  }
+
+  async createInsight(insertInsight: InsertInsight): Promise<Insight> {
+    const result = await db.insert(insights).values(insertInsight).returning();
+    return result[0];
+  }
+
+  // Persona methods
+  async getPersona(id: string): Promise<Persona | undefined> {
+    const result = await db.select().from(personas).where(eq(personas.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPersonas(createdBy?: string): Promise<Persona[]> {
+    let query = db.select().from(personas);
+    
+    if (createdBy) {
+      query = query.where(eq(personas.createdBy, createdBy)) as any;
+    }
+    
+    return await query;
+  }
+
+  async createPersona(insertPersona: InsertPersona): Promise<Persona> {
+    const result = await db.insert(personas).values(insertPersona).returning();
+    return result[0];
+  }
+
+  async updatePersona(id: string, updates: Partial<Persona>): Promise<Persona | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getPersona(id);
+    const result = await db.update(personas).set(cleaned).where(eq(personas.id, id)).returning();
+    return result[0];
+  }
+
+  // Task methods
+  async getTask(id: string): Promise<Task | undefined> {
+    const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTasks(filters?: { assignedTo?: string; status?: string; priority?: string }): Promise<Task[]> {
+    let query = db.select().from(tasks);
+    const conditions = [];
+    
+    if (filters?.assignedTo) {
+      conditions.push(eq(tasks.assignedTo, filters.assignedTo));
+    }
+    
+    if (filters?.status) {
+      conditions.push(eq(tasks.status, filters.status));
+    }
+    
+    if (filters?.priority) {
+      conditions.push(eq(tasks.priority, filters.priority));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query;
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const result = await db.insert(tasks).values(insertTask).returning();
+    return result[0];
+  }
+
+  async updateTask(id: string, updates: Partial<Task>): Promise<Task | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getTask(id);
+    const result = await db.update(tasks).set(cleaned).where(eq(tasks.id, id)).returning();
+    return result[0];
+  }
+}
+
+export const storage = new DbStorage();
