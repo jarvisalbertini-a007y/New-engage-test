@@ -1,0 +1,644 @@
+You are the lead engineer on our Sales Engagement AI app.
+
+Goal
+- Build the REAL application UI directly from a UX JSON spec (included below, verbatim).
+- No “prototype viewer.” These are production screens with navigation, components, and state.
+- Use Next.js 14 (App Router) + TypeScript + Tailwind + Framer Motion + React Query (or SWR).
+
+Repo Scaffolding (if project not set)
+1) Initialize Next.js 14 w/ App Router + TS + Tailwind
+   - npx create-next-app@latest --ts
+   - Add Tailwind per official docs
+
+2) Install deps
+   - npm i zod zustand framer-motion @tanstack/react-query recharts dompurify
+   - (optional) npm i monaco-editor @monaco-editor/react
+
+Project Structure
+- design/ux_spec.json                <-- write the JSON below (verbatim)
+- lib/uxSpecSchema.ts                <-- Zod schema for validation
+- lib/loadUxSpec.ts                  <-- load & validate spec (server + client helpers)
+- lib/themeVars.ts                   <-- map spec.styles -> CSS custom properties
+- components/ui/*                    <-- reusable UI components
+- app/(routes)/onboarding/page.tsx   <-- guided setup
+- app/(routes)/dashboard/page.tsx    <-- daily workflow (AI bar, KPIs, cards, FAB)
+- app/(routes)/outreach/page.tsx     <-- card stack + inline editor
+- app/(routes)/alerts/page.tsx       <-- realtime banners + daily digest
+- app/(routes)/analytics/page.tsx    <-- deep dashboards
+- app/(routes)/settings/page.tsx     <-- autopilot/collab prefs
+- app/(routes)/mobile/page.tsx       <-- notification/quick-action first
+- app/api/ux-spec/route.ts           <-- GET spec
+- app/api/ux-spec/validate/route.ts  <-- POST spec to validate
+- styles/globals.css                 <-- CSS variables + Tailwind base
+
+Implementation Requirements
+
+0) Tailwind theme + CSS Vars (VERY IMPORTANT)
+- Create styles/globals.css that defines CSS variables from the JSON at runtime.
+- Create lib/themeVars.ts with a function `applyTheme(spec)` that writes CSS vars to :root:
+  -- colors (bg, ink, accent, etc.), radius, shadows, typography scale.
+- In _app (or root layout), load spec (server) and inject a <style> tag or set vars on body using useEffect on client.
+
+Example: tailwind.config.js
+--------------------------------
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        bg: "var(--color-bg)",
+        bgMuted: "var(--color-bgMuted)",
+        ink: "var(--color-ink)",
+        inkMuted: "var(--color-inkMuted)",
+        accent: "var(--color-accent)",
+        accentMuted: "var(--color-accentMuted)",
+        positive: "var(--color-positive)",
+        warning: "var(--color-warning)",
+        danger: "var(--color-danger)",
+        border: "var(--color-border)",
+        card: "var(--color-card)"
+      },
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        pill: "var(--radius-pill)"
+      },
+      boxShadow: {
+        card: "0 4px 16px 0 var(--shadow-card)",
+        elevated: "0 10px 24px 0 var(--shadow-elevated)"
+      },
+      fontFamily: {
+        system: ["Inter", "SF Pro Text", "system-ui", "Arial", "sans-serif"]
+      }
+    }
+  },
+  plugins: []
+}
+
+Example: styles/globals.css
+--------------------------------
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* defaults; will be overwritten at runtime by JSON spec */
+  --color-bg: #ffffff;
+  --color-bgMuted: #f6f7f8;
+  --color-ink: #0b0c0e;
+  --color-inkMuted: #6b7280;
+  --color-accent: #0a84ff;
+  --color-accentMuted: #cfe8ff;
+  --color-positive: #0bb07b;
+  --color-warning: #ffb020;
+  --color-danger: #e5484d;
+  --color-border: #e5e7eb;
+  --color-card: #ffffff;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --shadow-card: rgba(0,0,0,0.06);
+  --shadow-elevated: rgba(0,0,0,0.12);
+
+  /* typography – we’ll use Tailwind sizes but expose CSS vars if needed */
+  --font-display: 36px/44px 700;
+  --font-h1: 28px/36px 700;
+  --font-h2: 22px/30px 600;
+  --font-h3: 18px/26px 600;
+  --font-body: 16px/24px 400;
+  --font-label: 13px/18px 600;
+  --font-mono: 12px/16px 500;
+}
+
+body {
+  @apply bg-bg text-ink font-system;
+}
+
+.utility-card {
+  @apply bg-card rounded-lg shadow-card border border-border;
+}
+
+Example: lib/themeVars.ts
+--------------------------------
+import type { UxSpec } from "./uxSpecSchema";
+
+export function cssVar(name: string, value: string) {
+  return `--${name}: ${value};`;
+}
+
+export function applyTheme(spec: UxSpec): string {
+  const c = spec.styles.colors;
+  const r = spec.styles.radius;
+  const s = spec.styles.shadows;
+
+  const vars = [
+    cssVar("color-bg", c.bg),
+    cssVar("color-bgMuted", c.bgMuted),
+    cssVar("color-ink", c.ink),
+    cssVar("color-inkMuted", c.inkMuted),
+    cssVar("color-accent", c.accent),
+    cssVar("color-accentMuted", c.accentMuted),
+    cssVar("color-positive", c.positive),
+    cssVar("color-warning", c.warning),
+    cssVar("color-danger", c.danger),
+    cssVar("color-border", c.border),
+    cssVar("color-card", c.card),
+    cssVar("shadow-card", spec.styles.colors.cardShadow ?? "rgba(0,0,0,0.06)"),
+    cssVar("shadow-elevated", "rgba(0,0,0,0.12)"),
+    cssVar("radius-sm", `${r.sm}px`),
+    cssVar("radius-md", `${r.md}px`),
+    cssVar("radius-lg", `${r.lg}px`),
+    cssVar("radius-xl", `${r.xl}px`),
+    cssVar("radius-pill", `${r.pill}px`),
+  ];
+
+  return `:root{${vars.join("")}}`;
+}
+
+Example: app/layout.tsx (apply theme at runtime)
+--------------------------------
+import "./globals.css";
+import { applyTheme } from "@/lib/themeVars";
+import { loadUxSpec } from "@/lib/loadUxSpec";
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const spec = await loadUxSpec(); // server-side read & validate
+  const themeCss = applyTheme(spec);
+
+  return (
+    <html lang="en">
+      <head><style dangerouslySetInnerHTML={{ __html: themeCss }} /></head>
+      <body>{children}</body>
+    </html>
+  );
+}
+
+1) UX Spec Validation
+- Create lib/uxSpecSchema.ts with Zod types for spec.styles/colors/typography/radius/shadows/components/pages/frames.
+- Create lib/loadUxSpec.ts that:
+  - reads design/ux_spec.json (fs on server),
+  - validates via Zod,
+  - throws on fatal errors; otherwise returns spec.
+
+2) API
+- app/api/ux-spec/route.ts: GET returns { spec, version: "v1", updatedAt: fs.stat }
+- app/api/ux-spec/validate/route.ts: POST body { spec } -> returns { ok, errors[], warnings[] }
+
+3) Components (production UI)
+Build real, reusable components:
+
+components/ui/Fab.tsx
+- Round FAB with Framer Motion scale.
+- Supports click (open command modal), long-press (quick shortcuts menu).
+
+components/ui/AiCommandBar.tsx
+- Text input + mic icon; placeholder: “Ask me to find, draft, sequence, or analyze…”
+- On submit, route to /outreach and pre-populate a new card stack.
+
+components/ui/Card.tsx
+- Header (title/meta), body preview, footer with actions (Skip / Edit / Approve & Send).
+- Swipe gestures (left/right/up) using Framer Motion.
+
+components/ui/Toast.tsx
+- Variants: info/success/warning; slide-down animations.
+
+components/ui/InlineEditor.tsx
+- Minimal editor with toolbar and coaching sidebar showing scores/tips.
+
+components/ui/KpiCard.tsx, FilterBar.tsx, Charts.tsx
+- KPI tiles, chip filters, Recharts mock bar/line/donut.
+
+4) Routes (REAL SCREENS)
+- /onboarding: 3 steps per spec (Welcome → Persona/Tone → Autopilot Prefs). On finish, route to /dashboard.
+- /dashboard: Top AI command bar, 4 KPI tiles, filter bar, AI cards list, FAB bottom-right.
+- /outreach: “Review AI Drafts” card stack + “Inline Editor”.
+- /alerts: Banner notification + Daily Digest list.
+- /analytics: Filters + 3 charts + AI insights list.
+- /settings: Autopilot + collaboration toggles.
+- /mobile: iPhone-sized responsive layout with FAB + notifications (quick-action first).
+
+5) State & Data
+- Use Zustand for global “autopilot vs copilot” and “user persona/tone” from onboarding.
+- Use React Query to fetch spec and mock data (KPI metrics, alerts).
+
+6) Security & Perf
+- Sanitize any rich text (DOMPurify) before inserting into DOM.
+- Virtualize long lists if needed.
+- Debounce AI command input parsing.
+
+7) Tests
+- Basic render tests per route.
+- Spec validation test (missing required keys fails).
+- Actions: approve/edit update state.
+
+8) Docs
+- Add docs/UI-BUILD.md explaining the JSON→UI mapping and how to extend components.
+
+ACCEPTANCE
+- App boots at /onboarding → then /dashboard.
+- FAB animates; AI command bar works; card stack swipes; toasts show; analytics renders charts.
+- Styles map to JSON variables (colors, radius, shadows, type).
+- No prototype viewer; these are production screens.
+
+NOW WRITE FILES AND CODE.
+- When finished, print:
+  - Routes created
+  - Components built
+  - How to run locally
+  - Where the JSON lives
+  - How to change theme from JSON
+
+----- BEGIN UX JSON (write to design/ux_spec.json, VERBATIM) -----
+{
+  "schema": "ux_spec_v1",
+  "project": {
+    "name": "Sales Engagement AI — Conversational UX",
+    "brand": "Neutral System UI",
+    "viewport": { "desktop": { "w": 1440, "h": 900 }, "mobile": { "w": 390, "h": 844 } }
+  },
+  "styles": {
+    "colors": {
+      "bg": "#FFFFFF",
+      "bgMuted": "#F6F7F8",
+      "ink": "#0B0C0E",
+      "inkMuted": "#6B7280",
+      "accent": "#0A84FF",
+      "accentMuted": "#CFE8FF",
+      "positive": "#0BB07B",
+      "warning": "#FFB020",
+      "danger": "#E5484D",
+      "border": "#E5E7EB",
+      "card": "#FFFFFF",
+      "cardShadow": "rgba(0,0,0,0.06)"
+    },
+    "typography": {
+      "font": "SF Pro / Inter / System",
+      "scale": [
+        { "token": "display", "size": 36, "line": 44, "weight": 700 },
+        { "token": "h1", "size": 28, "line": 36, "weight": 700 },
+        { "token": "h2", "size": 22, "line": 30, "weight": 600 },
+        { "token": "h3", "size": 18, "line": 26, "weight": 600 },
+        { "token": "body", "size": 16, "line": 24, "weight": 400 },
+        { "token": "label", "size": 13, "line": 18, "weight": 600 },
+        { "token": "mono", "size": 12, "line": 16, "weight": 500 }
+      ]
+    },
+    "radius": { "sm": 8, "md": 12, "lg": 16, "xl": 24, "pill": 999 },
+    "shadows": {
+      "card": { "x": 0, "y": 4, "b": 16, "s": 0, "color": "rgba(0,0,0,0.08)" },
+      "elevated": { "x": 0, "y": 10, "b": 24, "s": 0, "color": "rgba(0,0,0,0.12)" }
+    }
+  },
+  "components": [
+    {
+      "id": "cmp.button",
+      "name": "Button",
+      "variants": [
+        { "variant": "primary", "bg": "{colors.accent}", "ink": "#FFFFFF" },
+        { "variant": "secondary", "bg": "{colors.bgMuted}", "ink": "{colors.ink}" },
+        { "variant": "ghost", "bg": "transparent", "ink": "{colors.accent}", "border": "{colors.accent}" }
+      ],
+      "padding": { "x": 16, "y": 12 },
+      "radius": "{styles.radius.md}",
+      "iconGap": 8
+    },
+    {
+      "id": "cmp.fab",
+      "name": "Floating Action Button",
+      "shape": "circle",
+      "size": 64,
+      "bg": "{colors.accent}",
+      "ink": "#FFFFFF",
+      "elevation": "{styles.shadows.elevated}",
+      "microAnim": { "type": "scale", "duration": 180, "ease": "ease-out" },
+      "icon": "mic-plus"
+    },
+    {
+      "id": "cmp.card",
+      "name": "AI Card",
+      "size": { "w": 560, "h": 220 },
+      "bg": "{colors.card}",
+      "radius": "{styles.radius.lg}",
+      "shadow": "{styles.shadows.card}",
+      "header": { "avatar": true, "title": true, "meta": true },
+      "body": { "previewText": true, "badges": true },
+      "footer": {
+        "actions": [
+          { "id": "act.reject", "label": "Skip", "style": "ghost" },
+          { "id": "act.edit", "label": "Edit", "style": "secondary" },
+          { "id": "act.approve", "label": "Approve & Send", "style": "primary" }
+        ]
+      },
+      "microAnim": { "swipe": { "types": ["left","right","up"], "duration": 160 } }
+    },
+    {
+      "id": "cmp.input.ai",
+      "name": "AI Command Bar",
+      "placeholder": "Ask me to find, draft, sequence, or analyze…",
+      "prefixIcon": "sparkles",
+      "suffix": [{ "type": "voice", "icon": "mic" }, { "type": "history", "icon": "clock" }],
+      "radius": "{styles.radius.lg}",
+      "bg": "{colors.bgMuted}"
+    },
+    {
+      "id": "cmp.toast",
+      "name": "Notification Banner",
+      "variants": [
+        { "type": "info", "bg": "{colors.accentMuted}", "ink": "{colors.ink}" },
+        { "type": "success", "bg": "rgba(11,176,123,0.15)", "ink": "{colors.ink}" },
+        { "type": "warning", "bg": "rgba(255,176,32,0.15)", "ink": "{colors.ink}" }
+      ],
+      "microAnim": { "type": "slide-down", "duration": 180 }
+    },
+    {
+      "id": "cmp.editor",
+      "name": "Inline Message Editor",
+      "toolbar": ["tone","length","variables","personalize","analyze"],
+      "coach": {
+        "scores": ["clarity","tone","length","personalization"],
+        "tips": true
+      },
+      "layout": { "gutter": 16, "sidebarCoach": 280 }
+    },
+    {
+      "id": "cmp.kpi",
+      "name": "KPI Card",
+      "size": { "w": 320, "h": 160 },
+      "metrics": ["Replies","Meetings","Pipeline","Revenue"],
+      "sparkline": true
+    },
+    {
+      "id": "cmp.filterbar",
+      "name": "Filter Bar",
+      "chips": ["Persona","Industry","Channel","Signal Type","Date Range"],
+      "search": true
+    }
+  ],
+  "pages": [
+    {
+      "id": "pg.ui-kit",
+      "name": "UI Kit",
+      "frames": [
+        { "id": "ui.colors", "name": "Colors", "size": { "w": 1200, "h": 600 } },
+        { "id": "ui.type", "name": "Typography", "size": { "w": 1200, "h": 600 } },
+        { "id": "ui.components", "name": "Components", "size": { "w": 1600, "h": 1200 } }
+      ]
+    },
+    {
+      "id": "pg.onboarding",
+      "name": "Onboarding",
+      "frames": [
+        {
+          "id": "ob.01",
+          "name": "Welcome",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "text", "style": "display", "text": "Welcome to your AI Sales Copilot" },
+            { "type": "text", "style": "body", "text": "I’ll watch buyer signals and draft outreach. You can approve or let me run." },
+            { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Get Started", "linkTo": "ob.02" }
+          ],
+          "hints": [{ "target": "cmp.fab", "text": "Tap anytime to speak/type commands.", "microAnim": "fade" }]
+        },
+        {
+          "id": "ob.02",
+          "name": "Persona & Tone",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "form", "fields": [
+              { "label": "Primary Persona", "control": "dropdown", "options": ["CFO","CTO","VP Sales","VP RevOps"] },
+              { "label": "Brand Tone", "control": "segmented", "options": ["Concise","Consultative","Challenger"] }
+            ]},
+            { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Continue", "linkTo": "ob.03" }
+          ]
+        },
+        {
+          "id": "ob.03",
+          "name": "Autopilot Prefs",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "toggle", "label": "Enable Autopilot for low-risk sequences (default ON)", "value": true },
+            { "type": "toggle", "label": "Require review for Tier-1 accounts", "value": true },
+            { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Finish", "linkTo": "dw.home.desktop" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.daily",
+      "name": "Daily Workflow",
+      "frames": [
+        {
+          "id": "dw.home.desktop",
+          "name": "Home — Desktop",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "component", "ref": "cmp.input.ai", "position": { "x": 80, "y": 48, "w": 960 } },
+            { "type": "grid", "gap": 16, "cards": [
+              { "type": "component", "ref": "cmp.kpi", "metric": "Replies" },
+              { "type": "component", "ref": "cmp.kpi", "metric": "Meetings" },
+              { "type": "component", "ref": "cmp.kpi", "metric": "Pipeline" },
+              { "type": "component", "ref": "cmp.kpi", "metric": "Revenue" }
+            ]},
+            { "type": "component", "ref": "cmp.filterbar", "position": { "x": 80, "y": 280, "w": 1280 } },
+            { "type": "list", "name": "AI Cards", "items": [
+              { "type": "component", "ref": "cmp.card", "data": { "title": "Draft to CFO at Acme", "meta": "Pricing page visit · High intent", "preview": "Saw your pricing page—quick idea on consolidating tools..." }, "actions": { "approve.linkTo": "dw.toast.sent" , "edit.linkTo": "or.editor.desktop" } },
+              { "type": "component", "ref": "cmp.card", "data": { "title": "Follow-up to VP Sales at Hooli", "meta": "Job change · Medium intent", "preview": "Congrats on the new role—here’s a 30-day win..." }, "actions": { "approve.linkTo": "dw.toast.sent" , "edit.linkTo": "or.editor.desktop" } }
+            ]},
+            { "type": "component", "ref": "cmp.fab", "position": { "x": 1320, "y": 760 } }
+          ],
+          "prototype": [
+            { "event": "fab.tap", "action": "open", "linkTo": "dw.cmd.desktop" }
+          ]
+        },
+        {
+          "id": "dw.cmd.desktop",
+          "name": "Command — Desktop",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "overlay": {
+            "type": "sheet",
+            "from": "bottom",
+            "content": [
+              { "type": "text", "style": "h2", "text": "What do you want to do?" },
+              { "type": "chips", "items": ["Draft 3-step sequence","Find hot accounts","Analyze performance"] },
+              { "type": "textarea", "placeholder": "e.g., Draft a 3-step sequence for CFOs at funded accounts" },
+              { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Generate", "linkTo": "or.cards.desktop" }
+            ],
+            "microAnim": "scale"
+          }
+        },
+        {
+          "id": "dw.toast.sent",
+          "name": "Toast — Sent",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 100 },
+          "content": [
+            { "type": "component", "ref": "cmp.toast", "variant": "success", "text": "Approved & sent via Outreach." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.outreach",
+      "name": "Outreach Review",
+      "frames": [
+        {
+          "id": "or.cards.desktop",
+          "name": "Card Review — Desktop",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "text", "style": "h2", "text": "Review AI Drafts" },
+            { "type": "stack", "layout": "overlap", "items": [
+              { "type": "component", "ref": "cmp.card", "data": { "title": "Step 1 Email", "meta": "CFO · Funding signal", "preview": "Congrats on the Series B—here’s how teams cut tools by 30%…" }, "actions": { "edit.linkTo": "or.editor.desktop", "approve.linkTo": "dw.toast.sent" } },
+              { "type": "component", "ref": "cmp.card", "data": { "title": "Step 2 LinkedIn", "meta": "Social touch", "preview": "Saw your VP Ops note on tool bloat—quick 20-sec view…" }, "actions": { "edit.linkTo": "or.editor.desktop", "approve.linkTo": "dw.toast.sent" } }
+            ]},
+            { "type": "component", "ref": "cmp.fab", "position": { "x": 1320, "y": 760 } }
+          ]
+        },
+        {
+          "id": "or.editor.desktop",
+          "name": "Inline Editor — Desktop",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "component", "ref": "cmp.editor", "coach": { "scores": { "clarity": 0.92, "tone": 0.88, "length": 0.74, "personalization": 0.81 }, "tips": ["Shorten first sentence","Add 1 persona-specific line","Avoid spam phrase: 'free trial'"] } },
+            { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Approve & Send", "linkTo": "dw.toast.sent" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.alerts",
+      "name": "Signal Alerts",
+      "frames": [
+        {
+          "id": "al.banner.desktop",
+          "name": "Real-time Banner",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 120 },
+          "content": [
+            { "type": "component", "ref": "cmp.toast", "variant": "info", "text": "CFO at Acme viewed pricing · High intent · Suggest: send step 1 now", "actions": [
+              { "label": "Approve", "linkTo": "dw.toast.sent" },
+              { "label": "Snooze", "linkTo": "dw.home.desktop" }
+            ]}
+          ]
+        },
+        {
+          "id": "al.digest.desktop",
+          "name": "Daily Digest",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "text", "style": "h2", "text": "Today’s AI Digest" },
+            { "type": "list", "items": [
+              { "type": "row", "title": "5 hot accounts surged intent", "meta": "2 pricing page, 1 job change, 2 competitor switch" },
+              { "type": "row", "title": "3 sequences ready for approval", "meta": "Autopilot ON for long-tail accounts" }
+            ]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.analytics",
+      "name": "Analytics",
+      "frames": [
+        {
+          "id": "an.dashboard.desktop",
+          "name": "Analytics — Desktop",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "text", "style": "h2", "text": "Performance" },
+            { "type": "component", "ref": "cmp.filterbar" },
+            { "type": "grid", "gap": 16, "cards": [
+              { "type": "chart", "kind": "bar", "title": "Replies by Persona", "dataKey": "personaReplies" },
+              { "type": "chart", "kind": "line", "title": "Meetings Over Time", "dataKey": "meetingsTime" },
+              { "type": "chart", "kind": "donut", "title": "Top Signals Driving Replies", "dataKey": "signalsShare" }
+            ]},
+            { "type": "panel", "title": "AI Insights", "items": [
+              "‘ROI’ subject lines +25% replies with CFOs",
+              "Signals: Job change + Pricing page = highest booking odds this week"
+            ]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.integrations",
+      "name": "Integrations (Contextual)",
+      "frames": [
+        {
+          "id": "ig.context.desktop",
+          "name": "Context Actions",
+          "platform": "desktop",
+          "size": { "w": 1440, "h": 900 },
+          "content": [
+            { "type": "text", "style": "h2", "text": "Contextual Actions" },
+            { "type": "list", "items": [
+              { "type": "row", "title": "Push to Salesforce", "meta": "Available after approve/send" },
+              { "type": "row", "title": "Post to Slack #hot-leads", "meta": "Appears on high-intent events" }
+            ]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pg.mobile",
+      "name": "Mobile Quick Actions",
+      "frames": [
+        {
+          "id": "mb.home",
+          "name": "Home — Mobile",
+          "platform": "mobile",
+          "size": { "w": 390, "h": 844 },
+          "content": [
+            { "type": "component", "ref": "cmp.input.ai", "position": { "x": 16, "y": 24, "w": 358 } },
+            { "type": "list", "items": [
+              { "type": "component", "ref": "cmp.card", "size": { "w": 358, "h": 200 } },
+              { "type": "component", "ref": "cmp.card", "size": { "w": 358, "h": 200 } }
+            ]},
+            { "type": "component", "ref": "cmp.fab", "position": { "x": 310, "y": 740 } }
+          ],
+          "prototype": [{ "event": "fab.tap", "action": "open", "linkTo": "mb.cmd" }]
+        },
+        {
+          "id": "mb.cmd",
+          "name": "Command — Mobile",
+          "platform": "mobile",
+          "size": { "w": 390, "h": 844 },
+          "overlay": {
+            "type": "sheet",
+            "from": "bottom",
+            "content": [
+              { "type": "chips", "items": ["Approve last 3 drafts","Call hot lead","Summarize today"] },
+              { "type": "textarea", "placeholder": "Say or type your command…" },
+              { "type": "component", "ref": "cmp.button", "variant": "primary", "label": "Run", "linkTo": "mb.toast" }
+            ]
+          }
+        },
+        {
+          "id": "mb.toast",
+          "name": "Toast — Mobile",
+          "platform": "mobile",
+          "size": { "w": 390, "h": 100 },
+          "content": [
+            { "type": "component", "ref": "cmp.toast", "variant": "success", "text": "Approved & sent." }
+          ]
+        }
+      ]
+    }
+  ]
+}
+----- END UX JSON -----
