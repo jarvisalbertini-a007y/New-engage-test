@@ -783,6 +783,314 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====== Magic Setup & Platform Config ======
+  app.post("/api/magic-setup", async (req, res) => {
+    try {
+      const { linkedinUrl } = req.body;
+      
+      // Parse LinkedIn data (mock implementation)
+      const linkedinProfile = {
+        name: "John Smith",
+        title: "VP of Sales at TechCorp",
+        company: "TechCorp Solutions",
+        industry: "SaaS", 
+        companySize: "50-200",
+        location: "San Francisco, CA",
+        summary: "Building enterprise sales teams that consistently exceed quota",
+        experience: [
+          { role: "VP Sales", company: "TechCorp", duration: "3 years" },
+          { role: "Sales Director", company: "DataFlow", duration: "2 years" }
+        ]
+      };
+
+      // Auto-configure platform settings
+      const config = await storage.createPlatformConfig({
+        userId: "demo-user",
+        linkedinProfile,
+        linkedinUrl,
+        industryPlaybook: linkedinProfile.industry === "SaaS" ? "saas_enterprise" : "generic_b2b",
+        emailTemplates: {
+          coldEmail: generateEmailTemplate(linkedinProfile.industry),
+          followUp: generateFollowUpTemplate(linkedinProfile.industry),
+          meeting: generateMeetingTemplate(linkedinProfile.industry)
+        },
+        sequences: {
+          coldOutreach: generateMagicSetupSequenceSteps(linkedinProfile.industry),
+          nurture: generateNurtureSteps(linkedinProfile.industry)
+        },
+        emailDomain: linkedinProfile.company.toLowerCase().replace(/\s+/g, '') + '.com',
+        dailySendLimit: 50,
+        warmupEnabled: true,
+        autopilotEnabled: false,
+        autoFollowUp: true,
+        smartScheduling: true,
+        leadScoringRules: generateLeadScoringRules(linkedinProfile.industry),
+        qualificationCriteria: generateQualificationCriteria(linkedinProfile.industry)
+      });
+
+      // Create default playbooks based on industry
+      await createDefaultPlaybooks(linkedinProfile.industry);
+      
+      // Create initial workflow triggers
+      await createDefaultWorkflowTriggers();
+
+      res.json({ success: true, config, profile: linkedinProfile });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/platform-config", async (req, res) => {
+    try {
+      const userId = "demo-user"; // Would come from session
+      const config = await storage.getPlatformConfig(userId);
+      res.json(config || null);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.patch("/api/platform-config", async (req, res) => {
+    try {
+      const userId = "demo-user"; 
+      const updates = req.body;
+      const config = await storage.updatePlatformConfig(userId, updates);
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // ====== Workflow Triggers ======
+  app.get("/api/workflow-triggers", async (req, res) => {
+    try {
+      const { isActive, triggerType } = req.query;
+      const filters: any = {};
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+      if (triggerType) filters.triggerType = triggerType as string;
+      
+      const triggers = await storage.getWorkflowTriggers(filters);
+      res.json(triggers);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/workflow-triggers", async (req, res) => {
+    try {
+      const trigger = await storage.createWorkflowTrigger(req.body);
+      res.json(trigger);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.patch("/api/workflow-triggers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const trigger = await storage.updateWorkflowTrigger(id, req.body);
+      if (!trigger) {
+        return res.status(404).json({ error: 'Trigger not found' });
+      }
+      res.json(trigger);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.delete("/api/workflow-triggers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteWorkflowTrigger(id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Trigger not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // ====== Playbooks ======
+  app.get("/api/playbooks", async (req, res) => {
+    try {
+      const { industry, isTemplate } = req.query;
+      const filters: any = {};
+      if (industry) filters.industry = industry as string;
+      if (isTemplate !== undefined) filters.isTemplate = isTemplate === 'true';
+      
+      const playbooks = await storage.getPlaybooks(filters);
+      res.json(playbooks);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/playbooks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const playbook = await storage.getPlaybook(id);
+      if (!playbook) {
+        return res.status(404).json({ error: 'Playbook not found' });
+      }
+      res.json(playbook);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/playbooks", async (req, res) => {
+    try {
+      const playbook = await storage.createPlaybook(req.body);
+      res.json(playbook);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/playbooks/:id/apply", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const playbook = await storage.getPlaybook(id);
+      if (!playbook) {
+        return res.status(404).json({ error: 'Playbook not found' });
+      }
+      
+      // Apply the playbook - create sequences, templates, etc.
+      const results = await applyPlaybook(playbook);
+      res.json({ success: true, applied: results });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+// Helper functions for Magic Setup
+function generateEmailTemplate(industry: string) {
+  const templates: any = {
+    SaaS: "Hi {{firstName}},\n\nI noticed {{company}} is scaling rapidly. Many SaaS companies at your stage struggle with {{painPoint}}.\n\nWe've helped similar companies achieve {{outcome}}.\n\nWorth a quick chat?\n\nBest,\n{{senderName}}",
+    Fintech: "Hi {{firstName}},\n\nWith increasing regulatory requirements, I imagine {{company}} faces challenges around {{painPoint}}.\n\nOur platform helps fintech companies like yours {{outcome}}.\n\nOpen for a brief call next week?\n\nBest,\n{{senderName}}",
+    default: "Hi {{firstName}},\n\nI noticed {{company}} is {{trigger}}. This often means {{painPoint}}.\n\nWe've helped companies in {{industry}} achieve {{outcome}}.\n\nWould you be open to a quick conversation?\n\nBest,\n{{senderName}}"
+  };
+  return templates[industry] || templates.default;
+}
+
+function generateFollowUpTemplate(industry: string) {
+  return "Hi {{firstName}},\n\nJust following up on my previous message. I know you're busy, so I'll keep this brief.\n\n{{valueProps}}\n\nIf this isn't a priority right now, I'd appreciate you letting me know.\n\nBest,\n{{senderName}}";
+}
+
+function generateMeetingTemplate(industry: string) {
+  return "Hi {{firstName}},\n\nThanks for your interest! I have availability for a 30-minute call on:\n\n- {{slot1}}\n- {{slot2}}\n- {{slot3}}\n\nWhich works best for you? Here's my calendar link if easier: {{calendarLink}}\n\nLooking forward to our conversation!\n\nBest,\n{{senderName}}";
+}
+
+function generateMagicSetupSequenceSteps(industry: string) {
+  return [
+    { day: 0, type: "email", template: "coldEmail" },
+    { day: 3, type: "linkedin", action: "connect" },
+    { day: 5, type: "email", template: "followUp" },
+    { day: 10, type: "call", script: "discovery" },
+    { day: 14, type: "email", template: "finalFollowUp" }
+  ];
+}
+
+function generateNurtureSteps(industry: string) {
+  return [
+    { day: 0, type: "email", template: "valueContent" },
+    { day: 7, type: "linkedin", action: "share_content" },
+    { day: 14, type: "email", template: "caseStudy" },
+    { day: 30, type: "email", template: "checkIn" }
+  ];
+}
+
+function generateLeadScoringRules(industry: string) {
+  return {
+    companySize: { weight: 25, ideal: ["50-200", "200-500"] },
+    title: { weight: 30, ideal: ["VP", "Director", "C-Level"] },
+    engagement: { weight: 20, signals: ["email_opened", "link_clicked", "replied"] },
+    intent: { weight: 25, signals: ["pricing_page_visit", "demo_request", "content_download"] }
+  };
+}
+
+function generateQualificationCriteria(industry: string) {
+  return {
+    budget: { required: true, minimum: 10000 },
+    authority: { required: true, titles: ["VP", "Director", "C-Level"] },
+    need: { required: true, painPoints: ["scaling", "automation", "efficiency"] },
+    timeline: { required: false, ideal: "3-6 months" }
+  };
+}
+
+async function createDefaultPlaybooks(industry: string) {
+  const playbooks = [
+    {
+      name: `${industry} Cold Outreach`,
+      industry,
+      description: `Proven cold outreach playbook for ${industry} companies`,
+      targetAudience: { titles: ["VP Sales", "CRO", "Head of Sales"], companySize: ["50-200", "200-500"] },
+      sequences: generateMagicSetupSequenceSteps(industry),
+      emailTemplates: { cold: generateEmailTemplate(industry), followUp: generateFollowUpTemplate(industry) },
+      successMetrics: { openRate: 35, replyRate: 8, meetingRate: 3 },
+      isTemplate: true
+    },
+    {
+      name: `${industry} Nurture Campaign`,
+      industry,
+      description: `Long-term nurture sequence for ${industry} prospects`,
+      targetAudience: { titles: ["Director", "Manager"], companySize: ["10-50", "50-200"] },
+      sequences: generateNurtureSteps(industry),
+      emailTemplates: { nurture: generateFollowUpTemplate(industry) },
+      successMetrics: { openRate: 45, clickRate: 12, conversionRate: 2 },
+      isTemplate: true
+    }
+  ];
+
+  for (const playbook of playbooks) {
+    await storage.createPlaybook(playbook);
+  }
+}
+
+async function createDefaultWorkflowTriggers() {
+  const triggers = [
+    {
+      name: "High-Intent Visitor Alert",
+      description: "Trigger when visitor shows high buying intent",
+      triggerType: "page_visit",
+      triggerConditions: { pages: ["pricing", "demo"], timeOnSite: 300 },
+      actions: [{ type: "notify_rep" }, { type: "create_task" }, { type: "send_email" }],
+      isActive: true
+    },
+    {
+      name: "Email Engagement Follow-up",
+      description: "Auto follow-up when prospect engages with email",
+      triggerType: "email_opened",
+      triggerConditions: { openCount: 3, linkClicked: true },
+      actions: [{ type: "send_followup" }, { type: "update_lead_score" }],
+      isActive: true
+    },
+    {
+      name: "Lead Score Threshold",
+      description: "Alert when lead reaches qualification threshold",
+      triggerType: "lead_score",
+      triggerConditions: { scoreThreshold: 75 },
+      actions: [{ type: "assign_to_ae" }, { type: "create_opportunity" }],
+      isActive: true
+    }
+  ];
+
+  for (const trigger of triggers) {
+    await storage.createWorkflowTrigger(trigger);
+  }
+}
+
+async function applyPlaybook(playbook: any) {
+  // Implementation to apply playbook settings
+  // This would create sequences, templates, scripts, etc.
+  return {
+    sequencesCreated: playbook.sequences?.length || 0,
+    templatesCreated: Object.keys(playbook.emailTemplates || {}).length,
+    scriptsCreated: Object.keys(playbook.callScripts || {}).length
+  };
 }

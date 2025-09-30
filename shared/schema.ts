@@ -209,6 +209,69 @@ export const aiAgents = pgTable("ai_agents", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Platform Configuration for Magic Setup
+export const platformConfigs = pgTable("platform_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  // LinkedIn Import Data
+  linkedinProfile: jsonb("linkedin_profile"), // Parsed LinkedIn data
+  linkedinUrl: text("linkedin_url"),
+  
+  // Auto-configured Settings
+  industryPlaybook: text("industry_playbook"), // SaaS, Enterprise, Ecommerce, etc.
+  emailTemplates: jsonb("email_templates"), // Auto-generated templates
+  sequences: jsonb("sequences"), // Pre-configured sequences
+  
+  // Domain & Email Settings  
+  emailDomain: text("email_domain"),
+  dailySendLimit: integer("daily_send_limit").default(50),
+  warmupEnabled: boolean("warmup_enabled").default(true),
+  
+  // Automation Settings
+  autopilotEnabled: boolean("autopilot_enabled").default(false),
+  autoFollowUp: boolean("auto_follow_up").default(true),
+  smartScheduling: boolean("smart_scheduling").default(true),
+  
+  // Lead Scoring Configuration
+  leadScoringRules: jsonb("lead_scoring_rules"),
+  qualificationCriteria: jsonb("qualification_criteria"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Workflow Automation Rules
+export const workflowTriggers = pgTable("workflow_triggers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: text("trigger_type").notNull(), // email_opened, page_visit, form_submission, time_based, lead_score
+  triggerConditions: jsonb("trigger_conditions").notNull(),
+  actions: jsonb("actions").notNull(), // Array of actions to take
+  isActive: boolean("is_active").default(true),
+  executionCount: integer("execution_count").default(0),
+  lastExecuted: timestamp("last_executed"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Industry Playbooks
+export const playbooks = pgTable("playbooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  industry: text("industry").notNull(),
+  description: text("description"),
+  targetAudience: jsonb("target_audience"), // ICP definition
+  sequences: jsonb("sequences"), // Pre-built sequences
+  emailTemplates: jsonb("email_templates"),
+  callScripts: jsonb("call_scripts"),
+  objectionHandling: jsonb("objection_handling"),
+  successMetrics: jsonb("success_metrics"),
+  isTemplate: boolean("is_template").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const onboardingProfiles = pgTable("onboarding_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").unique(),  // Removed foreign key for demo purposes
@@ -305,6 +368,23 @@ export const insertOnboardingProfileSchema = createInsertSchema(onboardingProfil
   completedAt: true,
 });
 
+export const insertPlatformConfigSchema = createInsertSchema(platformConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkflowTriggerSchema = createInsertSchema(workflowTriggers).omit({
+  id: true,
+  createdAt: true,
+  lastExecuted: true,
+});
+
+export const insertPlaybookSchema = createInsertSchema(playbooks).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -347,3 +427,12 @@ export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 
 export type OnboardingProfile = typeof onboardingProfiles.$inferSelect;
 export type InsertOnboardingProfile = z.infer<typeof insertOnboardingProfileSchema>;
+
+export type PlatformConfig = typeof platformConfigs.$inferSelect;
+export type InsertPlatformConfig = z.infer<typeof insertPlatformConfigSchema>;
+
+export type WorkflowTrigger = typeof workflowTriggers.$inferSelect;
+export type InsertWorkflowTrigger = z.infer<typeof insertWorkflowTriggerSchema>;
+
+export type Playbook = typeof playbooks.$inferSelect;
+export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;

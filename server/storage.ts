@@ -13,7 +13,10 @@ import {
   type Voicemail, type InsertVoicemail,
   type AiAgent, type InsertAiAgent,
   type OnboardingProfile, type InsertOnboardingProfile,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles
+  type PlatformConfig, type InsertPlatformConfig,
+  type WorkflowTrigger, type InsertWorkflowTrigger,
+  type Playbook, type InsertPlaybook,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -114,6 +117,24 @@ export interface IStorage {
   getOnboardingProfile(userId: string): Promise<OnboardingProfile | undefined>;
   createOnboardingProfile(profile: InsertOnboardingProfile): Promise<OnboardingProfile>;
   updateOnboardingProfile(userId: string, updates: Partial<OnboardingProfile>): Promise<OnboardingProfile | undefined>;
+  
+  // Platform Config
+  getPlatformConfig(userId: string): Promise<PlatformConfig | undefined>;
+  createPlatformConfig(config: InsertPlatformConfig): Promise<PlatformConfig>;
+  updatePlatformConfig(userId: string, updates: Partial<PlatformConfig>): Promise<PlatformConfig | undefined>;
+  
+  // Workflow Triggers
+  getWorkflowTrigger(id: string): Promise<WorkflowTrigger | undefined>;
+  getWorkflowTriggers(filters?: { isActive?: boolean; triggerType?: string }): Promise<WorkflowTrigger[]>;
+  createWorkflowTrigger(trigger: InsertWorkflowTrigger): Promise<WorkflowTrigger>;
+  updateWorkflowTrigger(id: string, updates: Partial<WorkflowTrigger>): Promise<WorkflowTrigger | undefined>;
+  deleteWorkflowTrigger(id: string): Promise<boolean>;
+  
+  // Playbooks
+  getPlaybook(id: string): Promise<Playbook | undefined>;
+  getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]>;
+  createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
+  updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -679,6 +700,57 @@ export class MemStorage implements IStorage {
   async updateOnboardingProfile(userId: string, updates: Partial<OnboardingProfile>): Promise<OnboardingProfile | undefined> {
     return undefined;
   }
+  
+  // Platform Config stubs
+  async getPlatformConfig(userId: string): Promise<PlatformConfig | undefined> {
+    return undefined;
+  }
+
+  async createPlatformConfig(config: InsertPlatformConfig): Promise<PlatformConfig> {
+    return { ...config, id: randomUUID(), createdAt: new Date(), updatedAt: new Date() } as PlatformConfig;
+  }
+
+  async updatePlatformConfig(userId: string, updates: Partial<PlatformConfig>): Promise<PlatformConfig | undefined> {
+    return undefined;
+  }
+  
+  // Workflow Trigger stubs
+  async getWorkflowTrigger(id: string): Promise<WorkflowTrigger | undefined> {
+    return undefined;
+  }
+
+  async getWorkflowTriggers(filters?: { isActive?: boolean; triggerType?: string }): Promise<WorkflowTrigger[]> {
+    return [];
+  }
+
+  async createWorkflowTrigger(trigger: InsertWorkflowTrigger): Promise<WorkflowTrigger> {
+    return { ...trigger, id: randomUUID(), createdAt: new Date(), executionCount: 0, lastExecuted: null } as WorkflowTrigger;
+  }
+
+  async updateWorkflowTrigger(id: string, updates: Partial<WorkflowTrigger>): Promise<WorkflowTrigger | undefined> {
+    return undefined;
+  }
+
+  async deleteWorkflowTrigger(id: string): Promise<boolean> {
+    return false;
+  }
+  
+  // Playbook stubs  
+  async getPlaybook(id: string): Promise<Playbook | undefined> {
+    return undefined;
+  }
+
+  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]> {
+    return [];
+  }
+
+  async createPlaybook(playbook: InsertPlaybook): Promise<Playbook> {
+    return { ...playbook, id: randomUUID(), createdAt: new Date() } as Playbook;
+  }
+
+  async updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined> {
+    return undefined;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1101,6 +1173,93 @@ export class DbStorage implements IStorage {
     const cleaned = cleanPartial(updates);
     if (Object.keys(cleaned).length === 0) return this.getOnboardingProfile(userId);
     const result = await db.update(onboardingProfiles).set(cleaned).where(eq(onboardingProfiles.userId, userId)).returning();
+    return result[0];
+  }
+  
+  // Platform Config methods
+  async getPlatformConfig(userId: string): Promise<PlatformConfig | undefined> {
+    const result = await db.select().from(platformConfigs).where(eq(platformConfigs.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async createPlatformConfig(config: InsertPlatformConfig): Promise<PlatformConfig> {
+    const result = await db.insert(platformConfigs).values(config).returning();
+    return result[0];
+  }
+
+  async updatePlatformConfig(userId: string, updates: Partial<PlatformConfig>): Promise<PlatformConfig | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getPlatformConfig(userId);
+    const result = await db.update(platformConfigs).set(cleaned).where(eq(platformConfigs.userId, userId)).returning();
+    return result[0];
+  }
+  
+  // Workflow Trigger methods
+  async getWorkflowTrigger(id: string): Promise<WorkflowTrigger | undefined> {
+    const result = await db.select().from(workflowTriggers).where(eq(workflowTriggers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getWorkflowTriggers(filters?: { isActive?: boolean; triggerType?: string }): Promise<WorkflowTrigger[]> {
+    let query = db.select().from(workflowTriggers);
+    
+    const conditions: any[] = [];
+    if (filters?.isActive !== undefined) conditions.push(eq(workflowTriggers.isActive, filters.isActive));
+    if (filters?.triggerType) conditions.push(eq(workflowTriggers.triggerType, filters.triggerType));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createWorkflowTrigger(trigger: InsertWorkflowTrigger): Promise<WorkflowTrigger> {
+    const result = await db.insert(workflowTriggers).values(trigger).returning();
+    return result[0];
+  }
+
+  async updateWorkflowTrigger(id: string, updates: Partial<WorkflowTrigger>): Promise<WorkflowTrigger | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getWorkflowTrigger(id);
+    const result = await db.update(workflowTriggers).set(cleaned).where(eq(workflowTriggers.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteWorkflowTrigger(id: string): Promise<boolean> {
+    const result = await db.delete(workflowTriggers).where(eq(workflowTriggers.id, id)).returning();
+    return result.length > 0;
+  }
+  
+  // Playbook methods  
+  async getPlaybook(id: string): Promise<Playbook | undefined> {
+    const result = await db.select().from(playbooks).where(eq(playbooks.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]> {
+    let query = db.select().from(playbooks);
+    
+    const conditions: any[] = [];
+    if (filters?.industry) conditions.push(eq(playbooks.industry, filters.industry));
+    if (filters?.isTemplate !== undefined) conditions.push(eq(playbooks.isTemplate, filters.isTemplate));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createPlaybook(playbook: InsertPlaybook): Promise<Playbook> {
+    const result = await db.insert(playbooks).values(playbook).returning();
+    return result[0];
+  }
+
+  async updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getPlaybook(id);
+    const result = await db.update(playbooks).set(cleaned).where(eq(playbooks.id, id)).returning();
     return result[0];
   }
 }
