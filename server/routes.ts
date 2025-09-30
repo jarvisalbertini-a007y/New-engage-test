@@ -524,6 +524,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset onboarding for demo/testing purposes
+  app.delete("/api/onboarding/reset", async (req, res) => {
+    try {
+      const { onboardingProfiles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const userId = (req as any).session?.userId || "demo-user";
+      // Delete the onboarding profile to allow re-running onboarding
+      await db.delete(onboardingProfiles).where(eq(onboardingProfiles.userId, userId));
+      res.json({ success: true, message: "Onboarding reset" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   app.post("/api/onboarding/profile", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
@@ -543,8 +558,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/onboarding/profile", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
-      const updated = await storage.updateOnboardingProfile(userId, req.body);
-      res.json(updated);
+      const updates = { ...req.body };
+      // Don't modify completedAt here - let the database handle it
+      const updated = await storage.updateOnboardingProfile(userId, updates);
+      res.json(updated || {});
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }

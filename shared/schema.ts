@@ -211,7 +211,7 @@ export const aiAgents = pgTable("ai_agents", {
 
 export const onboardingProfiles = pgTable("onboarding_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).unique(),
+  userId: varchar("user_id").unique(),  // Removed foreign key for demo purposes
   companyName: text("company_name"),
   companyWebsite: text("company_website"),
   industry: text("industry"),

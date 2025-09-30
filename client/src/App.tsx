@@ -34,8 +34,8 @@ function Router() {
   
   useEffect(() => {
     if (!isLoading) {
-      // Redirect to onboarding if not completed and not on onboarding page
-      if (!profile?.isComplete && location !== "/onboarding") {
+      // Redirect to onboarding if profile doesn't exist or not completed
+      if ((!profile || !profile.isComplete) && location !== "/onboarding") {
         setLocation("/onboarding");
       }
     }

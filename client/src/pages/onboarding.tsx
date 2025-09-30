@@ -112,7 +112,6 @@ export default function Onboarding() {
       updateProfileMutation.mutate({
         onboardingStep: 5,
         isComplete: true,
-        completedAt: new Date().toISOString(),
       });
     },
   });
@@ -161,7 +160,6 @@ export default function Onboarding() {
     updateProfileMutation.mutate({
       onboardingStep: 5,
       isComplete: true,
-      completedAt: new Date().toISOString(),
     });
   };
 
@@ -510,7 +508,7 @@ export default function Onboarding() {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-2">
                             <Users className="h-5 w-5 text-primary" />
-                            <Badge variant="secondary">{aiConfig.personas.length}</Badge>
+                            <Badge variant="secondary">{aiConfig?.personas?.length || 0}</Badge>
                           </div>
                           <p className="font-medium">Buyer Personas</p>
                           <p className="text-sm text-muted-foreground">Target profiles created</p>
@@ -521,7 +519,7 @@ export default function Onboarding() {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-2">
                             <Zap className="h-5 w-5 text-primary" />
-                            <Badge variant="secondary">{aiConfig.sequences.length}</Badge>
+                            <Badge variant="secondary">{aiConfig?.sequences?.length || 0}</Badge>
                           </div>
                           <p className="font-medium">Sequences</p>
                           <p className="text-sm text-muted-foreground">Automated workflows</p>
@@ -532,7 +530,7 @@ export default function Onboarding() {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-2">
                             <Bot className="h-5 w-5 text-primary" />
-                            <Badge variant="secondary">{aiConfig.agents.length}</Badge>
+                            <Badge variant="secondary">{aiConfig?.agents?.length || 0}</Badge>
                           </div>
                           <p className="font-medium">AI Agents</p>
                           <p className="text-sm text-muted-foreground">Autonomous workers</p>
@@ -543,7 +541,7 @@ export default function Onboarding() {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-2">
                             <Settings className="h-5 w-5 text-primary" />
-                            <Badge variant="secondary">{aiConfig.templates.length}</Badge>
+                            <Badge variant="secondary">{aiConfig?.templates?.length || 0}</Badge>
                           </div>
                           <p className="font-medium">Templates</p>
                           <p className="text-sm text-muted-foreground">Email templates ready</p>
