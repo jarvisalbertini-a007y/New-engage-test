@@ -9,6 +9,7 @@ import { enrichCompanyData, getCompanyVisitorHistory } from "./services/ipIntell
 import { discoverInsights, generateInsightRecommendations, scoreInsightRelevance } from "./services/insightsEngine";
 import { generatePersonalizedEmail, categorizeEmailResponse } from "./services/openai";
 import { initiateCall, getCallAnalytics, scheduleCallCampaign, getOrGenerateCallScript } from "./services/cloudDialer";
+import { canSendEmail, incrementSendCount, getWarmupSchedule, checkDomainReputation, validateEmailContent, getSendingRecommendations } from "./services/emailLimits";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard & Analytics Routes
@@ -194,6 +195,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { emailContent } = req.body;
       const categorization = await categorizeEmailResponse(emailContent);
       res.json(categorization);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  // Email Limits & Reputation Routes
+  app.get("/api/emails/limits", async (req, res) => {
+    try {
+      const userId = "demo-user"; // Would come from session
+      const limits = await canSendEmail(userId);
+      const warmup = await getWarmupSchedule(userId);
+      const recommendations = await getSendingRecommendations(userId);
+      
+      res.json({
+        ...limits,
+        warmup,
+        recommendations
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  app.post("/api/emails/check-reputation", async (req, res) => {
+    try {
+      const { domain } = req.body;
+      const reputation = await checkDomainReputation(domain);
+      res.json(reputation);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  app.post("/api/emails/validate", async (req, res) => {
+    try {
+      const { content } = req.body;
+      const validation = validateEmailContent(content);
+      res.json(validation);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  app.post("/api/emails/send", async (req, res) => {
+    try {
+      const userId = "demo-user"; // Would come from session
+      
+      // Check if user can send email
+      const { allowed, remaining, limit } = await canSendEmail(userId);
+      if (!allowed) {
+        return res.status(429).json({ 
+          error: "Daily send limit reached",
+          limit,
+          remaining: 0 
+        });
+      }
+      
+      // Validate email content
+      const { content, subject } = req.body;
+      const validation = validateEmailContent(content);
+      if (!validation.isValid) {
+        return res.status(400).json({
+          error: "Email content has spam triggers",
+          issues: validation.issues,
+          spamScore: validation.spamScore
+        });
+      }
+      
+      // Create and "send" the email
+      const emailData = {
+        ...req.body,
+        status: "sent",
+        sentAt: new Date()
+      };
+      
+      const email = await storage.createEmail(emailData);
+      
+      // Increment send counter
+      incrementSendCount(userId);
+      
+      res.json({
+        success: true,
+        email,
+        remaining: remaining - 1,
+        limit
+      });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }

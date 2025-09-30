@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { EmailLimitsBadge, EmailReputationIndicator } from "@/components/email-limits-badge";
 // import type { SelectEmail } from "@shared/schema";
 
 // KPI Card Component
@@ -127,9 +128,15 @@ export default function DashboardAi() {
       {/* Top Section with AI Command Bar */}
       <div className="px-6 pt-6 pb-4">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <h1 className="font-display text-3xl mb-2">Welcome back, Alex</h1>
-            <p className="text-muted-foreground">Here's what your AI copilot found today</p>
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h1 className="font-display text-3xl mb-2">Welcome back, Alex</h1>
+              <p className="text-muted-foreground">Here's what your AI copilot found today</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <EmailLimitsBadge />
+              <EmailReputationIndicator />
+            </div>
           </div>
           
           <AiCommandBar
