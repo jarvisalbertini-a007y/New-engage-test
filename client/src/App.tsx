@@ -27,6 +27,7 @@ import { PlaybooksPage } from "@/pages/playbooks";
 import { AutopilotPage } from "@/pages/autopilot";
 import { WorkflowTriggersPage } from "@/pages/workflow-triggers";
 import { LeadScoringPage } from "@/pages/lead-scoring";
+import { RoleViewsPage } from "@/pages/role-views";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -84,6 +85,7 @@ function Router() {
           <Route path="/autopilot" component={AutopilotPage} />
           <Route path="/workflow-triggers" component={WorkflowTriggersPage} />
           <Route path="/lead-scoring" component={LeadScoringPage} />
+          <Route path="/role-views" component={RoleViewsPage} />
           <Route component={NotFound} />
         </Switch>
       </div>

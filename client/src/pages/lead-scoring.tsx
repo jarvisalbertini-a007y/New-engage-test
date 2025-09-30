@@ -162,11 +162,11 @@ export function LeadScoringPage() {
     .slice(0, 5);
 
   const runScoringModel = async () => {
-    if (!selectedModel || !contacts) return;
+    if (!selectedModel || !contacts || !activeModel) return;
 
     // Score all contacts with the selected model
     for (const contact of contacts) {
-      const score = calculateScore(contact, activeModel!);
+      const score = calculateScore(contact, activeModel);
       await createScore.mutateAsync({
         contactId: contact.id,
         modelId: selectedModel,

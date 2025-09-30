@@ -7,6 +7,7 @@ const navigation = [
     name: "Intelligence",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: ChartLine },
+      { name: "Role Views", href: "/role-views", icon: Users },
       { name: "Visitor Intelligence", href: "/visitors", icon: Users },
       { name: "Insights Engine", href: "/insights", icon: Lightbulb },
     ],
