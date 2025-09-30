@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { SelectEmail } from "@shared/schema";
+// import type { SelectEmail } from "@shared/schema";
 
 // KPI Card Component
 function KpiCard({ 
@@ -55,7 +55,7 @@ export default function DashboardAi() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
 
   // Fetch recent emails for AI cards
-  const { data: emails } = useQuery<SelectEmail[]>({
+  const { data: emails } = useQuery<any[]>({
     queryKey: ["/api/emails"],
     refetchInterval: 30000
   });
@@ -244,7 +244,7 @@ export default function DashboardAi() {
           <div className="mt-12">
             <h2 className="font-h2 text-xl mb-4">Live Visitor Intelligence</h2>
             <div className="grid gap-3">
-              {visitors?.slice(0, 3).map((visitor: any) => (
+              {Array.isArray(visitors) ? visitors.slice(0, 3).map((visitor: any) => (
                 <Card key={visitor.id} className="p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -261,7 +261,7 @@ export default function DashboardAi() {
                     </Badge>
                   </div>
                 </Card>
-              )) || (
+              )) : (
                 <Card className="p-8 text-center">
                   <Users className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">No recent visitors</p>
