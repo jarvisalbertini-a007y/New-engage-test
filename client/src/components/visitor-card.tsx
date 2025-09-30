@@ -1,7 +1,8 @@
-import { Building, Clock } from "lucide-react";
+import { Building, Clock, Globe, DollarSign, Cpu, MapPin } from "lucide-react";
 
 interface VisitorCardProps {
   company: string;
+  domain?: string;
   location: string;
   visitors: number;
   intentScore: number;
@@ -9,17 +10,24 @@ interface VisitorCardProps {
   pages: string[];
   industry?: string;
   size?: string;
+  revenue?: string;
+  technologies?: string[];
+  ipAddress?: string;
 }
 
 export default function VisitorCard({ 
   company, 
+  domain,
   location, 
   visitors, 
   intentScore, 
   timeAgo, 
   pages, 
   industry, 
-  size 
+  size,
+  revenue,
+  technologies,
+  ipAddress
 }: VisitorCardProps) {
   const getIntentColor = (score: number) => {
     if (score >= 80) return "bg-chart-1 text-background";
@@ -40,13 +48,39 @@ export default function VisitorCard({
           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
             <Building className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <p className="font-medium" data-testid={`text-company-${company.toLowerCase().replace(/\s+/g, '-')}`}>
-              {company}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {location} • {visitors} visitor{visitors !== 1 ? 's' : ''}
-            </p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-medium" data-testid={`text-company-${company.toLowerCase().replace(/\s+/g, '-')}`}>
+                {company}
+              </p>
+              {domain && (
+                <a 
+                  href={`https://${domain}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <Globe className="h-3 w-3" />
+                  {domain}
+                </a>
+              )}
+            </div>
+            <div className="text-sm text-muted-foreground flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {location}
+              </span>
+              <span>{visitors} visitor{visitors !== 1 ? 's' : ''}</span>
+              {revenue && (
+                <span className="flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  {revenue}
+                </span>
+              )}
+              {ipAddress && (
+                <span className="text-xs">IP: {ipAddress}</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="text-right">
@@ -59,7 +93,7 @@ export default function VisitorCard({
           </p>
         </div>
       </div>
-      <div className="mt-3 flex items-center space-x-2 flex-wrap">
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
         {pages.map((page, index) => (
           <span key={index} className="bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs">
             {page}
@@ -72,8 +106,21 @@ export default function VisitorCard({
         )}
         {size && (
           <span className="bg-secondary text-secondary-foreground px-2 py-1 rounded text-xs">
-            {size}
+            {size} employees
           </span>
+        )}
+        {technologies && technologies.length > 0 && (
+          <>
+            <Cpu className="h-3 w-3 text-muted-foreground" />
+            {technologies.slice(0, 3).map((tech, index) => (
+              <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                {tech}
+              </span>
+            ))}
+            {technologies.length > 3 && (
+              <span className="text-xs text-muted-foreground">+{technologies.length - 3} more</span>
+            )}
+          </>
         )}
       </div>
     </div>

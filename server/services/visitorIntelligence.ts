@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { type InsertVisitorSession, type VisitorSession } from "@shared/schema";
+import { identifyCompanyFromIP, enrichCompanyData, getCompanyVisitorHistory } from "./ipIntelligence";
 
 export interface VisitorIntelligenceData {
   session: VisitorSession;
@@ -85,17 +86,22 @@ export async function trackVisitorActivity(ipAddress: string, userAgent: string,
   if (existingSession) {
     // Update existing session
     const updatedPages = existingSession.pagesViewed ? [...existingSession.pagesViewed, page] : [page];
+    const timeOnSite = Math.floor((Date.now() - new Date(existingSession.createdAt).getTime()) / 1000);
+    const intentScore = await calculateIntentScore({ ...existingSession, pagesViewed: updatedPages, timeOnSite });
+    
     const updatedSession = await storage.updateVisitorSession(existingSession.id, {
       pagesViewed: updatedPages,
+      timeOnSite,
+      intentScore,
       lastActivity: new Date()
     });
     return updatedSession!;
   } else {
-    // Create new session
-    const companyId = await identifyCompanyFromIP(ipAddress);
+    // Create new session with company identification
+    const company = await identifyCompanyFromIP(ipAddress);
     
     const newSession: InsertVisitorSession = {
-      companyId,
+      companyId: company?.id || null,
       ipAddress,
       userAgent,
       pagesViewed: [page],
@@ -104,20 +110,21 @@ export async function trackVisitorActivity(ipAddress: string, userAgent: string,
       isActive: true
     };
     
-    return await storage.createVisitorSession(newSession);
+    const session = await storage.createVisitorSession(newSession);
+    
+    // Trigger enrichment in background if company was identified
+    if (company?.domain) {
+      enrichCompanyData(company.domain).then(enrichment => {
+        console.log(`Enriched data for ${company.name}:`, enrichment);
+      }).catch(err => {
+        console.error('Enrichment failed:', err);
+      });
+    }
+    
+    return session;
   }
 }
 
-async function identifyCompanyFromIP(ipAddress: string): Promise<string | null> {
-  // In a real implementation, this would use IP-to-company lookup services
-  // For demo purposes, we'll randomly assign to existing companies
-  const companies = await storage.getCompanies(10);
-  if (companies.length > 0) {
-    const randomIndex = Math.floor(Math.random() * companies.length);
-    return companies[randomIndex].id;
-  }
-  return null;
-}
 
 function getTimeAgo(date: Date): string {
   const now = new Date();

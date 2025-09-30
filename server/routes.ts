@@ -5,6 +5,7 @@ import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSeque
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
+import { enrichCompanyData, getCompanyVisitorHistory } from "./services/ipIntelligence";
 import { discoverInsights, generateInsightRecommendations, scoreInsightRelevance } from "./services/insightsEngine";
 import { generatePersonalizedEmail, categorizeEmailResponse } from "./services/openai";
 
@@ -51,9 +52,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/visitors/track", async (req, res) => {
     try {
       const { ipAddress, userAgent, page } = req.body;
-      const session = await trackVisitorActivity(ipAddress, userAgent, page);
+      
+      // Validate required fields
+      if (!ipAddress || !page) {
+        return res.status(400).json({ 
+          error: "Missing required fields: ipAddress and page are required" 
+        });
+      }
+      
+      const session = await trackVisitorActivity(ipAddress, userAgent || "Unknown", page);
       res.json(session);
     } catch (error) {
+      console.error("Error tracking visitor:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
@@ -88,6 +98,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(company);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  // Company Enrichment Routes
+  app.post("/api/companies/:id/enrich", async (req, res) => {
+    try {
+      const company = await storage.getCompany(req.params.id);
+      if (!company || !company.domain) {
+        return res.status(404).json({ error: "Company not found or missing domain" });
+      }
+      
+      const enrichment = await enrichCompanyData(company.domain);
+      res.json(enrichment);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  app.get("/api/companies/:id/visitor-history", async (req, res) => {
+    try {
+      const history = await getCompanyVisitorHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 

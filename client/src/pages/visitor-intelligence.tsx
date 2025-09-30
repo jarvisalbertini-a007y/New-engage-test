@@ -14,8 +14,9 @@ export default function VisitorIntelligence() {
   const [intentFilter, setIntentFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
 
-  const { data: activeVisitors, isLoading, refetch } = useQuery({
+  const { data: activeVisitors = [], isLoading, refetch } = useQuery({
     queryKey: ["/api/visitors/active"],
+    queryFn: () => api.getActiveVisitors(),
   });
 
   const { data: companies } = useQuery({
@@ -34,10 +35,10 @@ export default function VisitorIntelligence() {
     return matchesSearch && matchesIntent && matchesIndustry;
   });
 
-  const industries = [...new Set(companies?.map((c: any) => c.industry).filter(Boolean))];
+  const industries = Array.from(new Set(companies?.map((c: any) => c.industry).filter(Boolean) || []));
 
   const getIntentStats = () => {
-    if (!activeVisitors) return { high: 0, medium: 0, low: 0 };
+    if (!activeVisitors || !Array.isArray(activeVisitors)) return { high: 0, medium: 0, low: 0 };
     
     return activeVisitors.reduce((acc: any, visitor: any) => {
       if (visitor.intentScore >= 80) acc.high++;
@@ -164,8 +165,8 @@ export default function VisitorIntelligence() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Industries</SelectItem>
-                  {industries.map((industry: string) => (
-                    <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                  {industries.map((industry) => (
+                    <SelectItem key={String(industry)} value={String(industry)}>{String(industry)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -187,13 +188,17 @@ export default function VisitorIntelligence() {
                   <VisitorCard
                     key={visitor.session.id}
                     company={visitor.company.name}
+                    domain={visitor.company.domain}
                     location={visitor.company.location || "Unknown"}
-                    visitors={1}
+                    visitors={visitor.totalVisits || 1}
                     intentScore={visitor.intentScore}
                     timeAgo={visitor.timeAgo}
                     pages={visitor.session.pagesViewed || []}
                     industry={visitor.company.industry}
                     size={visitor.company.size}
+                    revenue={visitor.company.revenue}
+                    technologies={visitor.company.technologies || []}
+                    ipAddress={visitor.session.ipAddress}
                   />
                 ))}
               </div>
