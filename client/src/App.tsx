@@ -23,6 +23,7 @@ import Deliverability from "@/pages/deliverability";
 import AIAgents from "@/pages/agents";
 import Onboarding from "@/pages/onboarding";
 import MagicSetup from "@/pages/magic-setup";
+import { PlaybooksPage } from "@/pages/playbooks";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -76,6 +77,7 @@ function Router() {
           <Route path="/deliverability" component={Deliverability} />
           <Route path="/agents" component={AIAgents} />
           <Route path="/magic-setup" component={MagicSetup} />
+          <Route path="/playbooks" component={PlaybooksPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
