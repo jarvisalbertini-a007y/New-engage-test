@@ -18,7 +18,9 @@ import {
   type Playbook, type InsertPlaybook,
   type AutopilotCampaign, type InsertAutopilotCampaign,
   type AutopilotRun, type InsertAutopilotRun,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns
+  type LeadScoringModel, type InsertLeadScoringModel,
+  type LeadScore, type InsertLeadScore,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -149,6 +151,20 @@ export interface IStorage {
   getAutopilotRunsByCampaign(campaignId: string): Promise<AutopilotRun[]>;
   createAutopilotRun(run: InsertAutopilotRun): Promise<AutopilotRun>;
   updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined>;
+
+  // Lead Scoring Model methods
+  getLeadScoringModels(): Promise<LeadScoringModel[]>;
+  getLeadScoringModelById(id: string): Promise<LeadScoringModel | undefined>;
+  createLeadScoringModel(model: InsertLeadScoringModel): Promise<LeadScoringModel>;
+  updateLeadScoringModel(id: string, model: Partial<InsertLeadScoringModel>): Promise<LeadScoringModel>;
+  deleteLeadScoringModel(id: string): Promise<void>;
+
+  // Lead Score methods
+  getLeadScores(contactId?: string, modelId?: string): Promise<LeadScore[]>;
+  getLeadScoreById(id: string): Promise<LeadScore | undefined>;
+  createLeadScore(score: InsertLeadScore): Promise<LeadScore>;
+  updateLeadScore(id: string, score: Partial<InsertLeadScore>): Promise<LeadScore>;
+  deleteLeadScore(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -798,6 +814,48 @@ export class MemStorage implements IStorage {
   async updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined> {
     return { id, ...updates, startedAt: new Date() } as AutopilotRun;
   }
+
+  // Lead Scoring Model stub methods
+  async getLeadScoringModels(): Promise<LeadScoringModel[]> {
+    return [];
+  }
+
+  async getLeadScoringModelById(id: string): Promise<LeadScoringModel | undefined> {
+    return undefined;
+  }
+
+  async createLeadScoringModel(model: InsertLeadScoringModel): Promise<LeadScoringModel> {
+    return { id: randomUUID(), ...model, createdAt: new Date(), updatedAt: new Date() } as LeadScoringModel;
+  }
+
+  async updateLeadScoringModel(id: string, model: Partial<InsertLeadScoringModel>): Promise<LeadScoringModel> {
+    return { id, ...model, createdAt: new Date(), updatedAt: new Date() } as LeadScoringModel;
+  }
+
+  async deleteLeadScoringModel(id: string): Promise<void> {
+    // Stub implementation
+  }
+
+  // Lead Score stub methods
+  async getLeadScores(contactId?: string, modelId?: string): Promise<LeadScore[]> {
+    return [];
+  }
+
+  async getLeadScoreById(id: string): Promise<LeadScore | undefined> {
+    return undefined;
+  }
+
+  async createLeadScore(score: InsertLeadScore): Promise<LeadScore> {
+    return { id: randomUUID(), ...score, calculatedAt: new Date(), createdAt: new Date() } as LeadScore;
+  }
+
+  async updateLeadScore(id: string, score: Partial<InsertLeadScore>): Promise<LeadScore> {
+    return { id, ...score, calculatedAt: new Date(), createdAt: new Date() } as LeadScore;
+  }
+
+  async deleteLeadScore(id: string): Promise<void> {
+    // Stub implementation
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1364,6 +1422,78 @@ export class DbStorage implements IStorage {
     if (Object.keys(cleaned).length === 0) return this.getAutopilotRun(id);
     const result = await db.update(autopilotRuns).set(cleaned).where(eq(autopilotRuns.id, id)).returning();
     return result[0];
+  }
+
+  // Lead Scoring Model methods
+  async getLeadScoringModels(): Promise<LeadScoringModel[]> {
+    return await db.select().from(leadScoringModels);
+  }
+
+  async getLeadScoringModelById(id: string): Promise<LeadScoringModel | undefined> {
+    const result = await db.select().from(leadScoringModels).where(eq(leadScoringModels.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLeadScoringModel(model: InsertLeadScoringModel): Promise<LeadScoringModel> {
+    const result = await db.insert(leadScoringModels).values(model).returning();
+    return result[0];
+  }
+
+  async updateLeadScoringModel(id: string, model: Partial<InsertLeadScoringModel>): Promise<LeadScoringModel> {
+    const cleaned = cleanPartial(model);
+    if (Object.keys(cleaned).length === 0) {
+      const existing = await this.getLeadScoringModelById(id);
+      if (!existing) throw new Error('Lead scoring model not found');
+      return existing;
+    }
+    const result = await db.update(leadScoringModels).set(cleaned).where(eq(leadScoringModels.id, id)).returning();
+    if (!result[0]) throw new Error('Lead scoring model not found');
+    return result[0];
+  }
+
+  async deleteLeadScoringModel(id: string): Promise<void> {
+    await db.delete(leadScoringModels).where(eq(leadScoringModels.id, id));
+  }
+
+  // Lead Score methods
+  async getLeadScores(contactId?: string, modelId?: string): Promise<LeadScore[]> {
+    let query = db.select().from(leadScores);
+    const conditions = [];
+    if (contactId) conditions.push(eq(leadScores.contactId, contactId));
+    if (modelId) conditions.push(eq(leadScores.modelId, modelId));
+    
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async getLeadScoreById(id: string): Promise<LeadScore | undefined> {
+    const result = await db.select().from(leadScores).where(eq(leadScores.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createLeadScore(score: InsertLeadScore): Promise<LeadScore> {
+    const result = await db.insert(leadScores).values(score).returning();
+    return result[0];
+  }
+
+  async updateLeadScore(id: string, score: Partial<InsertLeadScore>): Promise<LeadScore> {
+    const cleaned = cleanPartial(score);
+    if (Object.keys(cleaned).length === 0) {
+      const existing = await this.getLeadScoreById(id);
+      if (!existing) throw new Error('Lead score not found');
+      return existing;
+    }
+    const result = await db.update(leadScores).set(cleaned).where(eq(leadScores.id, id)).returning();
+    if (!result[0]) throw new Error('Lead score not found');
+    return result[0];
+  }
+
+  async deleteLeadScore(id: string): Promise<void> {
+    await db.delete(leadScores).where(eq(leadScores.id, id));
   }
 }
 

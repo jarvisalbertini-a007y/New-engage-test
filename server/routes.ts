@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -992,6 +992,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deleted) {
         return res.status(404).json({ error: 'Trigger not found' });
       }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // ====== Lead Scoring Models ======
+  app.get("/api/lead-scoring-models", async (req, res) => {
+    try {
+      const models = await storage.getLeadScoringModels();
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/lead-scoring-models/:id", async (req, res) => {
+    try {
+      const model = await storage.getLeadScoringModelById(req.params.id);
+      if (!model) {
+        return res.status(404).json({ error: "Model not found" });
+      }
+      res.json(model);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/lead-scoring-models", async (req, res) => {
+    try {
+      const validated = insertLeadScoringModelSchema.parse(req.body);
+      const model = await storage.createLeadScoringModel(validated);
+      res.json(model);
+    } catch (error) {
+      console.error("Error creating lead scoring model:", error);
+      res.status(400).json({ error: "Invalid input" });
+    }
+  });
+
+  app.patch("/api/lead-scoring-models/:id", async (req, res) => {
+    try {
+      const model = await storage.updateLeadScoringModel(req.params.id, req.body);
+      res.json(model);
+    } catch (error) {
+      console.error("Error updating lead scoring model:", error);
+      res.status(500).json({ error: "Failed to update model" });
+    }
+  });
+
+  app.delete("/api/lead-scoring-models/:id", async (req, res) => {
+    try {
+      await storage.deleteLeadScoringModel(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // ====== Lead Scores ======
+  app.get("/api/lead-scores", async (req, res) => {
+    try {
+      const { contactId, modelId } = req.query;
+      const scores = await storage.getLeadScores(contactId as string, modelId as string);
+      res.json(scores);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/lead-scores/:id", async (req, res) => {
+    try {
+      const score = await storage.getLeadScoreById(req.params.id);
+      if (!score) {
+        return res.status(404).json({ error: "Score not found" });
+      }
+      res.json(score);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/lead-scores", async (req, res) => {
+    try {
+      const validated = insertLeadScoreSchema.parse(req.body);
+      const score = await storage.createLeadScore(validated);
+      res.json(score);
+    } catch (error) {
+      console.error("Error creating lead score:", error);
+      res.status(400).json({ error: "Invalid input" });
+    }
+  });
+
+  app.patch("/api/lead-scores/:id", async (req, res) => {
+    try {
+      const score = await storage.updateLeadScore(req.params.id, req.body);
+      res.json(score);
+    } catch (error) {
+      console.error("Error updating lead score:", error);
+      res.status(500).json({ error: "Failed to update score" });
+    }
+  });
+
+  app.delete("/api/lead-scores/:id", async (req, res) => {
+    try {
+      await storage.deleteLeadScore(req.params.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

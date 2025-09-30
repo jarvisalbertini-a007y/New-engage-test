@@ -255,6 +255,36 @@ export const workflowTriggers = pgTable("workflow_triggers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Lead Scoring Models table
+export const leadScoringModels = pgTable("lead_scoring_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  modelType: text("model_type").notNull(), // predictive, behavioral, demographic, firmographic
+  scoringFactors: jsonb("scoring_factors").notNull(), // Factors and weights
+  thresholds: jsonb("thresholds").notNull(), // Score thresholds for hot/warm/cold
+  isActive: boolean("is_active").default(true),
+  accuracy: integer("accuracy"), // Model accuracy percentage
+  lastTrained: timestamp("last_trained"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Lead Scores table (individual lead scores)
+export const leadScores = pgTable("lead_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  modelId: varchar("model_id").notNull().references(() => leadScoringModels.id),
+  score: integer("score").notNull(), // 0-100
+  category: text("category").notNull(), // hot, warm, cold
+  factors: jsonb("factors").notNull(), // Individual factor contributions
+  predictedConversionRate: integer("predicted_conversion_rate"), // Percentage
+  daysToConvert: integer("days_to_convert"), // Predicted days to conversion
+  nextBestAction: text("next_best_action"), // Recommended action
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Industry Playbooks
 export const autopilotCampaigns = pgTable("autopilot_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -462,6 +492,19 @@ export const insertAutopilotRunSchema = createInsertSchema(autopilotRuns).omit({
   duration: true,
 });
 
+export const insertLeadScoringModelSchema = createInsertSchema(leadScoringModels).omit({
+  id: true,
+  lastTrained: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({
+  id: true,
+  calculatedAt: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -519,3 +562,9 @@ export type InsertAutopilotCampaign = z.infer<typeof insertAutopilotCampaignSche
 
 export type AutopilotRun = typeof autopilotRuns.$inferSelect;
 export type InsertAutopilotRun = z.infer<typeof insertAutopilotRunSchema>;
+
+export type LeadScoringModel = typeof leadScoringModels.$inferSelect;
+export type InsertLeadScoringModel = z.infer<typeof insertLeadScoringModelSchema>;
+
+export type LeadScore = typeof leadScores.$inferSelect;
+export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
