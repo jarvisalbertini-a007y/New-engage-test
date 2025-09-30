@@ -431,6 +431,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Agents routes
+  app.get("/api/agents/metrics", async (req, res) => {
+    try {
+      const agents = await storage.getAiAgents();
+      const activeAgents = agents.filter(a => a.status === 'active');
+      
+      const totalProspected = agents.reduce((sum, a) => sum + (a.totalContacted || 0), 0);
+      const totalQualified = agents.reduce((sum, a) => sum + (a.totalQualified || 0), 0);
+      const avgSuccessRate = agents.length > 0 
+        ? agents.reduce((sum, a) => sum + parseFloat(a.successRate || '0'), 0) / agents.length
+        : 0;
+      const todayActions = activeAgents.reduce((sum, a) => sum + (a.currentProgress || 0), 0);
+      
+      const metrics = {
+        totalAgents: agents.length,
+        activeAgents: activeAgents.length,
+        totalProspected,
+        totalQualified,
+        avgSuccessRate: Math.round(avgSuccessRate),
+        todayActions,
+      };
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/agents", async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const type = req.query.type as string;
+      const createdBy = req.query.createdBy as string;
+      
+      const agents = await storage.getAiAgents({ status, type, createdBy });
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/agents", async (req, res) => {
+    try {
+      const { insertAiAgentSchema } = await import("@shared/schema");
+      const agent = insertAiAgentSchema.parse(req.body);
+      const created = await storage.createAiAgent(agent);
+      res.json(created);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+  });
+
+  app.patch("/api/agents/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const updated = await storage.updateAiAgent(id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.delete("/api/agents/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteAiAgent(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // Deliverability routes
   app.get("/api/deliverability/domain-health/:domain", async (req, res) => {
     try {

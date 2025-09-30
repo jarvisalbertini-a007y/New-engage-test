@@ -126,4 +126,16 @@ export const api = {
     apiRequest("POST", "/api/deliverability/warming-settings", settings),
   verifyDomain: (domain: string) =>
     apiRequest("POST", "/api/deliverability/verify-domain", { domain }),
+  
+  // AI Agents APIs
+  getAgentMetrics: () =>
+    fetch("/api/agents/metrics").then(res => res.json()),
+  getAgents: () =>
+    fetch("/api/agents").then(res => res.json()),
+  createAgent: (data: any) =>
+    apiRequest("POST", "/api/agents", data),
+  updateAgent: (id: string, data: any) =>
+    apiRequest("PATCH", `/api/agents/${id}`, data),
+  deleteAgent: (id: string) =>
+    apiRequest("DELETE", `/api/agents/${id}`, {}),
 };

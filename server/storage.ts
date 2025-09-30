@@ -11,7 +11,8 @@ import {
   type PhoneCall, type InsertPhoneCall,
   type CallScript, type InsertCallScript,
   type Voicemail, type InsertVoicemail,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails
+  type AiAgent, type InsertAiAgent,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -100,6 +101,13 @@ export interface IStorage {
   getVoicemails(filters?: { contactId?: string; isListened?: boolean }): Promise<Voicemail[]>;
   createVoicemail(voicemail: InsertVoicemail): Promise<Voicemail>;
   updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined>;
+
+  // AI Agents
+  getAiAgent(id: string): Promise<AiAgent | undefined>;
+  getAiAgents(filters?: { status?: string; type?: string; createdBy?: string }): Promise<AiAgent[]>;
+  createAiAgent(agent: InsertAiAgent): Promise<AiAgent>;
+  updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined>;
+  deleteAiAgent(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -580,6 +588,78 @@ export class MemStorage implements IStorage {
     this.tasks.set(id, updated);
     return updated;
   }
+
+  // Phone Calls (stub implementations)
+  async getPhoneCall(id: string): Promise<PhoneCall | undefined> {
+    return undefined;
+  }
+
+  async getPhoneCalls(filters?: { contactId?: string; userId?: string; status?: string }): Promise<PhoneCall[]> {
+    return [];
+  }
+
+  async createPhoneCall(call: InsertPhoneCall): Promise<PhoneCall> {
+    return { ...call, id: randomUUID(), createdAt: new Date() } as PhoneCall;
+  }
+
+  async updatePhoneCall(id: string, updates: Partial<PhoneCall>): Promise<PhoneCall | undefined> {
+    return undefined;
+  }
+
+  // Call Scripts (stub implementations)
+  async getCallScript(id: string): Promise<CallScript | undefined> {
+    return undefined;
+  }
+
+  async getCallScripts(filters?: { type?: string; personaId?: string }): Promise<CallScript[]> {
+    return [];
+  }
+
+  async createCallScript(script: InsertCallScript): Promise<CallScript> {
+    return { ...script, id: randomUUID(), createdAt: new Date(), usageCount: 0 } as CallScript;
+  }
+
+  async updateCallScript(id: string, updates: Partial<CallScript>): Promise<CallScript | undefined> {
+    return undefined;
+  }
+
+  // Voicemails (stub implementations)
+  async getVoicemail(id: string): Promise<Voicemail | undefined> {
+    return undefined;
+  }
+
+  async getVoicemails(filters?: { contactId?: string; isListened?: boolean }): Promise<Voicemail[]> {
+    return [];
+  }
+
+  async createVoicemail(voicemail: InsertVoicemail): Promise<Voicemail> {
+    return { ...voicemail, id: randomUUID(), createdAt: new Date() } as Voicemail;
+  }
+
+  async updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined> {
+    return undefined;
+  }
+
+  // AI Agents (stub implementations)
+  async getAiAgent(id: string): Promise<AiAgent | undefined> {
+    return undefined;
+  }
+
+  async getAiAgents(filters?: { status?: string; type?: string; createdBy?: string }): Promise<AiAgent[]> {
+    return [];
+  }
+
+  async createAiAgent(agent: InsertAiAgent): Promise<AiAgent> {
+    return { ...agent, id: randomUUID(), createdAt: new Date() } as AiAgent;
+  }
+
+  async updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined> {
+    return undefined;
+  }
+
+  async deleteAiAgent(id: string): Promise<boolean> {
+    return false;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -947,6 +1027,44 @@ export class DbStorage implements IStorage {
     if (Object.keys(cleaned).length === 0) return this.getVoicemail(id);
     const result = await db.update(voicemails).set(cleaned).where(eq(voicemails.id, id)).returning();
     return result[0];
+  }
+
+  // AI Agent methods
+  async getAiAgent(id: string): Promise<AiAgent | undefined> {
+    const result = await db.select().from(aiAgents).where(eq(aiAgents.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAiAgents(filters?: { status?: string; type?: string; createdBy?: string }): Promise<AiAgent[]> {
+    let query = db.select().from(aiAgents);
+    
+    const conditions: any[] = [];
+    if (filters?.status) conditions.push(eq(aiAgents.status, filters.status));
+    if (filters?.type) conditions.push(eq(aiAgents.type, filters.type));
+    if (filters?.createdBy) conditions.push(eq(aiAgents.createdBy, filters.createdBy));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createAiAgent(agent: InsertAiAgent): Promise<AiAgent> {
+    const result = await db.insert(aiAgents).values(agent).returning();
+    return result[0];
+  }
+
+  async updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAiAgent(id);
+    const result = await db.update(aiAgents).set(cleaned).where(eq(aiAgents.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteAiAgent(id: string): Promise<boolean> {
+    const result = await db.delete(aiAgents).where(eq(aiAgents.id, id)).returning();
+    return result.length > 0;
   }
 }
 

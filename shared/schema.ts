@@ -188,6 +188,27 @@ export const voicemails = pgTable("voicemails", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const aiAgents = pgTable("ai_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // prospecting, engagement, booking
+  description: text("description"),
+  status: text("status").notNull().default("active"), // active, paused
+  persona: text("persona"),
+  targetsPerDay: integer("targets_per_day").notNull().default(50),
+  currentProgress: integer("current_progress").notNull().default(0),
+  successRate: decimal("success_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  totalContacted: integer("total_contacted").notNull().default(0),
+  totalQualified: integer("total_qualified").notNull().default(0),
+  totalResponded: integer("total_responded").notNull().default(0),
+  totalBooked: integer("total_booked").notNull().default(0),
+  totalAttended: integer("total_attended").notNull().default(0),
+  settings: jsonb("settings").notNull().default('{}'),
+  lastRun: timestamp("last_run"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -250,6 +271,12 @@ export const insertVoicemailSchema = createInsertSchema(voicemails).omit({
   createdAt: true,
 });
 
+export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
+  id: true,
+  createdAt: true,
+  lastRun: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -286,3 +313,6 @@ export type InsertCallScript = z.infer<typeof insertCallScriptSchema>;
 
 export type Voicemail = typeof voicemails.$inferSelect;
 export type InsertVoicemail = z.infer<typeof insertVoicemailSchema>;
+
+export type AiAgent = typeof aiAgents.$inferSelect;
+export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;

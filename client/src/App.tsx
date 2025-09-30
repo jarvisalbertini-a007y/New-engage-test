@@ -15,6 +15,7 @@ import Personas from "@/pages/personas";
 import Analytics from "@/pages/analytics";
 import CloudDialer from "@/pages/cloud-dialer";
 import Deliverability from "@/pages/deliverability";
+import AIAgents from "@/pages/agents";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -37,6 +38,7 @@ function Router() {
           <Route path="/analytics" component={Analytics} />
           <Route path="/dialer" component={CloudDialer} />
           <Route path="/deliverability" component={Deliverability} />
+          <Route path="/agents" component={AIAgents} />
           <Route component={NotFound} />
         </Switch>
       </div>
