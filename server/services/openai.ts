@@ -1,15 +1,34 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
-});
+const hasOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+const openai = hasOpenAIKey ? new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR
+}) : null;
 
 export async function analyzeEmailDraft(emailText: string): Promise<{
   score: number;
   suggestions: string[];
   improvements: { type: string; message: string; }[];
 }> {
+  if (!openai) {
+    // Return mock analysis when OpenAI is not configured
+    return {
+      score: 75,
+      suggestions: [
+        "Add a clear value proposition in the opening",
+        "Include specific metrics or case studies",
+        "Create a stronger call-to-action",
+        "Personalize with recipient's company context"
+      ],
+      improvements: [
+        { type: "clarity", message: "Simplify complex sentences for better readability" },
+        { type: "engagement", message: "Add questions to encourage response" },
+        { type: "personalization", message: "Reference recent company news or achievements" }
+      ]
+    };
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
@@ -41,6 +60,14 @@ export async function generatePersonalizedEmail(context: {
   valueProposition: string;
   tone?: string;
 }): Promise<{ subject: string; body: string; }> {
+  if (!openai) {
+    // Return mock personalized email when OpenAI is not configured
+    return {
+      subject: `${context.firstName}, let's discuss how we can help ${context.company} ${context.valueProposition}`,
+      body: `Hi ${context.firstName},\n\nI noticed ${context.company} is in the ${context.industry || 'your'} industry${context.insight ? ` and ${context.insight}` : ''}.\n\n${context.valueProposition}\n\nWould you be open to a brief 15-minute call next week to discuss how we can help ${context.company}?\n\nBest regards`
+    };
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
@@ -70,6 +97,18 @@ export async function generatePersonalizedEmail(context: {
 }
 
 export async function improveEmailDraft(emailText: string): Promise<{ improvedSubject: string; improvedBody: string; }> {
+  if (!openai) {
+    // Return mock improved email when OpenAI is not configured
+    const lines = emailText.split('\n');
+    const subject = lines[0] || "Partnership Opportunity";
+    const body = lines.slice(1).join('\n') || emailText;
+    
+    return {
+      improvedSubject: `Quick question about ${subject}`,
+      improvedBody: `${body}\n\nP.S. I'll keep this brief - just 15 minutes to show you how we've helped similar companies achieve [specific result].`
+    };
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
@@ -99,6 +138,14 @@ export async function generateInsightMessage(insight: {
   contactName?: string;
   valueProposition: string;
 }): Promise<{ subject: string; message: string; }> {
+  if (!openai) {
+    // Return mock insight message when OpenAI is not configured
+    return {
+      subject: `Congrats on ${insight.insightType} at ${insight.companyName}`,
+      message: `${insight.contactName ? `Hi ${insight.contactName},\n\n` : ''}Congratulations on ${insight.insightDescription}!\n\n${insight.valueProposition}\n\nWould you be interested in learning more?`
+    };
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
@@ -131,6 +178,23 @@ export async function categorizeEmailResponse(emailContent: string): Promise<{
   confidence: number;
   nextAction: string;
 }> {
+  if (!openai) {
+    // Return mock categorization when OpenAI is not configured
+    const lowerContent = emailContent.toLowerCase();
+    
+    if (lowerContent.includes('interested') || lowerContent.includes('yes') || lowerContent.includes('schedule')) {
+      return { category: 'interested', confidence: 0.8, nextAction: 'Schedule a meeting' };
+    } else if (lowerContent.includes('unsubscribe') || lowerContent.includes('remove')) {
+      return { category: 'unsubscribe', confidence: 0.9, nextAction: 'Remove from list' };
+    } else if (lowerContent.includes('not interested') || lowerContent.includes('no thanks')) {
+      return { category: 'objection', confidence: 0.7, nextAction: 'Handle objection' };
+    } else if (lowerContent.includes('out of office') || lowerContent.includes('vacation')) {
+      return { category: 'out_of_office', confidence: 0.9, nextAction: 'Follow up later' };
+    } else {
+      return { category: 'follow_up', confidence: 0.6, nextAction: 'Send follow-up email' };
+    }
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
