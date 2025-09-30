@@ -25,6 +25,24 @@ export default function Sequences() {
     queryKey: ["/api/personas"],
   });
 
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["/api/contacts"],
+  });
+
+  const { data: emails = [] } = useQuery({
+    queryKey: ["/api/emails"],
+  });
+
+  // Calculate real metrics
+  const totalContacts = contacts.length;
+  const sentEmails = emails.filter((e: any) => 
+    ['sent', 'delivered', 'opened', 'replied'].includes(e.status)
+  );
+  const repliedEmails = emails.filter((e: any) => e.status === 'replied');
+  const avgReplyRate = sentEmails.length > 0 
+    ? Math.round((repliedEmails.length / sentEmails.length) * 100) 
+    : 0;
+
   const createSequenceMutation = useMutation({
     mutationFn: api.createSequence,
     onSuccess: () => {
@@ -141,7 +159,7 @@ export default function Sequences() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Contacts</p>
                   <p className="text-3xl font-bold text-chart-2" data-testid="text-total-contacts">
-                    {Math.floor(Math.random() * 5000 + 1000)}
+                    {totalContacts}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-chart-2" />
@@ -155,7 +173,7 @@ export default function Sequences() {
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Reply Rate</p>
                   <p className="text-3xl font-bold text-chart-3" data-testid="text-reply-rate">
-                    {Math.floor(Math.random() * 20 + 25)}%
+                    {avgReplyRate}%
                   </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-chart-3" />
@@ -210,29 +228,30 @@ export default function Sequences() {
                               </span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Contacts:</span>
-                              <span className="ml-2 font-medium">
-                                {Math.floor(Math.random() * 200 + 50)}
+                              <span className="text-muted-foreground">Enrolled:</span>
+                              <span className="ml-2 font-medium text-muted-foreground">
+                                —
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Sent:</span>
+                              <span className="ml-2 font-medium text-muted-foreground">
+                                —
                               </span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Reply Rate:</span>
-                              <span className="ml-2 font-medium text-chart-1">
-                                {Math.floor(Math.random() * 30 + 20)}%
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Progress:</span>
-                              <span className="ml-2 font-medium">
-                                {Math.floor(Math.random() * 40 + 60)}%
+                              <span className="ml-2 font-medium text-muted-foreground">
+                                —
                               </span>
                             </div>
                           </div>
                           
-                          <Progress 
-                            value={Math.floor(Math.random() * 40 + 60)} 
-                            className="h-2" 
-                          />
+                          <div className="text-xs text-muted-foreground text-center py-2">
+                            {sequence.status === 'draft' ? 'Activate to start tracking metrics' : 
+                             sequence.status === 'completed' ? 'Sequence completed' :
+                             'No contacts enrolled yet'}
+                          </div>
                           
                           <div className="flex items-center space-x-2 pt-2">
                             <Button size="sm" variant="outline" data-testid={`button-edit-${sequence.id}`}>

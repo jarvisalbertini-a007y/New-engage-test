@@ -112,40 +112,32 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
 
   const generateAISteps = async () => {
     try {
-      // In a real implementation, this would call the API
-      const aiSteps: SequenceStep[] = [
-        {
-          stepNumber: 1,
-          type: "email",
-          delay: 0,
-          subject: "Quick question about {{company}}'s {{industry}} strategy",
-          template: "Hi {{firstName}},\n\nI noticed {{company}} has been growing in the {{industry}} space. I'd love to share how we've helped similar companies scale their operations.\n\nWould you be open to a brief 15-minute conversation?\n\nBest,\n{{senderName}}",
-          isActive: true,
-        },
-        {
-          stepNumber: 2,
-          type: "email",
-          delay: 3,
-          subject: "Following up on {{company}}'s growth",
-          template: "Hi {{firstName}},\n\nI wanted to follow up on my previous email about helping {{company}} with your {{industry}} initiatives.\n\nI've attached a case study showing how we helped a similar company achieve 40% efficiency gains.\n\nWould next week work for a quick call?\n\nBest regards,\n{{senderName}}",
-          isActive: true,
-        },
-        {
-          stepNumber: 3,
-          type: "linkedin",
-          delay: 7,
-          template: "Hi {{firstName}}, I've been trying to reach you about some interesting insights for {{company}}. Would love to connect here on LinkedIn!",
-          isActive: true,
-        },
-        {
-          stepNumber: 4,
-          type: "email",
-          delay: 10,
-          subject: "Last attempt - {{company}} and sales automation",
-          template: "Hi {{firstName}},\n\nI don't want to be a pest, but I believe our solution could really benefit {{company}}.\n\nIf timing isn't right now, no worries! I'll check back in a few months.\n\nIf you are interested but the timing isn't perfect, just let me know when might work better.\n\nBest,\n{{senderName}}",
-          isActive: true,
-        }
-      ];
+      const sequenceName = form.getValues("name") || "New Sequence";
+      const sequenceDescription = form.getValues("description") || "";
+      
+      const response = await fetch("/api/sequences/generate-steps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: sequenceName,
+          description: sequenceDescription,
+          sequenceType,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate steps");
+      }
+
+      const data = await response.json();
+      const aiSteps: SequenceStep[] = data.steps.map((step: any, index: number) => ({
+        stepNumber: index + 1,
+        type: step.type || "email",
+        delay: step.delay || 0,
+        subject: step.subject,
+        template: step.template || step.content || "",
+        isActive: true,
+      }));
       
       setSteps(aiSteps);
       toast({
@@ -155,7 +147,7 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to generate AI steps. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to generate AI steps. Please try again.",
         variant: "destructive",
       });
     }
