@@ -114,4 +114,16 @@ export const api = {
     if (filters?.isListened !== undefined) params.append("isListened", String(filters.isListened));
     return fetch(`/api/voicemails?${params}`).then(res => res.json());
   },
+  
+  // Deliverability APIs
+  getDomainHealth: (domain: string) =>
+    fetch(`/api/deliverability/domain-health/${domain}`).then(res => res.json()),
+  getWarmingStatus: (domain: string) =>
+    fetch(`/api/deliverability/warming-status/${domain}`).then(res => res.json()),
+  getInboxPlacement: () =>
+    fetch("/api/deliverability/inbox-placement").then(res => res.json()),
+  updateWarmingSettings: (settings: { enabled: boolean; speed: string }) =>
+    apiRequest("POST", "/api/deliverability/warming-settings", settings),
+  verifyDomain: (domain: string) =>
+    apiRequest("POST", "/api/deliverability/verify-domain", { domain }),
 };

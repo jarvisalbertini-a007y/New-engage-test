@@ -14,6 +14,7 @@ import UnifiedInbox from "@/pages/unified-inbox";
 import Personas from "@/pages/personas";
 import Analytics from "@/pages/analytics";
 import CloudDialer from "@/pages/cloud-dialer";
+import Deliverability from "@/pages/deliverability";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -35,6 +36,7 @@ function Router() {
           <Route path="/personas" component={Personas} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/dialer" component={CloudDialer} />
+          <Route path="/deliverability" component={Deliverability} />
           <Route component={NotFound} />
         </Switch>
       </div>

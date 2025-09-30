@@ -431,6 +431,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Deliverability routes
+  app.get("/api/deliverability/domain-health/:domain", async (req, res) => {
+    try {
+      // Mock implementation for domain health check
+      const domainHealth = {
+        overall: 85 + Math.floor(Math.random() * 10),
+        spf: { status: Math.random() > 0.3 ? "pass" : "warning", record: "v=spf1 include:_spf.google.com ~all" },
+        dkim: { status: Math.random() > 0.2 ? "pass" : "warning", selector: "google" },
+        dmarc: { status: Math.random() > 0.5 ? "pass" : "warning", policy: "p=none" },
+        reputation: 88 + Math.floor(Math.random() * 10),
+        blacklists: Math.random() > 0.9 ? 1 : 0,
+        deliverabilityRate: 93 + Math.random() * 5,
+      };
+      res.json(domainHealth);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/deliverability/warming-status/:domain", async (req, res) => {
+    try {
+      const warmingStatus = {
+        isActive: true,
+        currentVolume: Math.floor(Math.random() * 100) + 50,
+        targetVolume: 500,
+        daysActive: Math.floor(Math.random() * 30) + 1,
+        schedule: Array.from({ length: 7 }, (_, i) => ({
+          day: i + 1,
+          emails: (i + 1) * 10 + Math.floor(Math.random() * 10),
+          opened: Math.floor((i + 1) * 8 + Math.random() * 5),
+          replied: Math.floor((i + 1) * 2 + Math.random() * 3),
+        })),
+      };
+      res.json(warmingStatus);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/deliverability/inbox-placement", async (req, res) => {
+    try {
+      const inboxPlacement = [
+        { provider: "Gmail", inbox: 92 + Math.floor(Math.random() * 5), spam: 3 + Math.floor(Math.random() * 3), missing: 2 },
+        { provider: "Outlook", inbox: 90 + Math.floor(Math.random() * 5), spam: 4 + Math.floor(Math.random() * 3), missing: 2 },
+        { provider: "Yahoo", inbox: 88 + Math.floor(Math.random() * 5), spam: 6 + Math.floor(Math.random() * 3), missing: 2 },
+        { provider: "Apple", inbox: 94 + Math.floor(Math.random() * 4), spam: 2 + Math.floor(Math.random() * 2), missing: 1 },
+      ];
+      res.json(inboxPlacement);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/deliverability/warming-settings", async (req, res) => {
+    try {
+      const { enabled, speed } = req.body;
+      // Mock implementation - would update warming settings
+      res.json({ success: true, enabled, speed });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/deliverability/verify-domain", async (req, res) => {
+    try {
+      const { domain } = req.body;
+      // Mock implementation - would trigger domain verification
+      res.json({ success: true, domain, verified: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
