@@ -37,6 +37,7 @@ const navigation = [
     items: [
       { name: "Setup Assistant", href: "/setup-assistant", icon: MessageSquare },
       { name: "Performance Coaching", href: "/performance-coaching", icon: GraduationCap },
+      { name: "Team Collaboration", href: "/team-collaboration", icon: Users },
       { name: "Lead Scoring", href: "/lead-scoring", icon: Brain },
       { name: "Workflow Triggers", href: "/workflow-triggers", icon: Zap },
       { name: "Deliverability", href: "/deliverability", icon: Shield },

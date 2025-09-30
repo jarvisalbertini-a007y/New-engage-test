@@ -30,6 +30,7 @@ import { LeadScoringPage } from "@/pages/lead-scoring";
 import { RoleViewsPage } from "@/pages/role-views";
 import { SetupAssistantPage } from "@/pages/setup-assistant";
 import { PerformanceCoachingPage } from "@/pages/performance-coaching";
+import { TeamCollaborationPage } from "@/pages/team-collaboration";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -90,6 +91,7 @@ function Router() {
           <Route path="/role-views" component={RoleViewsPage} />
           <Route path="/setup-assistant" component={SetupAssistantPage} />
           <Route path="/performance-coaching" component={PerformanceCoachingPage} />
+          <Route path="/team-collaboration" component={TeamCollaborationPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
