@@ -25,6 +25,7 @@ import Onboarding from "@/pages/onboarding";
 import MagicSetup from "@/pages/magic-setup";
 import { PlaybooksPage } from "@/pages/playbooks";
 import { AutopilotPage } from "@/pages/autopilot";
+import { WorkflowTriggersPage } from "@/pages/workflow-triggers";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -80,6 +81,7 @@ function Router() {
           <Route path="/magic-setup" component={MagicSetup} />
           <Route path="/playbooks" component={PlaybooksPage} />
           <Route path="/autopilot" component={AutopilotPage} />
+          <Route path="/workflow-triggers" component={WorkflowTriggersPage} />
           <Route component={NotFound} />
         </Switch>
       </div>

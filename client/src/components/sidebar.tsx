@@ -34,6 +34,7 @@ const navigation = [
   {
     name: "Tools",
     items: [
+      { name: "Workflow Triggers", href: "/workflow-triggers", icon: Zap },
       { name: "Deliverability", href: "/deliverability", icon: Shield },
       { name: "Analytics", href: "/analytics", icon: BarChart },
     ],
