@@ -29,6 +29,7 @@ import { WorkflowTriggersPage } from "@/pages/workflow-triggers";
 import { LeadScoringPage } from "@/pages/lead-scoring";
 import { RoleViewsPage } from "@/pages/role-views";
 import { SetupAssistantPage } from "@/pages/setup-assistant";
+import { PerformanceCoachingPage } from "@/pages/performance-coaching";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -88,6 +89,7 @@ function Router() {
           <Route path="/lead-scoring" component={LeadScoringPage} />
           <Route path="/role-views" component={RoleViewsPage} />
           <Route path="/setup-assistant" component={SetupAssistantPage} />
+          <Route path="/performance-coaching" component={PerformanceCoachingPage} />
           <Route component={NotFound} />
         </Switch>
       </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen, Zap, MessageSquare } from "lucide-react";
+import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen, Zap, MessageSquare, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -36,6 +36,7 @@ const navigation = [
     name: "Tools",
     items: [
       { name: "Setup Assistant", href: "/setup-assistant", icon: MessageSquare },
+      { name: "Performance Coaching", href: "/performance-coaching", icon: GraduationCap },
       { name: "Lead Scoring", href: "/lead-scoring", icon: Brain },
       { name: "Workflow Triggers", href: "/workflow-triggers", icon: Zap },
       { name: "Deliverability", href: "/deliverability", icon: Shield },
