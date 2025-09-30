@@ -13,6 +13,7 @@ import ContentStudio from "@/pages/content-studio";
 import UnifiedInbox from "@/pages/unified-inbox";
 import Personas from "@/pages/personas";
 import Analytics from "@/pages/analytics";
+import CloudDialer from "@/pages/cloud-dialer";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -33,6 +34,7 @@ function Router() {
           <Route path="/inbox" component={UnifiedInbox} />
           <Route path="/personas" component={Personas} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/dialer" component={CloudDialer} />
           <Route component={NotFound} />
         </Switch>
       </div>

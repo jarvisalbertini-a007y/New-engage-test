@@ -82,4 +82,36 @@ export const api = {
   },
   createTask: (data: any) => apiRequest("POST", "/api/tasks", data),
   updateTask: (id: string, data: any) => apiRequest("PATCH", `/api/tasks/${id}`, data),
+  
+  // Phone Calls
+  initiateCall: (data: { contactId: string; userId: string; scriptType: string }) =>
+    apiRequest("POST", "/api/calls/initiate", data),
+  startCallCampaign: (data: { contactIds: string[]; userId: string; scriptType: string }) =>
+    apiRequest("POST", "/api/calls/campaign", data),
+  getCallAnalytics: (userId?: string) => {
+    const params = userId ? `?userId=${userId}` : "";
+    return fetch(`/api/calls/analytics${params}`).then(res => res.json());
+  },
+  getPhoneCalls: (filters?: { contactId?: string; userId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.contactId) params.append("contactId", filters.contactId);
+    if (filters?.userId) params.append("userId", filters.userId);
+    if (filters?.status) params.append("status", filters.status);
+    return fetch(`/api/calls?${params}`).then(res => res.json());
+  },
+  getPhoneCall: (id: string) => fetch(`/api/calls/${id}`).then(res => res.json()),
+  getCallScripts: (filters?: { type?: string; personaId?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.type) params.append("type", filters.type);
+    if (filters?.personaId) params.append("personaId", filters.personaId);
+    return fetch(`/api/call-scripts?${params}`).then(res => res.json());
+  },
+  generateCallScript: (data: { type: string; contactId?: string }) =>
+    apiRequest("POST", "/api/call-scripts/generate", data),
+  getVoicemails: (filters?: { contactId?: string; isListened?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filters?.contactId) params.append("contactId", filters.contactId);
+    if (filters?.isListened !== undefined) params.append("isListened", String(filters.isListened));
+    return fetch(`/api/voicemails?${params}`).then(res => res.json());
+  },
 };

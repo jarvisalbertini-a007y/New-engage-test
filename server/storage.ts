@@ -8,7 +8,10 @@ import {
   type Insight, type InsertInsight,
   type Persona, type InsertPersona,
   type Task, type InsertTask,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks
+  type PhoneCall, type InsertPhoneCall,
+  type CallScript, type InsertCallScript,
+  type Voicemail, type InsertVoicemail,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -79,6 +82,24 @@ export interface IStorage {
   getTasks(filters?: { assignedTo?: string; status?: string; priority?: string }): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<Task>): Promise<Task | undefined>;
+
+  // Phone Calls
+  getPhoneCall(id: string): Promise<PhoneCall | undefined>;
+  getPhoneCalls(filters?: { contactId?: string; userId?: string; status?: string }): Promise<PhoneCall[]>;
+  createPhoneCall(call: InsertPhoneCall): Promise<PhoneCall>;
+  updatePhoneCall(id: string, updates: Partial<PhoneCall>): Promise<PhoneCall | undefined>;
+
+  // Call Scripts
+  getCallScript(id: string): Promise<CallScript | undefined>;
+  getCallScripts(filters?: { type?: string; personaId?: string }): Promise<CallScript[]>;
+  createCallScript(script: InsertCallScript): Promise<CallScript>;
+  updateCallScript(id: string, updates: Partial<CallScript>): Promise<CallScript | undefined>;
+
+  // Voicemails
+  getVoicemail(id: string): Promise<Voicemail | undefined>;
+  getVoicemails(filters?: { contactId?: string; isListened?: boolean }): Promise<Voicemail[]>;
+  createVoicemail(voicemail: InsertVoicemail): Promise<Voicemail>;
+  updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -828,6 +849,103 @@ export class DbStorage implements IStorage {
     const cleaned = cleanPartial(updates);
     if (Object.keys(cleaned).length === 0) return this.getTask(id);
     const result = await db.update(tasks).set(cleaned).where(eq(tasks.id, id)).returning();
+    return result[0];
+  }
+
+  // Phone Call methods
+  async getPhoneCall(id: string): Promise<PhoneCall | undefined> {
+    const result = await db.select().from(phoneCalls).where(eq(phoneCalls.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPhoneCalls(filters?: { contactId?: string; userId?: string; status?: string }): Promise<PhoneCall[]> {
+    let query = db.select().from(phoneCalls);
+    
+    const conditions: any[] = [];
+    if (filters?.contactId) conditions.push(eq(phoneCalls.contactId, filters.contactId));
+    if (filters?.userId) conditions.push(eq(phoneCalls.userId, filters.userId));
+    if (filters?.status) conditions.push(eq(phoneCalls.status, filters.status));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createPhoneCall(call: InsertPhoneCall): Promise<PhoneCall> {
+    const result = await db.insert(phoneCalls).values(call).returning();
+    return result[0];
+  }
+
+  async updatePhoneCall(id: string, updates: Partial<PhoneCall>): Promise<PhoneCall | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getPhoneCall(id);
+    const result = await db.update(phoneCalls).set(cleaned).where(eq(phoneCalls.id, id)).returning();
+    return result[0];
+  }
+
+  // Call Script methods
+  async getCallScript(id: string): Promise<CallScript | undefined> {
+    const result = await db.select().from(callScripts).where(eq(callScripts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCallScripts(filters?: { type?: string; personaId?: string }): Promise<CallScript[]> {
+    let query = db.select().from(callScripts);
+    
+    const conditions: any[] = [];
+    if (filters?.type) conditions.push(eq(callScripts.type, filters.type));
+    if (filters?.personaId) conditions.push(eq(callScripts.personaId, filters.personaId));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createCallScript(script: InsertCallScript): Promise<CallScript> {
+    const result = await db.insert(callScripts).values(script).returning();
+    return result[0];
+  }
+
+  async updateCallScript(id: string, updates: Partial<CallScript>): Promise<CallScript | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getCallScript(id);
+    const result = await db.update(callScripts).set(cleaned).where(eq(callScripts.id, id)).returning();
+    return result[0];
+  }
+
+  // Voicemail methods
+  async getVoicemail(id: string): Promise<Voicemail | undefined> {
+    const result = await db.select().from(voicemails).where(eq(voicemails.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getVoicemails(filters?: { contactId?: string; isListened?: boolean }): Promise<Voicemail[]> {
+    let query = db.select().from(voicemails);
+    
+    const conditions: any[] = [];
+    if (filters?.contactId) conditions.push(eq(voicemails.contactId, filters.contactId));
+    if (filters?.isListened !== undefined) conditions.push(eq(voicemails.isListened, filters.isListened));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createVoicemail(voicemail: InsertVoicemail): Promise<Voicemail> {
+    const result = await db.insert(voicemails).values(voicemail).returning();
+    return result[0];
+  }
+
+  async updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getVoicemail(id);
+    const result = await db.update(voicemails).set(cleaned).where(eq(voicemails.id, id)).returning();
     return result[0];
   }
 }

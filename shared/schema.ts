@@ -141,6 +141,53 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const phoneCalls = pgTable("phone_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => contacts.id),
+  userId: varchar("user_id").references(() => users.id),
+  phoneNumber: text("phone_number").notNull(),
+  direction: text("direction").notNull(), // inbound, outbound
+  status: text("status").notNull(), // initiated, ringing, connected, completed, failed, voicemail
+  duration: integer("duration"), // seconds
+  recordingUrl: text("recording_url"),
+  transcription: text("transcription"),
+  sentiment: text("sentiment"), // positive, neutral, negative
+  talkTrackId: varchar("talk_track_id"),
+  notes: text("notes"),
+  scheduledAt: timestamp("scheduled_at"),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const callScripts = pgTable("call_scripts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // cold_call, follow_up, demo_booking, objection_handling
+  personaId: varchar("persona_id").references(() => personas.id),
+  opening: text("opening").notNull(),
+  valueProps: text("value_props").array(),
+  questions: text("questions").array(),
+  objectionHandlers: jsonb("objection_handlers"), // { objection: response } mapping
+  closing: text("closing"),
+  aiGenerated: boolean("ai_generated").default(false),
+  successRate: decimal("success_rate", { precision: 5, scale: 2 }),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const voicemails = pgTable("voicemails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callId: varchar("call_id").references(() => phoneCalls.id),
+  contactId: varchar("contact_id").references(() => contacts.id),
+  scriptId: varchar("script_id").references(() => callScripts.id),
+  audioUrl: text("audio_url"),
+  transcription: text("transcription"),
+  duration: integer("duration"), // seconds
+  isListened: boolean("is_listened").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -188,6 +235,21 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   createdAt: true,
 });
 
+export const insertPhoneCallSchema = createInsertSchema(phoneCalls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCallScriptSchema = createInsertSchema(callScripts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertVoicemailSchema = createInsertSchema(voicemails).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -215,3 +277,12 @@ export type InsertPersona = z.infer<typeof insertPersonaSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type PhoneCall = typeof phoneCalls.$inferSelect;
+export type InsertPhoneCall = z.infer<typeof insertPhoneCallSchema>;
+
+export type CallScript = typeof callScripts.$inferSelect;
+export type InsertCallScript = z.infer<typeof insertCallScriptSchema>;
+
+export type Voicemail = typeof voicemails.$inferSelect;
+export type InsertVoicemail = z.infer<typeof insertVoicemailSchema>;

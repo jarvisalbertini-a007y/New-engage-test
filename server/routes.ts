@@ -8,6 +8,7 @@ import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/v
 import { enrichCompanyData, getCompanyVisitorHistory } from "./services/ipIntelligence";
 import { discoverInsights, generateInsightRecommendations, scoreInsightRelevance } from "./services/insightsEngine";
 import { generatePersonalizedEmail, categorizeEmailResponse } from "./services/openai";
+import { initiateCall, getCallAnalytics, scheduleCallCampaign, getOrGenerateCallScript } from "./services/cloudDialer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard & Analytics Routes
@@ -331,6 +332,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Task not found" });
       }
       res.json(task);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Phone Call Routes
+  app.post("/api/calls/initiate", async (req, res) => {
+    try {
+      const { contactId, userId, scriptType } = req.body;
+      if (!contactId || !userId) {
+        return res.status(400).json({ error: "contactId and userId are required" });
+      }
+      const call = await initiateCall(contactId, userId, scriptType || 'cold_call');
+      res.json(call);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/calls/campaign", async (req, res) => {
+    try {
+      const { contactIds, userId, scriptType } = req.body;
+      if (!contactIds || !Array.isArray(contactIds) || !userId) {
+        return res.status(400).json({ error: "contactIds array and userId are required" });
+      }
+      const calls = await scheduleCallCampaign(contactIds, userId, scriptType || 'cold_call');
+      res.json({ message: `Scheduled ${contactIds.length} calls`, calls });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/calls/analytics", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const analytics = await getCallAnalytics(userId);
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/calls", async (req, res) => {
+    try {
+      const contactId = req.query.contactId as string;
+      const userId = req.query.userId as string;
+      const status = req.query.status as string;
+      const calls = await storage.getPhoneCalls({ contactId, userId, status });
+      res.json(calls);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/calls/:id", async (req, res) => {
+    try {
+      const call = await storage.getPhoneCall(req.params.id);
+      if (!call) {
+        return res.status(404).json({ error: "Call not found" });
+      }
+      res.json(call);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/call-scripts", async (req, res) => {
+    try {
+      const type = req.query.type as string;
+      const personaId = req.query.personaId as string;
+      const scripts = await storage.getCallScripts({ type, personaId });
+      res.json(scripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/call-scripts/generate", async (req, res) => {
+    try {
+      const { type, contactId } = req.body;
+      const contact = contactId ? await storage.getContact(contactId) : null;
+      const script = await getOrGenerateCallScript(type || 'cold_call', contact);
+      res.json(script);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/voicemails", async (req, res) => {
+    try {
+      const contactId = req.query.contactId as string;
+      const isListened = req.query.isListened === 'true';
+      const voicemails = await storage.getVoicemails({ contactId, isListened });
+      res.json(voicemails);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
