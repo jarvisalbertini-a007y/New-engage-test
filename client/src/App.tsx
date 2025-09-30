@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import Dashboard from "@/pages/dashboard";
 import DashboardAi from "@/pages/dashboard-ai";
+import OutreachReview from "@/pages/outreach-review";
 import VisitorIntelligence from "@/pages/visitor-intelligence";
 import EmailCoach from "@/pages/email-coach";
 import Sequences from "@/pages/sequences";
@@ -60,6 +61,7 @@ function Router() {
           <Route path="/" component={DashboardAi} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/dashboard-ai" component={DashboardAi} />
+          <Route path="/outreach" component={OutreachReview} />
           <Route path="/visitors" component={VisitorIntelligence} />
           <Route path="/email-coach" component={EmailCoach} />
           <Route path="/sequences" component={Sequences} />
