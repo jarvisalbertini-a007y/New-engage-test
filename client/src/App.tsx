@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import Dashboard from "@/pages/dashboard";
+import DashboardAi from "@/pages/dashboard-ai";
 import VisitorIntelligence from "@/pages/visitor-intelligence";
 import EmailCoach from "@/pages/email-coach";
 import Sequences from "@/pages/sequences";
@@ -56,8 +57,9 @@ function Router() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Switch>
-          <Route path="/" component={Dashboard} />
+          <Route path="/" component={DashboardAi} />
           <Route path="/dashboard" component={Dashboard} />
+          <Route path="/dashboard-ai" component={DashboardAi} />
           <Route path="/visitors" component={VisitorIntelligence} />
           <Route path="/email-coach" component={EmailCoach} />
           <Route path="/sequences" component={Sequences} />
