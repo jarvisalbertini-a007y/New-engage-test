@@ -138,4 +138,16 @@ export const api = {
     apiRequest("PATCH", `/api/agents/${id}`, data),
   deleteAgent: (id: string) =>
     apiRequest("DELETE", `/api/agents/${id}`, {}),
+    
+  // Onboarding APIs
+  getOnboardingProfile: () =>
+    fetch("/api/onboarding/profile").then(res => res.json()),
+  createOnboardingProfile: (data: any) =>
+    apiRequest("POST", "/api/onboarding/profile", data),
+  updateOnboardingProfile: (data: any) =>
+    apiRequest("PATCH", "/api/onboarding/profile", data),
+  autoConfigureOnboarding: (data: any) =>
+    apiRequest("POST", "/api/onboarding/auto-configure", data),
+  applyOnboardingConfig: (data: any) =>
+    apiRequest("POST", "/api/onboarding/apply-config", data),
 };

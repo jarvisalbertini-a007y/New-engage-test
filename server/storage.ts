@@ -12,7 +12,8 @@ import {
   type CallScript, type InsertCallScript,
   type Voicemail, type InsertVoicemail,
   type AiAgent, type InsertAiAgent,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents
+  type OnboardingProfile, type InsertOnboardingProfile,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -108,6 +109,11 @@ export interface IStorage {
   createAiAgent(agent: InsertAiAgent): Promise<AiAgent>;
   updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined>;
   deleteAiAgent(id: string): Promise<boolean>;
+  
+  // Onboarding
+  getOnboardingProfile(userId: string): Promise<OnboardingProfile | undefined>;
+  createOnboardingProfile(profile: InsertOnboardingProfile): Promise<OnboardingProfile>;
+  updateOnboardingProfile(userId: string, updates: Partial<OnboardingProfile>): Promise<OnboardingProfile | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -660,6 +666,19 @@ export class MemStorage implements IStorage {
   async deleteAiAgent(id: string): Promise<boolean> {
     return false;
   }
+  
+  // Onboarding (stub implementations)
+  async getOnboardingProfile(userId: string): Promise<OnboardingProfile | undefined> {
+    return undefined;
+  }
+  
+  async createOnboardingProfile(profile: InsertOnboardingProfile): Promise<OnboardingProfile> {
+    return { ...profile, id: randomUUID(), createdAt: new Date(), isComplete: false, onboardingStep: 1 } as OnboardingProfile;
+  }
+  
+  async updateOnboardingProfile(userId: string, updates: Partial<OnboardingProfile>): Promise<OnboardingProfile | undefined> {
+    return undefined;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1065,6 +1084,24 @@ export class DbStorage implements IStorage {
   async deleteAiAgent(id: string): Promise<boolean> {
     const result = await db.delete(aiAgents).where(eq(aiAgents.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Onboarding methods
+  async getOnboardingProfile(userId: string): Promise<OnboardingProfile | undefined> {
+    const result = await db.select().from(onboardingProfiles).where(eq(onboardingProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async createOnboardingProfile(profile: InsertOnboardingProfile): Promise<OnboardingProfile> {
+    const result = await db.insert(onboardingProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateOnboardingProfile(userId: string, updates: Partial<OnboardingProfile>): Promise<OnboardingProfile | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getOnboardingProfile(userId);
+    const result = await db.update(onboardingProfiles).set(cleaned).where(eq(onboardingProfiles.userId, userId)).returning();
+    return result[0];
   }
 }
 

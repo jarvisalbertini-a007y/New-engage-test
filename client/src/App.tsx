@@ -1,8 +1,11 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { api } from "@/lib/api";
 import Dashboard from "@/pages/dashboard";
 import VisitorIntelligence from "@/pages/visitor-intelligence";
 import EmailCoach from "@/pages/email-coach";
@@ -16,10 +19,38 @@ import Analytics from "@/pages/analytics";
 import CloudDialer from "@/pages/cloud-dialer";
 import Deliverability from "@/pages/deliverability";
 import AIAgents from "@/pages/agents";
+import Onboarding from "@/pages/onboarding";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
 function Router() {
+  const [location, setLocation] = useLocation();
+  
+  // Check onboarding status
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["/api/onboarding/profile"],
+    queryFn: api.getOnboardingProfile,
+  });
+  
+  useEffect(() => {
+    if (!isLoading) {
+      // Redirect to onboarding if not completed and not on onboarding page
+      if (!profile?.isComplete && location !== "/onboarding") {
+        setLocation("/onboarding");
+      }
+    }
+  }, [profile, isLoading, location, setLocation]);
+
+  // Show onboarding page without sidebar
+  if (location === "/onboarding") {
+    return (
+      <Switch>
+        <Route path="/onboarding" component={Onboarding} />
+        <Route component={Onboarding} />
+      </Switch>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden dark">
       <Sidebar />

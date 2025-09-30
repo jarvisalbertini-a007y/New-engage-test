@@ -513,6 +513,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Onboarding routes
+  app.get("/api/onboarding/profile", async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId || "demo-user";
+      const profile = await storage.getOnboardingProfile(userId);
+      res.json(profile || { onboardingStep: 1, isComplete: false });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/onboarding/profile", async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId || "demo-user";
+      const { insertOnboardingProfileSchema } = await import("@shared/schema");
+      const profile = insertOnboardingProfileSchema.parse({ ...req.body, userId });
+      const created = await storage.createOnboardingProfile(profile);
+      res.json(created);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+  });
+
+  app.patch("/api/onboarding/profile", async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId || "demo-user";
+      const updated = await storage.updateOnboardingProfile(userId, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/onboarding/auto-configure", async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId || "demo-user";
+      const { industry, companySize, targetMarket, primaryGoal } = req.body;
+      
+      // AI-based auto-configuration logic
+      const config: {
+        personas: any[];
+        sequences: any[];
+        agents: any[];
+        templates: any[];
+      } = {
+        personas: [],
+        sequences: [],
+        agents: [],
+        templates: []
+      };
+
+      // Auto-generate personas based on industry and target market
+      if (industry && targetMarket) {
+        const personaNames = targetMarket === 'B2B' 
+          ? ['Decision Maker', 'Technical Buyer', 'End User']
+          : ['Early Adopter', 'Value Seeker', 'Premium Buyer'];
+          
+        config.personas = personaNames.map(name => ({
+          name: `${industry} ${name}`,
+          description: `Key buyer persona for ${industry} companies`,
+          targetTitles: targetMarket === 'B2B' 
+            ? ['VP', 'Director', 'Manager'] 
+            : ['Individual', 'Team Lead'],
+          industries: [industry],
+          companySizes: [companySize || 'all'],
+        }));
+      }
+
+      // Auto-generate sequences based on primary goal
+      if (primaryGoal) {
+        const sequenceTypes = {
+          'lead_gen': ['Cold Outreach', 'Content Nurture', 'Event Follow-up'],
+          'closing': ['Decision Maker', 'Objection Handling', 'Contract Follow-up'],
+          'nurturing': ['Welcome Series', 'Education', 'Re-engagement'],
+          'all': ['Prospecting', 'Qualification', 'Closing']
+        };
+        
+        config.sequences = (sequenceTypes[primaryGoal as keyof typeof sequenceTypes] || sequenceTypes.all).map(name => ({
+          name,
+          description: `Automated ${name.toLowerCase()} sequence`,
+          steps: [
+            { type: 'email', delay: 0, subject: `Initial ${name}`, template: 'auto-generated' },
+            { type: 'email', delay: 3, subject: `Follow-up ${name}`, template: 'auto-generated' },
+            { type: 'call', delay: 5, script: 'auto-generated' }
+          ]
+        }));
+      }
+
+      // Auto-generate AI agents
+      config.agents = [
+        {
+          name: 'Lead Hunter',
+          type: 'prospecting',
+          description: `Find ${targetMarket} prospects in ${industry}`,
+          targetsPerDay: 50,
+          status: 'active'
+        },
+        {
+          name: 'Engagement Bot',
+          type: 'engagement',
+          description: 'Automated follow-ups and responses',
+          targetsPerDay: 30,
+          status: 'active'
+        }
+      ];
+
+      // Auto-generate email templates
+      config.templates = [
+        {
+          name: 'Cold Intro',
+          subject: `Quick question about {{company}}`,
+          body: `Hi {{firstName}},\n\nI noticed {{company}} is in the ${industry} space...`
+        },
+        {
+          name: 'Follow-up',
+          subject: `Following up - {{company}}`,
+          body: `Hi {{firstName}},\n\nJust wanted to circle back on my previous message...`
+        }
+      ];
+
+      // Save the auto-configuration
+      await storage.updateOnboardingProfile(userId, {
+        aiSuggestions: config as any,
+        autoConfigured: {
+          personasCount: config.personas.length,
+          sequencesCount: config.sequences.length,
+          agentsCount: config.agents.length,
+          templatesCount: config.templates.length
+        } as any
+      });
+
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/onboarding/apply-config", async (req, res) => {
+    try {
+      const { personas, sequences, agents } = req.body;
+      const results: { personas: any[]; sequences: any[]; agents: any[] } = { 
+        personas: [], 
+        sequences: [], 
+        agents: [] 
+      };
+
+      // Create personas
+      if (personas?.length) {
+        for (const persona of personas) {
+          const created = await storage.createPersona(persona);
+          results.personas.push(created);
+        }
+      }
+
+      // Create sequences
+      if (sequences?.length) {
+        for (const sequence of sequences) {
+          const created = await storage.createSequence(sequence);
+          results.sequences.push(created);
+        }
+      }
+
+      // Create AI agents
+      if (agents?.length) {
+        for (const agent of agents) {
+          const created = await storage.createAiAgent(agent);
+          results.agents.push(created);
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // Deliverability routes
   app.get("/api/deliverability/domain-health/:domain", async (req, res) => {
     try {

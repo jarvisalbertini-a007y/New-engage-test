@@ -209,6 +209,28 @@ export const aiAgents = pgTable("ai_agents", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const onboardingProfiles = pgTable("onboarding_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).unique(),
+  companyName: text("company_name"),
+  companyWebsite: text("company_website"),
+  industry: text("industry"),
+  companySize: text("company_size"),
+  targetMarket: text("target_market"), // B2B, B2C, Enterprise, SMB
+  salesCycle: text("sales_cycle"), // short (< 30 days), medium (30-90), long (> 90)
+  primaryGoal: text("primary_goal"), // lead_gen, closing, nurturing, all
+  currentCRM: text("current_crm"),
+  teamSize: integer("team_size"),
+  monthlyLeadTarget: integer("monthly_lead_target"),
+  avgDealSize: integer("avg_deal_size"),
+  onboardingStep: integer("onboarding_step").notNull().default(1),
+  isComplete: boolean("is_complete").notNull().default(false),
+  aiSuggestions: jsonb("ai_suggestions"), // AI-generated suggestions
+  autoConfigured: jsonb("auto_configured"), // What was auto-setup
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -277,6 +299,12 @@ export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
   lastRun: true,
 });
 
+export const insertOnboardingProfileSchema = createInsertSchema(onboardingProfiles).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -316,3 +344,6 @@ export type InsertVoicemail = z.infer<typeof insertVoicemailSchema>;
 
 export type AiAgent = typeof aiAgents.$inferSelect;
 export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
+
+export type OnboardingProfile = typeof onboardingProfiles.$inferSelect;
+export type InsertOnboardingProfile = z.infer<typeof insertOnboardingProfileSchema>;
