@@ -1051,6 +1051,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Autopilot Campaigns
+  app.get("/api/autopilot/campaigns", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.createdBy) filters.createdBy = req.query.createdBy as string;
+      
+      const campaigns = await storage.getAutopilotCampaigns(filters);
+      res.json(campaigns);
+    } catch (error: any) {
+      console.error("Error fetching autopilot campaigns:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/autopilot/campaigns/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const campaign = await storage.getAutopilotCampaign(id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error: any) {
+      console.error("Error fetching autopilot campaign:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/autopilot/campaigns", async (req, res) => {
+    try {
+      const campaign = await storage.createAutopilotCampaign(req.body);
+      res.json(campaign);
+    } catch (error: any) {
+      console.error("Error creating autopilot campaign:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/autopilot/campaigns/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const campaign = await storage.updateAutopilotCampaign(id, req.body);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error: any) {
+      console.error("Error updating autopilot campaign:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/autopilot/campaigns/:id/toggle", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const campaign = await storage.getAutopilotCampaign(id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      
+      const newStatus = campaign.status === "active" ? "paused" : "active";
+      const updated = await storage.updateAutopilotCampaign(id, { 
+        status: newStatus,
+        lastRunAt: newStatus === "active" ? new Date() : campaign.lastRunAt
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error toggling autopilot campaign:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/autopilot/campaigns/:id/runs", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const runs = await storage.getAutopilotRunsByCampaign(id);
+      res.json(runs);
+    } catch (error: any) {
+      console.error("Error fetching autopilot runs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/autopilot/campaigns/:id/run", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const campaign = await storage.getAutopilotCampaign(id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      // Create a new run
+      const run = await storage.createAutopilotRun({
+        campaignId: id,
+        status: "running",
+        runType: "prospecting",
+        leadsProcessed: 0,
+        emailsSent: 0,
+        emailsSkipped: 0
+      });
+
+      // Simulate autonomous processing (in production, this would be handled by a job queue)
+      setTimeout(async () => {
+        const leadsProcessed = Math.floor(Math.random() * 20) + 10;
+        const emailsSent = Math.floor(Math.random() * leadsProcessed);
+        
+        await storage.updateAutopilotRun(run.id, {
+          status: "completed",
+          leadsProcessed,
+          emailsSent,
+          emailsSkipped: leadsProcessed - emailsSent,
+          completedAt: new Date(),
+          duration: Math.floor(Math.random() * 300) + 60
+        });
+
+        await storage.updateAutopilotCampaign(id, {
+          totalLeadsProcessed: (campaign.totalLeadsProcessed || 0) + leadsProcessed,
+          totalEmailsSent: (campaign.totalEmailsSent || 0) + emailsSent,
+          totalReplies: (campaign.totalReplies || 0) + Math.floor(emailsSent * 0.15),
+          totalMeetingsBooked: (campaign.totalMeetingsBooked || 0) + Math.floor(emailsSent * 0.05)
+        });
+      }, 5000);
+
+      res.json({ message: "Autopilot run started", run });
+    } catch (error: any) {
+      console.error("Error starting autopilot run:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

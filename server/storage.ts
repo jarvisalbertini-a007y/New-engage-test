@@ -16,7 +16,9 @@ import {
   type PlatformConfig, type InsertPlatformConfig,
   type WorkflowTrigger, type InsertWorkflowTrigger,
   type Playbook, type InsertPlaybook,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks
+  type AutopilotCampaign, type InsertAutopilotCampaign,
+  type AutopilotRun, type InsertAutopilotRun,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -135,6 +137,18 @@ export interface IStorage {
   getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]>;
   createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
   updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined>;
+
+  // Autopilot Campaigns
+  getAutopilotCampaign(id: string): Promise<AutopilotCampaign | undefined>;
+  getAutopilotCampaigns(filters?: { status?: string; createdBy?: string }): Promise<AutopilotCampaign[]>;
+  createAutopilotCampaign(campaign: InsertAutopilotCampaign): Promise<AutopilotCampaign>;
+  updateAutopilotCampaign(id: string, updates: Partial<AutopilotCampaign>): Promise<AutopilotCampaign | undefined>;
+
+  // Autopilot Runs
+  getAutopilotRun(id: string): Promise<AutopilotRun | undefined>;
+  getAutopilotRunsByCampaign(campaignId: string): Promise<AutopilotRun[]>;
+  createAutopilotRun(run: InsertAutopilotRun): Promise<AutopilotRun>;
+  updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -751,6 +765,39 @@ export class MemStorage implements IStorage {
   async updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined> {
     return undefined;
   }
+
+  // Autopilot stubs
+  async getAutopilotCampaign(id: string): Promise<AutopilotCampaign | undefined> {
+    return undefined;
+  }
+
+  async getAutopilotCampaigns(filters?: { status?: string; createdBy?: string }): Promise<AutopilotCampaign[]> {
+    return [];
+  }
+
+  async createAutopilotCampaign(campaign: InsertAutopilotCampaign): Promise<AutopilotCampaign> {
+    return { ...campaign, id: randomUUID(), createdAt: new Date() } as AutopilotCampaign;
+  }
+
+  async updateAutopilotCampaign(id: string, updates: Partial<AutopilotCampaign>): Promise<AutopilotCampaign | undefined> {
+    return { id, ...updates, createdAt: new Date() } as AutopilotCampaign;
+  }
+
+  async getAutopilotRun(id: string): Promise<AutopilotRun | undefined> {
+    return undefined;
+  }
+
+  async getAutopilotRunsByCampaign(campaignId: string): Promise<AutopilotRun[]> {
+    return [];
+  }
+
+  async createAutopilotRun(run: InsertAutopilotRun): Promise<AutopilotRun> {
+    return { ...run, id: randomUUID(), startedAt: new Date() } as AutopilotRun;
+  }
+
+  async updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined> {
+    return { id, ...updates, startedAt: new Date() } as AutopilotRun;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1260,6 +1307,62 @@ export class DbStorage implements IStorage {
     const cleaned = cleanPartial(updates);
     if (Object.keys(cleaned).length === 0) return this.getPlaybook(id);
     const result = await db.update(playbooks).set(cleaned).where(eq(playbooks.id, id)).returning();
+    return result[0];
+  }
+
+  // Autopilot Campaign methods
+  async getAutopilotCampaign(id: string): Promise<AutopilotCampaign | undefined> {
+    const result = await db.select().from(autopilotCampaigns).where(eq(autopilotCampaigns.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAutopilotCampaigns(filters?: { status?: string; createdBy?: string }): Promise<AutopilotCampaign[]> {
+    let query = db.select().from(autopilotCampaigns);
+    
+    const conditions: any[] = [];
+    if (filters?.status) conditions.push(eq(autopilotCampaigns.status, filters.status));
+    if (filters?.createdBy) conditions.push(eq(autopilotCampaigns.createdBy, filters.createdBy));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createAutopilotCampaign(campaign: InsertAutopilotCampaign): Promise<AutopilotCampaign> {
+    const result = await db.insert(autopilotCampaigns).values(campaign).returning();
+    return result[0];
+  }
+
+  async updateAutopilotCampaign(id: string, updates: Partial<AutopilotCampaign>): Promise<AutopilotCampaign | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAutopilotCampaign(id);
+    const result = await db.update(autopilotCampaigns).set(cleaned).where(eq(autopilotCampaigns.id, id)).returning();
+    return result[0];
+  }
+
+  // Autopilot Run methods
+  async getAutopilotRun(id: string): Promise<AutopilotRun | undefined> {
+    const result = await db.select().from(autopilotRuns).where(eq(autopilotRuns.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAutopilotRunsByCampaign(campaignId: string): Promise<AutopilotRun[]> {
+    return await db.select().from(autopilotRuns)
+      .where(eq(autopilotRuns.campaignId, campaignId))
+      .orderBy(autopilotRuns.startedAt);
+  }
+
+  async createAutopilotRun(run: InsertAutopilotRun): Promise<AutopilotRun> {
+    const result = await db.insert(autopilotRuns).values(run).returning();
+    return result[0];
+  }
+
+  async updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAutopilotRun(id);
+    const result = await db.update(autopilotRuns).set(cleaned).where(eq(autopilotRuns.id, id)).returning();
     return result[0];
   }
 }

@@ -256,6 +256,66 @@ export const workflowTriggers = pgTable("workflow_triggers", {
 });
 
 // Industry Playbooks
+export const autopilotCampaigns = pgTable("autopilot_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  status: text("status").notNull().default("paused"), // active, paused, completed
+  targetPersona: varchar("target_persona").references(() => personas.id),
+  sequence: varchar("sequence_id").references(() => sequences.id),
+  
+  // Configuration
+  dailyTargetLeads: integer("daily_target_leads").default(50),
+  dailySendLimit: integer("daily_send_limit").default(100),
+  workingHours: jsonb("working_hours"), // { start: "09:00", end: "17:00", timezone: "UTC" }
+  workingDays: jsonb("working_days"), // ["Monday", "Tuesday", ...]
+  
+  // Autonomous behaviors
+  autoProspect: boolean("auto_prospect").default(true),
+  autoFollowUp: boolean("auto_follow_up").default(true),
+  autoQualify: boolean("auto_qualify").default(false),
+  autoBookMeetings: boolean("auto_book_meetings").default(false),
+  
+  // AI Configuration
+  creativityLevel: integer("creativity_level").default(5), // 1-10
+  personalizationDepth: text("personalization_depth").default("moderate"), // light, moderate, deep
+  toneOfVoice: text("tone_of_voice").default("professional"), // professional, casual, direct
+  
+  // Metrics
+  totalLeadsProcessed: integer("total_leads_processed").default(0),
+  totalEmailsSent: integer("total_emails_sent").default(0),
+  totalReplies: integer("total_replies").default(0),
+  totalMeetingsBooked: integer("total_meetings_booked").default(0),
+  
+  // Dates
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  lastRunAt: timestamp("last_run_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const autopilotRuns = pgTable("autopilot_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => autopilotCampaigns.id).notNull(),
+  status: text("status").notNull().default("running"), // running, completed, failed
+  runType: text("run_type").notNull(), // prospecting, follow_up, qualification
+  
+  // Run Details
+  leadsProcessed: integer("leads_processed").default(0),
+  emailsSent: integer("emails_sent").default(0),
+  emailsSkipped: integer("emails_skipped").default(0),
+  errors: jsonb("errors"), // Array of error messages
+  
+  // AI Decisions
+  decisions: jsonb("decisions"), // Array of AI decisions made
+  qualificationResults: jsonb("qualification_results"),
+  
+  // Timing
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  duration: integer("duration"), // in seconds
+});
+
 export const playbooks = pgTable("playbooks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -385,6 +445,23 @@ export const insertPlaybookSchema = createInsertSchema(playbooks).omit({
   createdAt: true,
 });
 
+export const insertAutopilotCampaignSchema = createInsertSchema(autopilotCampaigns).omit({
+  id: true,
+  createdAt: true,
+  lastRunAt: true,
+  totalLeadsProcessed: true,
+  totalEmailsSent: true,
+  totalReplies: true,
+  totalMeetingsBooked: true,
+});
+
+export const insertAutopilotRunSchema = createInsertSchema(autopilotRuns).omit({
+  id: true,
+  startedAt: true,
+  completedAt: true,
+  duration: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -436,3 +513,9 @@ export type InsertWorkflowTrigger = z.infer<typeof insertWorkflowTriggerSchema>;
 
 export type Playbook = typeof playbooks.$inferSelect;
 export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
+
+export type AutopilotCampaign = typeof autopilotCampaigns.$inferSelect;
+export type InsertAutopilotCampaign = z.infer<typeof insertAutopilotCampaignSchema>;
+
+export type AutopilotRun = typeof autopilotRuns.$inferSelect;
+export type InsertAutopilotRun = z.infer<typeof insertAutopilotRunSchema>;

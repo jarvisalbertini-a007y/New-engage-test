@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen } from "lucide-react";
+import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -14,6 +14,7 @@ const navigation = [
   {
     name: "Outreach",
     items: [
+      { name: "AI Autopilot", href: "/autopilot", icon: Zap },
       { name: "Playbooks", href: "/playbooks", icon: BookOpen },
       { name: "Sequences", href: "/sequences", icon: NotebookPen },
       { name: "AI Email Coach", href: "/email-coach", icon: Wand2 },

@@ -24,6 +24,7 @@ import AIAgents from "@/pages/agents";
 import Onboarding from "@/pages/onboarding";
 import MagicSetup from "@/pages/magic-setup";
 import { PlaybooksPage } from "@/pages/playbooks";
+import { AutopilotPage } from "@/pages/autopilot";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/sidebar";
 
@@ -78,6 +79,7 @@ function Router() {
           <Route path="/agents" component={AIAgents} />
           <Route path="/magic-setup" component={MagicSetup} />
           <Route path="/playbooks" component={PlaybooksPage} />
+          <Route path="/autopilot" component={AutopilotPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
