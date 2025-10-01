@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   Play, Target, Mail, Phone, Users, TrendingUp, Clock, CheckCircle,
@@ -255,6 +258,9 @@ export function PlaybooksPage() {
   const { toast } = useToast();
   const [selectedIndustry, setSelectedIndustry] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookTemplate | null>(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
   // Fetch user's custom playbooks
   const { data: customPlaybooks, isLoading } = useQuery<Playbook[]>({
@@ -263,8 +269,8 @@ export function PlaybooksPage() {
 
   // Apply playbook mutation
   const applyPlaybook = useMutation({
-    mutationFn: async (playbookId: string) => {
-      return apiRequest(`/api/playbooks/${playbookId}/apply`, "POST");
+    mutationFn: async ({ playbookId, sequences }: { playbookId: string; sequences: string[] }) => {
+      return apiRequest(`/api/playbooks/${playbookId}/apply`, "POST", { sequences });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
@@ -272,8 +278,28 @@ export function PlaybooksPage() {
         title: "Playbook Applied!",
         description: "Sequences and templates have been created successfully.",
       });
+      setApplyModalOpen(false);
+      setSelectedPlaybook(null);
+      setSelectedSequences([]);
     },
   });
+
+  // Handle opening apply modal
+  const handleApplyClick = (template: PlaybookTemplate) => {
+    setSelectedPlaybook(template);
+    setSelectedSequences(template.sequences.map(s => s.name)); // Select all by default
+    setApplyModalOpen(true);
+  };
+
+  // Handle applying the playbook
+  const handleApplyPlaybook = () => {
+    if (selectedPlaybook) {
+      applyPlaybook.mutate({ 
+        playbookId: selectedPlaybook.id, 
+        sequences: selectedSequences 
+      });
+    }
+  };
 
   // Filter templates based on search and industry
   const filteredTemplates = playbookTemplates.filter(template => {
@@ -451,12 +477,12 @@ export function PlaybooksPage() {
                 <div className="flex gap-2 pt-3">
                   <Button 
                     className="flex-1" 
-                    onClick={() => applyPlaybook.mutate(template.id)}
+                    onClick={() => handleApplyClick(template)}
                     disabled={applyPlaybook.isPending}
                     data-testid={`button-apply-${template.id}`}
                   >
                     <Play className="h-4 w-4 mr-2" />
-                    {applyPlaybook.isPending ? "Applying..." : "Apply Playbook"}
+                    Apply Playbook
                   </Button>
                   <Button variant="outline" size="icon" data-testid={`button-preview-${template.id}`}>
                     <FileText className="h-4 w-4" />
@@ -505,6 +531,107 @@ export function PlaybooksPage() {
           </Card>
         )}
       </div>
+
+      {/* Apply Playbook Modal */}
+      <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Apply Playbook: {selectedPlaybook?.name}</DialogTitle>
+            <DialogDescription>
+              Configure how you want to apply this playbook to your outreach campaigns.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPlaybook && (
+            <div className="space-y-4 py-4">
+              {/* Target Audience Info */}
+              <div>
+                <Label className="text-sm font-medium mb-2">Target Audience</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedPlaybook.targetAudience.titles.map((title) => (
+                    <Badge key={title} variant="outline">
+                      {title}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {selectedPlaybook.targetAudience.companySize} • {selectedPlaybook.targetAudience.industries.join(", ")}
+                </p>
+              </div>
+
+              {/* Select Sequences */}
+              <div>
+                <Label className="text-sm font-medium mb-2">Select Sequences to Create</Label>
+                <div className="space-y-2 mt-2">
+                  {selectedPlaybook.sequences.map((sequence) => (
+                    <div key={sequence.name} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={sequence.name}
+                        checked={selectedSequences.includes(sequence.name)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedSequences([...selectedSequences, sequence.name]);
+                          } else {
+                            setSelectedSequences(selectedSequences.filter(s => s !== sequence.name));
+                          }
+                        }}
+                        data-testid={`checkbox-sequence-${sequence.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      />
+                      <label
+                        htmlFor={sequence.name}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{sequence.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {sequence.steps} steps • {sequence.duration}
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Expected Metrics */}
+              <div>
+                <Label className="text-sm font-medium mb-2">Expected Performance</Label>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <Card className="p-3 text-center">
+                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.avgReplyRate}</p>
+                    <p className="text-xs text-muted-foreground">Reply Rate</p>
+                  </Card>
+                  <Card className="p-3 text-center">
+                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.avgMeetingRate}</p>
+                    <p className="text-xs text-muted-foreground">Meeting Rate</p>
+                  </Card>
+                  <Card className="p-3 text-center">
+                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.timeToFirst}</p>
+                    <p className="text-xs text-muted-foreground">First Response</p>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setApplyModalOpen(false)}
+              data-testid="button-cancel-apply"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApplyPlaybook}
+              disabled={applyPlaybook.isPending || selectedSequences.length === 0}
+              data-testid="button-confirm-apply"
+            >
+              {applyPlaybook.isPending ? "Applying..." : "Apply Playbook"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

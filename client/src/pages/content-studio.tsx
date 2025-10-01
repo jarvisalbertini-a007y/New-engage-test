@@ -13,10 +13,10 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ContentStudio() {
-  const [selectedPersona, setSelectedPersona] = useState("");
-  const [selectedContact, setSelectedContact] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("");
-  const [selectedInsight, setSelectedInsight] = useState("");
+  const [selectedPersona, setSelectedPersona] = useState("none");
+  const [selectedContact, setSelectedContact] = useState("none");
+  const [selectedCompany, setSelectedCompany] = useState("none");
+  const [selectedInsight, setSelectedInsight] = useState("none");
   const [contentType, setContentType] = useState("email");
   const [tone, setTone] = useState("professional");
   const [customPrompt, setCustomPrompt] = useState("");
@@ -63,10 +63,10 @@ export default function ContentStudio() {
 
   const handleGenerate = () => {
     const request = {
-      personaId: selectedPersona || undefined,
-      contactId: selectedContact || undefined,
-      companyId: selectedCompany || undefined,
-      insightId: selectedInsight || undefined,
+      personaId: selectedPersona !== "none" ? selectedPersona : undefined,
+      contactId: selectedContact !== "none" ? selectedContact : undefined,
+      companyId: selectedCompany !== "none" ? selectedCompany : undefined,
+      insightId: selectedInsight !== "none" ? selectedInsight : undefined,
       customPrompt: customPrompt || undefined,
       tone,
       type: contentType,
@@ -97,10 +97,10 @@ export default function ContentStudio() {
 
   const getPersonalizationScore = () => {
     let score = 30; // Base score
-    if (selectedPersona) score += 20;
-    if (selectedContact) score += 25;
-    if (selectedCompany) score += 15;
-    if (selectedInsight) score += 10;
+    if (selectedPersona !== "none") score += 20;
+    if (selectedContact !== "none") score += 25;
+    if (selectedCompany !== "none") score += 15;
+    if (selectedInsight !== "none") score += 10;
     return Math.min(100, score);
   };
 
@@ -172,7 +172,7 @@ export default function ContentStudio() {
                       <SelectValue placeholder="Select persona" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {personas?.map((persona: any) => (
                         <SelectItem key={persona.id} value={persona.id}>
                           {persona.name}
@@ -189,7 +189,7 @@ export default function ContentStudio() {
                       <SelectValue placeholder="Select contact" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {contacts?.slice(0, 20).map((contact: any) => (
                         <SelectItem key={contact.id} value={contact.id}>
                           {contact.firstName} {contact.lastName}
@@ -206,7 +206,7 @@ export default function ContentStudio() {
                       <SelectValue placeholder="Select company" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {companies?.slice(0, 20).map((company: any) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -223,7 +223,7 @@ export default function ContentStudio() {
                       <SelectValue placeholder="Select insight" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {insights?.slice(0, 10).map((insight: any) => (
                         <SelectItem key={insight.id} value={insight.id}>
                           {insight.title}
@@ -267,13 +267,13 @@ export default function ContentStudio() {
             </Card>
 
             {/* Context Preview */}
-            {(selectedContact || selectedCompany || selectedInsight) && (
+            {(selectedContact !== "none" || selectedCompany !== "none" || selectedInsight !== "none") && (
               <Card>
                 <CardHeader>
                   <CardTitle>Context Preview</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {selectedContact && (
+                  {selectedContact !== "none" && (
                     <div className="flex items-start space-x-2">
                       <User className="h-4 w-4 text-chart-1 mt-0.5" />
                       <div>
@@ -287,7 +287,7 @@ export default function ContentStudio() {
                     </div>
                   )}
                   
-                  {selectedCompany && (
+                  {selectedCompany !== "none" && (
                     <div className="flex items-start space-x-2">
                       <Building className="h-4 w-4 text-chart-2 mt-0.5" />
                       <div>
@@ -301,7 +301,7 @@ export default function ContentStudio() {
                     </div>
                   )}
                   
-                  {selectedInsight && (
+                  {selectedInsight !== "none" && (
                     <div className="flex items-start space-x-2">
                       <Lightbulb className="h-4 w-4 text-chart-4 mt-0.5" />
                       <div>
