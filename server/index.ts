@@ -41,8 +41,10 @@ app.use((req, res, next) => {
 app.disable('x-powered-by');
 
 // Security Headers with Helmet
+// In development, use less restrictive CSP to allow Vite to work
+const isDevelopment = app.get("env") === "development";
 app.use(helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: isDevelopment ? false : {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:", "http:"],
