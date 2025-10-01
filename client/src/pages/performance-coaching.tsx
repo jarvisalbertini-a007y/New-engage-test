@@ -11,7 +11,7 @@ import {
   BarChart, Activity, AlertCircle, CheckCircle, Clock,
   MessageSquare, Video, BookOpen, Trophy, Star, Zap,
   ChevronRight, ArrowUp, ArrowDown, Play, User,
-  Lightbulb, Shield, Heart, Sparkles, GraduationCap
+  Lightbulb, Shield, Heart, Sparkles, GraduationCap, Phone
 } from "lucide-react";
 import {
   RadarChart,

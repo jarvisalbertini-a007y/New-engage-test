@@ -762,7 +762,7 @@ export function LeadScoringPage() {
                       <Input type="number" defaultValue="50" data-testid="input-warm-threshold" />
                     </div>
                     <div>
-                      <Label className="text-xs">Cold (<)</Label>
+                      <Label className="text-xs">Cold (&lt;50)</Label>
                       <Input type="number" defaultValue="50" disabled />
                     </div>
                   </div>
