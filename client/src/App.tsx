@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import DashboardAi from "@/pages/dashboard-ai";
 import OutreachReview from "@/pages/outreach-review";
@@ -32,27 +33,40 @@ import { SetupAssistantPage } from "@/pages/setup-assistant";
 import { PerformanceCoachingPage } from "@/pages/performance-coaching";
 import { TeamCollaborationPage } from "@/pages/team-collaboration";
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing";
 import Sidebar from "@/components/sidebar";
 
 function Router() {
   const [location, setLocation] = useLocation();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   
-  // Check onboarding status
-  const { data: profile, isLoading } = useQuery({
+  // Check onboarding status (only for authenticated users)
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["/api/onboarding/profile"],
     queryFn: api.getOnboardingProfile,
+    enabled: isAuthenticated, // Only check if authenticated
   });
   
   useEffect(() => {
-    if (!isLoading) {
+    if (isAuthenticated && !profileLoading) {
       // Redirect to onboarding if profile doesn't exist or not completed
       if ((!profile || !profile.isComplete) && location !== "/onboarding") {
         setLocation("/onboarding");
       }
     }
-  }, [profile, isLoading, location, setLocation]);
+  }, [profile, profileLoading, location, setLocation, isAuthenticated]);
 
-  // Show onboarding page without sidebar
+  // Show landing page for non-authenticated users
+  if (authLoading || !isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
+  }
+
+  // Show onboarding page without sidebar for authenticated users who need onboarding
   if (location === "/onboarding") {
     return (
       <Switch>

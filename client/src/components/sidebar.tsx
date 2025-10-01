@@ -1,6 +1,16 @@
 import { Link, useLocation } from "wouter";
-import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen, Zap, MessageSquare, GraduationCap } from "lucide-react";
+import { Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navigation = [
   {
@@ -48,6 +58,7 @@ const navigation = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <div className="w-64 bg-card border-r border-border flex flex-col">
@@ -71,24 +82,22 @@ export default function Sidebar() {
             {section.items.map((item) => {
               const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
               return (
-                <Link key={item.name} href={item.href}>
-                  <a
-                    className={cn(
-                      "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                    data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.name}</span>
-                    {item.badge && (
-                      <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full ml-auto">
-                        {item.badge}
-                      </span>
-                    )}
-                  </a>
+                <Link key={item.name} href={item.href}
+                  className={cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                  data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                  {item.badge && (
+                    <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full ml-auto">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -98,23 +107,51 @@ export default function Sidebar() {
 
       {/* User Profile */}
       <div className="p-4 border-t border-border">
-        <div className="flex items-center space-x-3">
-          <img 
-            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=80&h=80" 
-            alt="User profile" 
-            className="w-10 h-10 rounded-full object-cover" 
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">Alex Thompson</p>
-            <p className="text-xs text-muted-foreground truncate">Sales Manager</p>
-          </div>
-          <button 
-            className="text-muted-foreground hover:text-foreground"
-            data-testid="button-settings"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="w-full justify-start p-0">
+              <div className="flex items-center space-x-3 w-full">
+                {user?.profileImageUrl ? (
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt="User profile" 
+                    className="w-10 h-10 rounded-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-primary-foreground font-semibold">
+                      {user?.firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium truncate">
+                    {user?.firstName && user?.lastName 
+                      ? `${user.firstName} ${user.lastName}`
+                      : user?.email || 'User'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user?.email}
+                  </p>
+                </div>
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

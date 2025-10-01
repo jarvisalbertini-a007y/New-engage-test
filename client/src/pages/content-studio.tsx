@@ -24,21 +24,21 @@ export default function ContentStudio() {
   
   const { toast } = useToast();
 
-  const { data: personas } = useQuery({
+  const { data: personas = [] } = useQuery({
     queryKey: ["/api/personas"],
   });
 
-  const { data: contacts } = useQuery({
+  const { data: contacts = [] } = useQuery({
     queryKey: ["/api/contacts"],
     queryFn: () => api.getContacts({ limit: 100 }),
   });
 
-  const { data: companies } = useQuery({
+  const { data: companies = [] } = useQuery({
     queryKey: ["/api/companies"],
     queryFn: () => api.getCompanies(100),
   });
 
-  const { data: insights } = useQuery({
+  const { data: insights = [] } = useQuery({
     queryKey: ["/api/insights"],
     queryFn: () => api.getInsights({ limit: 20 }),
   });
