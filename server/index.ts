@@ -1,10 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Security: Payload size limits to prevent memory exhaustion
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // CRITICAL SECURITY: Block access to sensitive files and directories
 app.use((req, res, next) => {
@@ -35,6 +39,54 @@ app.use((req, res, next) => {
 
 // Security: Remove X-Powered-By header
 app.disable('x-powered-by');
+
+// Security Headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:", "http:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:", "http:"],
+      imgSrc: ["'self'", "data:", "https:", "http:", "blob:"],
+      fontSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https:", "http:", "ws:", "wss:"],
+      frameSrc: ["'self'", "https:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  crossOriginEmbedderPolicy: false // Allow embedding for development
+}));
+
+// Rate Limiting Configuration
+// Strict rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window for auth endpoints
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many authentication attempts, please try again later",
+  skipSuccessfulRequests: false
+});
+
+// Moderate rate limiting for general API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window for general API
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many requests, please slow down",
+  skip: (req) => {
+    // Skip rate limiting for static assets
+    return !req.path.startsWith('/api');
+  }
+});
+
+// Apply rate limiters
+app.use('/api/login', authLimiter);
+app.use('/api/logout', authLimiter);
+app.use('/api/callback', authLimiter);
+app.use('/api/', apiLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();
