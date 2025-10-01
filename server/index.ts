@@ -12,6 +12,21 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // CRITICAL SECURITY: Block access to sensitive files and directories
 app.use((req, res, next) => {
+  // Allow Vite development assets to pass through
+  if (app.get("env") === "development") {
+    // Skip blocking for Vite assets
+    if (req.path.startsWith('/@') || 
+        req.path.startsWith('/node_modules/') ||
+        req.path.startsWith('/src/') ||
+        req.path.includes('.tsx') ||
+        req.path.includes('.ts') ||
+        req.path.includes('.jsx') ||
+        req.path.includes('.js') ||
+        req.path.includes('.css')) {
+      return next();
+    }
+  }
+  
   const blockedPatterns = [
     /^\/\.git/,       // Block .git directory
     /^\/\.env/,       // Block .env files
@@ -24,7 +39,7 @@ app.use((req, res, next) => {
     /\.DS_Store$/,    // Block macOS files
     /\.gitignore$/,   // Block gitignore
     /\.git/,          // Block any git path
-    /node_modules/,   // Block node_modules
+    /node_modules/,   // Block node_modules (except in dev for Vite)
     /\.log$/,         // Block log files
     /\.sql$/,         // Block SQL files
     /\.sqlite$/,      // Block SQLite files
