@@ -14,7 +14,18 @@ import { canSendEmail, incrementSendCount, getWarmupSchedule, checkDomainReputat
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
-  await setupAuth(app);
+  console.log("[Auth Setup] Starting authentication setup...");
+  try {
+    await setupAuth(app);
+    console.log("[Auth Setup] Authentication setup completed successfully");
+  } catch (error) {
+    console.error("[Auth Setup] Failed to set up authentication:", error);
+    throw error;
+  }
+  
+  // Test if middleware is actually loaded
+  console.log("[Auth Setup] isAuthenticated middleware type:", typeof isAuthenticated);
+  console.log("[Auth Setup] isAuthenticated middleware exists:", !!isAuthenticated);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -29,8 +40,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard & Analytics Routes - Protected
-  app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
+  app.get("/api/dashboard/stats", async (req: any, res) => {
     try {
+      // Check authentication directly in the handler
+      requireAuth(req);
+      
       const activeVisitors = await storage.getActiveVisitorSessions();
       const sequences = await storage.getSequences();
       const emails = await storage.getEmails({ limit: 100 });
@@ -52,8 +66,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       res.json(stats);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.message === "Unauthorized") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.status(500).json({ error: error.message || 'Unknown error' });
     }
   });
 
@@ -86,26 +103,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to check authentication directly in routes
+  const requireAuth = (req: any) => {
+    // Check for authenticated session
+    if (!req.session || !req.user || !req.user.claims || !req.user.claims.sub) {
+      throw new Error("Unauthorized");
+    }
+    
+    // Check if session is expired
+    const now = Math.floor(Date.now() / 1000);
+    if (req.user.expires_at && now > req.user.expires_at) {
+      throw new Error("Unauthorized");
+    }
+    
+    return req.user;
+  };
+  
   // Company Routes
-  app.get("/api/companies", isAuthenticated, async (req, res) => {
+  app.get("/api/companies", async (req: any, res) => {
     try {
+      // Check authentication directly in the handler
+      requireAuth(req);
+      
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const companies = await storage.getCompanies(limit);
       res.json(companies);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.message === "Unauthorized") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.status(500).json({ error: error.message || 'Unknown error' });
     }
   });
 
-  app.get("/api/companies/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/companies/:id", async (req: any, res) => {
     try {
+      // Check authentication directly in the handler
+      requireAuth(req);
+      
       const company = await storage.getCompany(req.params.id);
       if (!company) {
         return res.status(404).json({ error: "Company not found" });
       }
       res.json(company);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.message === "Unauthorized") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.status(500).json({ error: error.message || 'Unknown error' });
     }
   });
 
@@ -144,14 +189,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contact Routes
-  app.get("/api/contacts", isAuthenticated, async (req, res) => {
+  app.get("/api/contacts", async (req: any, res) => {
     try {
+      // Check authentication directly in the handler
+      requireAuth(req);
+      
       const companyId = req.query.companyId as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const contacts = await storage.getContacts({ companyId, limit });
       res.json(contacts);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.message === "Unauthorized") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.status(500).json({ error: error.message || 'Unknown error' });
     }
   });
 

@@ -31,6 +31,11 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  
+  // Check if we're in a secure environment (production/HTTPS)
+  const isProduction = process.env.NODE_ENV === "production";
+  const isSecure = isProduction || process.env.REPLIT_DOMAINS?.includes("replit.app");
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -38,7 +43,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: isSecure,
+      sameSite: isSecure ? "none" : "lax",
       maxAge: sessionTtl,
     },
   });
@@ -127,31 +133,45 @@ export async function setupAuth(app: Express) {
   });
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
+export const isAuthenticated: RequestHandler = (req, res, next) => {
+  // Wrap async logic in an immediately invoked async function
+  (async () => {
+    const user = req.user as any;
+    
+    // Debug logging for authentication
+    console.log(`[Auth Debug] ${req.method} ${req.path}:`, {
+      isAuthenticated: req.isAuthenticated(),
+      hasUser: !!req.user,
+      userSub: user?.claims?.sub,
+      sessionID: req.sessionID,
+      hasCookie: !!req.headers.cookie
+    });
 
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+    if (!req.isAuthenticated() || !user?.expires_at) {
+      console.log(`[Auth Debug] Rejecting unauthenticated request to ${req.path}`);
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
-  }
+    const now = Math.floor(Date.now() / 1000);
+    if (now <= user.expires_at) {
+      return next();
+    }
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
+    const refreshToken = user.refresh_token;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
+    try {
+      const config = await getOidcConfig();
+      const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+      updateUserSession(user, tokenResponse);
+      return next();
+    } catch (error) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+  })().catch((error) => {
+    console.error("[Auth Error]", error);
+    res.status(500).json({ message: "Internal server error" });
+  });
 };
