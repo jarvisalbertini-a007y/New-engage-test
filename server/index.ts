@@ -6,6 +6,36 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// CRITICAL SECURITY: Block access to sensitive files and directories
+app.use((req, res, next) => {
+  const blockedPatterns = [
+    /^\/\.git/,       // Block .git directory
+    /^\/\.env/,       // Block .env files
+    /\.env$/,         // Block any .env file
+    /\.bak$/,         // Block backup files
+    /\.old$/,         // Block old files
+    /~$/,             // Block temp files
+    /\.backup$/,      // Block backup files
+    /\.swp$/,         // Block swap files
+    /\.DS_Store$/,    // Block macOS files
+    /\.gitignore$/,   // Block gitignore
+    /\.git/,          // Block any git path
+    /node_modules/,   // Block node_modules
+    /\.log$/,         // Block log files
+    /\.sql$/,         // Block SQL files
+    /\.sqlite$/,      // Block SQLite files
+    /\.db$/           // Block database files
+  ];
+  
+  if (blockedPatterns.some(pattern => pattern.test(req.path))) {
+    return res.status(404).send('Not Found');
+  }
+  next();
+});
+
+// Security: Remove X-Powered-By header
+app.disable('x-powered-by');
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
