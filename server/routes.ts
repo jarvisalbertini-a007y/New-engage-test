@@ -23,12 +23,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw error;
   }
   
-  // Test if middleware is actually loaded
-  console.log("[Auth Setup] isAuthenticated middleware type:", typeof isAuthenticated);
-  console.log("[Auth Setup] isAuthenticated middleware exists:", !!isAuthenticated);
+  // Define public endpoints that don't require authentication
+  const publicEndpoints = [
+    '/api/login',
+    '/api/callback',
+    '/api/logout',
+    '/api/health' // Add any other public endpoints here
+  ];
+  
+  // Global authentication middleware for all /api routes
+  app.use('/api/*', (req: any, res, next) => {
+    // Skip authentication for public endpoints
+    const path = req.baseUrl + req.path;
+    if (publicEndpoints.some(endpoint => path.startsWith(endpoint))) {
+      return next();
+    }
+    
+    // Skip authentication for OPTIONS requests (CORS preflight)
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+    
+    // Check authentication
+    try {
+      if (!req.session || !req.user || !req.user.claims || !req.user.claims.sub) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Check if session is expired
+      const now = Math.floor(Date.now() / 1000);
+      if (req.user.expires_at && now > req.user.expires_at) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      next();
+    } catch (error) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+  });
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auth/user', async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -40,11 +75,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard & Analytics Routes - Protected
-  app.get("/api/dashboard/stats", async (req: any, res) => {
+  app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      // Check authentication directly in the handler
-      requireAuth(req);
-      
       const activeVisitors = await storage.getActiveVisitorSessions();
       const sequences = await storage.getSequences();
       const emails = await storage.getEmails({ limit: 100 });
@@ -66,16 +98,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       res.json(stats);
-    } catch (error: any) {
-      if (error.message === "Unauthorized") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      res.status(500).json({ error: error.message || 'Unknown error' });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Visitor Intelligence Routes - Protected
-  app.get("/api/visitors/active", isAuthenticated, async (req, res) => {
+  app.get("/api/visitors/active", async (req, res) => {
     try {
       const visitorIntelligence = await getActiveVisitorIntelligence();
       res.json(visitorIntelligence);
@@ -84,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/visitors/track", isAuthenticated, async (req, res) => {
+  app.post("/api/visitors/track", async (req, res) => {
     try {
       const { ipAddress, userAgent, page } = req.body;
       
@@ -103,58 +132,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to check authentication directly in routes
-  const requireAuth = (req: any) => {
-    // Check for authenticated session
-    if (!req.session || !req.user || !req.user.claims || !req.user.claims.sub) {
-      throw new Error("Unauthorized");
-    }
-    
-    // Check if session is expired
-    const now = Math.floor(Date.now() / 1000);
-    if (req.user.expires_at && now > req.user.expires_at) {
-      throw new Error("Unauthorized");
-    }
-    
-    return req.user;
-  };
   
   // Company Routes
-  app.get("/api/companies", async (req: any, res) => {
+  app.get("/api/companies", async (req, res) => {
     try {
-      // Check authentication directly in the handler
-      requireAuth(req);
-      
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const companies = await storage.getCompanies(limit);
       res.json(companies);
-    } catch (error: any) {
-      if (error.message === "Unauthorized") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      res.status(500).json({ error: error.message || 'Unknown error' });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.get("/api/companies/:id", async (req: any, res) => {
+  app.get("/api/companies/:id", async (req, res) => {
     try {
-      // Check authentication directly in the handler
-      requireAuth(req);
-      
       const company = await storage.getCompany(req.params.id);
       if (!company) {
         return res.status(404).json({ error: "Company not found" });
       }
       res.json(company);
-    } catch (error: any) {
-      if (error.message === "Unauthorized") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      res.status(500).json({ error: error.message || 'Unknown error' });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/companies", isAuthenticated, async (req, res) => {
+  app.post("/api/companies", async (req, res) => {
     try {
       const validatedData = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(validatedData);
@@ -165,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Company Enrichment Routes
-  app.post("/api/companies/:id/enrich", isAuthenticated, async (req, res) => {
+  app.post("/api/companies/:id/enrich", async (req, res) => {
     try {
       const company = await storage.getCompany(req.params.id);
       if (!company || !company.domain) {
@@ -179,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/companies/:id/visitor-history", isAuthenticated, async (req, res) => {
+  app.get("/api/companies/:id/visitor-history", async (req, res) => {
     try {
       const history = await getCompanyVisitorHistory(req.params.id);
       res.json(history);
@@ -189,24 +191,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contact Routes
-  app.get("/api/contacts", async (req: any, res) => {
+  app.get("/api/contacts", async (req, res) => {
     try {
-      // Check authentication directly in the handler
-      requireAuth(req);
-      
       const companyId = req.query.companyId as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const contacts = await storage.getContacts({ companyId, limit });
       res.json(contacts);
-    } catch (error: any) {
-      if (error.message === "Unauthorized") {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      res.status(500).json({ error: error.message || 'Unknown error' });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/contacts", isAuthenticated, async (req, res) => {
+  app.post("/api/contacts", async (req, res) => {
     try {
       const validatedData = insertContactSchema.parse(req.body);
       const contact = await storage.createContact(validatedData);
@@ -217,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Email Analysis Routes
-  app.post("/api/emails/analyze", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/analyze", async (req, res) => {
     try {
       const { emailContent } = req.body;
       const analysis = await analyzeEmail(emailContent);
@@ -227,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/emails/improve", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/improve", async (req, res) => {
     try {
       const { emailContent } = req.body;
       const improvement = await improveEmail(emailContent);
@@ -237,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/emails/spam-check", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/spam-check", async (req, res) => {
     try {
       const { emailContent } = req.body;
       const spamAnalysis = analyzeSpamRisk(emailContent);
@@ -247,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/emails/optimize-subject", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/optimize-subject", async (req, res) => {
     try {
       const { subject } = req.body;
       const optimization = optimizeSubjectLine(subject);
@@ -257,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/emails/categorize", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/categorize", async (req, res) => {
     try {
       const { emailContent } = req.body;
       const categorization = await categorizeEmailResponse(emailContent);
@@ -268,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Email Limits & Reputation Routes
-  app.get("/api/emails/limits", isAuthenticated, async (req, res) => {
+  app.get("/api/emails/limits", async (req, res) => {
     try {
       const userId = "demo-user"; // Would come from session
       const limits = await canSendEmail(userId);
@@ -285,7 +281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/emails/check-reputation", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/check-reputation", async (req, res) => {
     try {
       const { domain } = req.body;
       const reputation = await checkDomainReputation(domain);
@@ -295,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/emails/validate", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/validate", async (req, res) => {
     try {
       const { content } = req.body;
       const validation = validateEmailContent(content);
@@ -305,7 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/emails/send", isAuthenticated, async (req, res) => {
+  app.post("/api/emails/send", async (req, res) => {
     try {
       const userId = "demo-user"; // Would come from session
       
@@ -354,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Content Generation Routes
-  app.post("/api/content/generate", isAuthenticated, async (req, res) => {
+  app.post("/api/content/generate", async (req, res) => {
     try {
       const content = await generateContent(req.body);
       res.json(content);
@@ -363,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/content/personalized-email", isAuthenticated, async (req, res) => {
+  app.post("/api/content/personalized-email", async (req, res) => {
     try {
       const email = await generatePersonalizedEmail(req.body);
       res.json(email);
@@ -373,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sequence Routes
-  app.get("/api/sequences", isAuthenticated, async (req, res) => {
+  app.get("/api/sequences", async (req, res) => {
     try {
       const createdBy = req.query.createdBy as string;
       const status = req.query.status as string;
@@ -384,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sequences", isAuthenticated, async (req, res) => {
+  app.post("/api/sequences", async (req, res) => {
     try {
       const validatedData = insertSequenceSchema.parse(req.body);
       const sequence = await storage.createSequence(validatedData);
@@ -394,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sequences/generate-steps", isAuthenticated, async (req, res) => {
+  app.post("/api/sequences/generate-steps", async (req, res) => {
     try {
       const { personaId, sequenceType, stepCount } = req.body;
       const steps = await generateSequenceSteps(personaId, sequenceType, stepCount);
@@ -405,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Insights Routes
-  app.get("/api/insights", isAuthenticated, async (req, res) => {
+  app.get("/api/insights", async (req, res) => {
     try {
       const companyId = req.query.companyId as string;
       const type = req.query.type as string;
@@ -417,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/insights/discover", isAuthenticated, async (req, res) => {
+  app.post("/api/insights/discover", async (req, res) => {
     try {
       const insights = await discoverInsights();
       res.json(insights);
@@ -426,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/insights/:id/recommendations", isAuthenticated, async (req, res) => {
+  app.get("/api/insights/:id/recommendations", async (req, res) => {
     try {
       const recommendations = await generateInsightRecommendations(req.params.id);
       res.json(recommendations);
@@ -436,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Persona Routes
-  app.get("/api/personas", isAuthenticated, async (req, res) => {
+  app.get("/api/personas", async (req, res) => {
     try {
       const createdBy = req.query.createdBy as string;
       const personas = await storage.getPersonas(createdBy);
@@ -446,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/personas", isAuthenticated, async (req, res) => {
+  app.post("/api/personas", async (req, res) => {
     try {
       const validatedData = insertPersonaSchema.parse(req.body);
       const persona = await storage.createPersona(validatedData);
@@ -457,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task Routes
-  app.get("/api/tasks", isAuthenticated, async (req, res) => {
+  app.get("/api/tasks", async (req, res) => {
     try {
       const assignedTo = req.query.assignedTo as string;
       const status = req.query.status as string;
@@ -469,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tasks", isAuthenticated, async (req, res) => {
+  app.post("/api/tasks", async (req, res) => {
     try {
       const validatedData = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(validatedData);
@@ -479,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/tasks/:id", async (req, res) => {
     try {
       const task = await storage.updateTask(req.params.id, req.body);
       if (!task) {
@@ -492,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Phone Call Routes
-  app.post("/api/calls/initiate", isAuthenticated, async (req, res) => {
+  app.post("/api/calls/initiate", async (req, res) => {
     try {
       const { contactId, userId, scriptType } = req.body;
       if (!contactId || !userId) {
@@ -505,7 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/calls/campaign", isAuthenticated, async (req, res) => {
+  app.post("/api/calls/campaign", async (req, res) => {
     try {
       const { contactIds, userId, scriptType } = req.body;
       if (!contactIds || !Array.isArray(contactIds) || !userId) {
@@ -518,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/calls/analytics", isAuthenticated, async (req, res) => {
+  app.get("/api/calls/analytics", async (req, res) => {
     try {
       const userId = req.query.userId as string;
       const analytics = await getCallAnalytics(userId);
@@ -528,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/calls", isAuthenticated, async (req, res) => {
+  app.get("/api/calls", async (req, res) => {
     try {
       const contactId = req.query.contactId as string;
       const userId = req.query.userId as string;
@@ -540,7 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/calls/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/calls/:id", async (req, res) => {
     try {
       const call = await storage.getPhoneCall(req.params.id);
       if (!call) {
@@ -552,7 +548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/call-scripts", isAuthenticated, async (req, res) => {
+  app.get("/api/call-scripts", async (req, res) => {
     try {
       const type = req.query.type as string;
       const personaId = req.query.personaId as string;
@@ -563,7 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/call-scripts/generate", isAuthenticated, async (req, res) => {
+  app.post("/api/call-scripts/generate", async (req, res) => {
     try {
       const { type, contactId } = req.body;
       const contact = contactId ? await storage.getContact(contactId) : null;
@@ -574,7 +570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/voicemails", isAuthenticated, async (req, res) => {
+  app.get("/api/voicemails", async (req, res) => {
     try {
       const contactId = req.query.contactId as string;
       const isListened = req.query.isListened === 'true';
@@ -586,7 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Agents routes
-  app.get("/api/agents/metrics", isAuthenticated, async (req, res) => {
+  app.get("/api/agents/metrics", async (req, res) => {
     try {
       const agents = await storage.getAiAgents();
       const activeAgents = agents.filter(a => a.status === 'active');
@@ -612,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agents", isAuthenticated, async (req, res) => {
+  app.get("/api/agents", async (req, res) => {
     try {
       const status = req.query.status as string;
       const type = req.query.type as string;
@@ -625,7 +621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agents", isAuthenticated, async (req, res) => {
+  app.post("/api/agents", async (req, res) => {
     try {
       const { insertAiAgentSchema } = await import("@shared/schema");
       const agent = insertAiAgentSchema.parse(req.body);
@@ -640,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/agents/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/agents/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -654,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/agents/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/agents/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteAiAgent(id);
@@ -668,7 +664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Onboarding routes
-  app.get("/api/onboarding/profile", isAuthenticated, async (req, res) => {
+  app.get("/api/onboarding/profile", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
       const profile = await storage.getOnboardingProfile(userId);
@@ -679,7 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reset onboarding for demo/testing purposes
-  app.delete("/api/onboarding/reset", isAuthenticated, async (req, res) => {
+  app.delete("/api/onboarding/reset", async (req, res) => {
     try {
       const { onboardingProfiles } = await import("@shared/schema");
       const { db } = await import("./db");
@@ -693,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/onboarding/profile", isAuthenticated, async (req, res) => {
+  app.post("/api/onboarding/profile", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
       const { insertOnboardingProfileSchema } = await import("@shared/schema");
@@ -709,7 +705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/onboarding/profile", isAuthenticated, async (req, res) => {
+  app.patch("/api/onboarding/profile", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
       const updates = { ...req.body };
@@ -721,7 +717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/onboarding/auto-configure", isAuthenticated, async (req, res) => {
+  app.post("/api/onboarding/auto-configure", async (req, res) => {
     try {
       const userId = (req as any).session?.userId || "demo-user";
       const { industry, companySize, targetMarket, primaryGoal } = req.body;
@@ -825,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/onboarding/apply-config", isAuthenticated, async (req, res) => {
+  app.post("/api/onboarding/apply-config", async (req, res) => {
     try {
       const { personas, sequences, agents } = req.body;
       const results: { personas: any[]; sequences: any[]; agents: any[] } = { 
@@ -865,7 +861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Deliverability routes
-  app.get("/api/deliverability/domain-health/:domain", isAuthenticated, async (req, res) => {
+  app.get("/api/deliverability/domain-health/:domain", async (req, res) => {
     try {
       // Mock implementation for domain health check
       const domainHealth = {
@@ -883,7 +879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/deliverability/warming-status/:domain", isAuthenticated, async (req, res) => {
+  app.get("/api/deliverability/warming-status/:domain", async (req, res) => {
     try {
       const warmingStatus = {
         isActive: true,
@@ -903,7 +899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/deliverability/inbox-placement", isAuthenticated, async (req, res) => {
+  app.get("/api/deliverability/inbox-placement", async (req, res) => {
     try {
       const inboxPlacement = [
         { provider: "Gmail", inbox: 92 + Math.floor(Math.random() * 5), spam: 3 + Math.floor(Math.random() * 3), missing: 2 },
@@ -917,7 +913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/deliverability/warming-settings", isAuthenticated, async (req, res) => {
+  app.post("/api/deliverability/warming-settings", async (req, res) => {
     try {
       const { enabled, speed } = req.body;
       // Mock implementation - would update warming settings
@@ -927,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/deliverability/verify-domain", isAuthenticated, async (req, res) => {
+  app.post("/api/deliverability/verify-domain", async (req, res) => {
     try {
       const { domain } = req.body;
       // Mock implementation - would trigger domain verification
@@ -938,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====== Magic Setup & Platform Config ======
-  app.post("/api/magic-setup", isAuthenticated, async (req, res) => {
+  app.post("/api/magic-setup", async (req, res) => {
     try {
       const { linkedinUrl } = req.body;
       
@@ -994,7 +990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/platform-config", isAuthenticated, async (req, res) => {
+  app.get("/api/platform-config", async (req, res) => {
     try {
       const userId = "demo-user"; // Would come from session
       const config = await storage.getPlatformConfig(userId);
@@ -1004,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/platform-config", isAuthenticated, async (req, res) => {
+  app.patch("/api/platform-config", async (req, res) => {
     try {
       const userId = "demo-user"; 
       const updates = req.body;
@@ -1016,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====== Workflow Triggers ======
-  app.get("/api/workflow-triggers", isAuthenticated, async (req, res) => {
+  app.get("/api/workflow-triggers", async (req, res) => {
     try {
       const { isActive, triggerType } = req.query;
       const filters: any = {};
@@ -1030,7 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/workflow-triggers", isAuthenticated, async (req, res) => {
+  app.post("/api/workflow-triggers", async (req, res) => {
     try {
       const trigger = await storage.createWorkflowTrigger(req.body);
       res.json(trigger);
@@ -1039,7 +1035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/workflow-triggers/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/workflow-triggers/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const trigger = await storage.updateWorkflowTrigger(id, req.body);
@@ -1052,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/workflow-triggers/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/workflow-triggers/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteWorkflowTrigger(id);
@@ -1066,7 +1062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====== Lead Scoring Models ======
-  app.get("/api/lead-scoring-models", isAuthenticated, async (req, res) => {
+  app.get("/api/lead-scoring-models", async (req, res) => {
     try {
       const models = await storage.getLeadScoringModels();
       res.json(models);
@@ -1075,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/lead-scoring-models/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/lead-scoring-models/:id", async (req, res) => {
     try {
       const model = await storage.getLeadScoringModelById(req.params.id);
       if (!model) {
@@ -1087,7 +1083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/lead-scoring-models", isAuthenticated, async (req, res) => {
+  app.post("/api/lead-scoring-models", async (req, res) => {
     try {
       const validated = insertLeadScoringModelSchema.parse(req.body);
       const model = await storage.createLeadScoringModel(validated);
@@ -1098,7 +1094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/lead-scoring-models/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/lead-scoring-models/:id", async (req, res) => {
     try {
       const model = await storage.updateLeadScoringModel(req.params.id, req.body);
       res.json(model);
@@ -1108,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/lead-scoring-models/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/lead-scoring-models/:id", async (req, res) => {
     try {
       await storage.deleteLeadScoringModel(req.params.id);
       res.json({ success: true });
@@ -1118,7 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====== Lead Scores ======
-  app.get("/api/lead-scores", isAuthenticated, async (req, res) => {
+  app.get("/api/lead-scores", async (req, res) => {
     try {
       const { contactId, modelId } = req.query;
       const scores = await storage.getLeadScores(contactId as string, modelId as string);
@@ -1128,7 +1124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/lead-scores/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/lead-scores/:id", async (req, res) => {
     try {
       const score = await storage.getLeadScoreById(req.params.id);
       if (!score) {
@@ -1140,7 +1136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/lead-scores", isAuthenticated, async (req, res) => {
+  app.post("/api/lead-scores", async (req, res) => {
     try {
       const validated = insertLeadScoreSchema.parse(req.body);
       const score = await storage.createLeadScore(validated);
@@ -1151,7 +1147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/lead-scores/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/lead-scores/:id", async (req, res) => {
     try {
       const score = await storage.updateLeadScore(req.params.id, req.body);
       res.json(score);
@@ -1161,7 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/lead-scores/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/lead-scores/:id", async (req, res) => {
     try {
       await storage.deleteLeadScore(req.params.id);
       res.json({ success: true });
@@ -1171,7 +1167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====== Playbooks ======
-  app.get("/api/playbooks", isAuthenticated, async (req, res) => {
+  app.get("/api/playbooks", async (req, res) => {
     try {
       const { industry, isTemplate } = req.query;
       const filters: any = {};
@@ -1185,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/playbooks/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/playbooks/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const playbook = await storage.getPlaybook(id);
@@ -1198,7 +1194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/playbooks", isAuthenticated, async (req, res) => {
+  app.post("/api/playbooks", async (req, res) => {
     try {
       const playbook = await storage.createPlaybook(req.body);
       res.json(playbook);
@@ -1207,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/playbooks/:id/apply", isAuthenticated, async (req, res) => {
+  app.post("/api/playbooks/:id/apply", async (req, res) => {
     try {
       const { id } = req.params;
       const playbook = await storage.getPlaybook(id);
@@ -1224,7 +1220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Autopilot Campaigns
-  app.get("/api/autopilot/campaigns", isAuthenticated, async (req, res) => {
+  app.get("/api/autopilot/campaigns", async (req, res) => {
     try {
       const filters: any = {};
       if (req.query.status) filters.status = req.query.status as string;
@@ -1238,7 +1234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/autopilot/campaigns/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/autopilot/campaigns/:id", async (req, res) => {
     const { id } = req.params;
     try {
       const campaign = await storage.getAutopilotCampaign(id);
@@ -1252,7 +1248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/autopilot/campaigns", isAuthenticated, async (req, res) => {
+  app.post("/api/autopilot/campaigns", async (req, res) => {
     try {
       const campaign = await storage.createAutopilotCampaign(req.body);
       res.json(campaign);
@@ -1262,7 +1258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/autopilot/campaigns/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/autopilot/campaigns/:id", async (req, res) => {
     const { id } = req.params;
     try {
       const campaign = await storage.updateAutopilotCampaign(id, req.body);
@@ -1276,7 +1272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/autopilot/campaigns/:id/toggle", isAuthenticated, async (req, res) => {
+  app.post("/api/autopilot/campaigns/:id/toggle", async (req, res) => {
     const { id } = req.params;
     try {
       const campaign = await storage.getAutopilotCampaign(id);
@@ -1297,7 +1293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/autopilot/campaigns/:id/runs", isAuthenticated, async (req, res) => {
+  app.get("/api/autopilot/campaigns/:id/runs", async (req, res) => {
     const { id } = req.params;
     try {
       const runs = await storage.getAutopilotRunsByCampaign(id);
@@ -1308,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/autopilot/campaigns/:id/run", isAuthenticated, async (req, res) => {
+  app.post("/api/autopilot/campaigns/:id/run", async (req, res) => {
     const { id } = req.params;
     try {
       const campaign = await storage.getAutopilotCampaign(id);
