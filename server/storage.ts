@@ -20,7 +20,12 @@ import {
   type AutopilotRun, type InsertAutopilotRun,
   type LeadScoringModel, type InsertLeadScoringModel,
   type LeadScore, type InsertLeadScore,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores
+  type Workflow, type InsertWorkflow,
+  type WorkflowExecution, type InsertWorkflowExecution,
+  type AgentType, type InsertAgentType,
+  type WorkflowTemplate, type InsertWorkflowTemplate,
+  type HumanApproval, type InsertHumanApproval,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -164,6 +169,37 @@ export interface IStorage {
   createLeadScore(score: InsertLeadScore): Promise<LeadScore>;
   updateLeadScore(id: string, score: Partial<InsertLeadScore>): Promise<LeadScore>;
   deleteLeadScore(id: string): Promise<void>;
+
+  // Workflows
+  getWorkflow(id: string): Promise<Workflow | undefined>;
+  getWorkflows(filters?: { status?: string; category?: string; isTemplate?: boolean; createdBy?: string }): Promise<Workflow[]>;
+  createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
+  updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | undefined>;
+  deleteWorkflow(id: string): Promise<boolean>;
+  
+  // Workflow Executions
+  getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined>;
+  getWorkflowExecutions(filters?: { workflowId?: string; status?: string }): Promise<WorkflowExecution[]>;
+  createWorkflowExecution(execution: InsertWorkflowExecution): Promise<WorkflowExecution>;
+  updateWorkflowExecution(id: string, updates: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined>;
+  
+  // Agent Types
+  getAgentType(id: string): Promise<AgentType | undefined>;
+  getAgentTypes(filters?: { category?: string }): Promise<AgentType[]>;
+  createAgentType(agentType: InsertAgentType): Promise<AgentType>;
+  updateAgentType(id: string, updates: Partial<AgentType>): Promise<AgentType | undefined>;
+  
+  // Workflow Templates
+  getWorkflowTemplate(id: string): Promise<WorkflowTemplate | undefined>;
+  getWorkflowTemplates(filters?: { category?: string; difficulty?: string }): Promise<WorkflowTemplate[]>;
+  createWorkflowTemplate(template: InsertWorkflowTemplate): Promise<WorkflowTemplate>;
+  updateWorkflowTemplate(id: string, updates: Partial<WorkflowTemplate>): Promise<WorkflowTemplate | undefined>;
+  
+  // Human Approvals
+  getHumanApproval(id: string): Promise<HumanApproval | undefined>;
+  getHumanApprovals(filters?: { executionId?: string; status?: string }): Promise<HumanApproval[]>;
+  createHumanApproval(approval: InsertHumanApproval): Promise<HumanApproval>;
+  updateHumanApproval(id: string, updates: Partial<HumanApproval>): Promise<HumanApproval | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -854,6 +890,121 @@ export class MemStorage implements IStorage {
   async deleteLeadScore(id: string): Promise<void> {
     // Stub implementation
   }
+
+  // Workflow stub methods
+  async getWorkflow(id: string): Promise<Workflow | undefined> {
+    return undefined;
+  }
+
+  async getWorkflows(filters?: { status?: string; category?: string; isTemplate?: boolean; createdBy?: string }): Promise<Workflow[]> {
+    return [];
+  }
+
+  async createWorkflow(workflow: InsertWorkflow): Promise<Workflow> {
+    return { 
+      id: randomUUID(), 
+      ...workflow, 
+      nodes: workflow.nodes || [], 
+      edges: workflow.edges || [],
+      createdAt: new Date(), 
+      updatedAt: new Date() 
+    } as Workflow;
+  }
+
+  async updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | undefined> {
+    return { id, ...updates, createdAt: new Date(), updatedAt: new Date() } as Workflow;
+  }
+
+  async deleteWorkflow(id: string): Promise<boolean> {
+    return true;
+  }
+
+  // Workflow Execution stub methods
+  async getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined> {
+    return undefined;
+  }
+
+  async getWorkflowExecutions(filters?: { workflowId?: string; status?: string }): Promise<WorkflowExecution[]> {
+    return [];
+  }
+
+  async createWorkflowExecution(execution: InsertWorkflowExecution): Promise<WorkflowExecution> {
+    return { 
+      id: randomUUID(), 
+      ...execution, 
+      startedAt: new Date() 
+    } as WorkflowExecution;
+  }
+
+  async updateWorkflowExecution(id: string, updates: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined> {
+    return { id, ...updates, startedAt: new Date() } as WorkflowExecution;
+  }
+
+  // Agent Type stub methods
+  async getAgentType(id: string): Promise<AgentType | undefined> {
+    return undefined;
+  }
+
+  async getAgentTypes(filters?: { category?: string }): Promise<AgentType[]> {
+    return [];
+  }
+
+  async createAgentType(agentType: InsertAgentType): Promise<AgentType> {
+    return { 
+      id: randomUUID(), 
+      ...agentType, 
+      temperature: agentType.temperature || 0.7,
+      maxTokens: agentType.maxTokens || 2000,
+      createdAt: new Date() 
+    } as AgentType;
+  }
+
+  async updateAgentType(id: string, updates: Partial<AgentType>): Promise<AgentType | undefined> {
+    return { id, ...updates, createdAt: new Date() } as AgentType;
+  }
+
+  // Workflow Template stub methods
+  async getWorkflowTemplate(id: string): Promise<WorkflowTemplate | undefined> {
+    return undefined;
+  }
+
+  async getWorkflowTemplates(filters?: { category?: string; difficulty?: string }): Promise<WorkflowTemplate[]> {
+    return [];
+  }
+
+  async createWorkflowTemplate(template: InsertWorkflowTemplate): Promise<WorkflowTemplate> {
+    return { 
+      id: randomUUID(), 
+      ...template,
+      usageCount: 0, 
+      createdAt: new Date() 
+    } as WorkflowTemplate;
+  }
+
+  async updateWorkflowTemplate(id: string, updates: Partial<WorkflowTemplate>): Promise<WorkflowTemplate | undefined> {
+    return { id, ...updates, createdAt: new Date() } as WorkflowTemplate;
+  }
+
+  // Human Approval stub methods
+  async getHumanApproval(id: string): Promise<HumanApproval | undefined> {
+    return undefined;
+  }
+
+  async getHumanApprovals(filters?: { executionId?: string; status?: string }): Promise<HumanApproval[]> {
+    return [];
+  }
+
+  async createHumanApproval(approval: InsertHumanApproval): Promise<HumanApproval> {
+    return { 
+      id: randomUUID(), 
+      ...approval, 
+      requestedAt: new Date() 
+    } as HumanApproval;
+  }
+
+  async updateHumanApproval(id: string, updates: Partial<HumanApproval>): Promise<HumanApproval | undefined> {
+    return { id, ...updates, requestedAt: new Date() } as HumanApproval;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1497,6 +1648,193 @@ export class DbStorage implements IStorage {
 
   async deleteLeadScore(id: string): Promise<void> {
     await db.delete(leadScores).where(eq(leadScores.id, id));
+  }
+
+  // Workflow methods
+  async getWorkflow(id: string): Promise<Workflow | undefined> {
+    const result = await db.select().from(workflows).where(eq(workflows.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getWorkflows(filters?: { status?: string; category?: string; isTemplate?: boolean; createdBy?: string }): Promise<Workflow[]> {
+    let query = db.select().from(workflows);
+    const conditions: any[] = [];
+
+    if (filters?.status) {
+      conditions.push(eq(workflows.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(workflows.category, filters.category));
+    }
+    if (filters?.isTemplate !== undefined) {
+      conditions.push(eq(workflows.isTemplate, filters.isTemplate));
+    }
+    if (filters?.createdBy) {
+      conditions.push(eq(workflows.createdBy, filters.createdBy));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createWorkflow(workflow: InsertWorkflow): Promise<Workflow> {
+    const result = await db.insert(workflows).values(workflow).returning();
+    return result[0];
+  }
+
+  async updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getWorkflow(id);
+    const result = await db.update(workflows).set({
+      ...cleaned,
+      updatedAt: new Date()
+    }).where(eq(workflows.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteWorkflow(id: string): Promise<boolean> {
+    const result = await db.delete(workflows).where(eq(workflows.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Workflow Execution methods
+  async getWorkflowExecution(id: string): Promise<WorkflowExecution | undefined> {
+    const result = await db.select().from(workflowExecutions).where(eq(workflowExecutions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getWorkflowExecutions(filters?: { workflowId?: string; status?: string }): Promise<WorkflowExecution[]> {
+    let query = db.select().from(workflowExecutions);
+    const conditions: any[] = [];
+
+    if (filters?.workflowId) {
+      conditions.push(eq(workflowExecutions.workflowId, filters.workflowId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(workflowExecutions.status, filters.status));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createWorkflowExecution(execution: InsertWorkflowExecution): Promise<WorkflowExecution> {
+    const result = await db.insert(workflowExecutions).values(execution).returning();
+    return result[0];
+  }
+
+  async updateWorkflowExecution(id: string, updates: Partial<WorkflowExecution>): Promise<WorkflowExecution | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getWorkflowExecution(id);
+    const result = await db.update(workflowExecutions).set(cleaned).where(eq(workflowExecutions.id, id)).returning();
+    return result[0];
+  }
+
+  // Agent Type methods
+  async getAgentType(id: string): Promise<AgentType | undefined> {
+    const result = await db.select().from(agentTypes).where(eq(agentTypes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentTypes(filters?: { category?: string }): Promise<AgentType[]> {
+    if (filters?.category) {
+      return await db.select().from(agentTypes).where(eq(agentTypes.category, filters.category));
+    }
+    return await db.select().from(agentTypes);
+  }
+
+  async createAgentType(agentType: InsertAgentType): Promise<AgentType> {
+    const result = await db.insert(agentTypes).values(agentType).returning();
+    return result[0];
+  }
+
+  async updateAgentType(id: string, updates: Partial<AgentType>): Promise<AgentType | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAgentType(id);
+    const result = await db.update(agentTypes).set(cleaned).where(eq(agentTypes.id, id)).returning();
+    return result[0];
+  }
+
+  // Workflow Template methods
+  async getWorkflowTemplate(id: string): Promise<WorkflowTemplate | undefined> {
+    const result = await db.select().from(workflowTemplates).where(eq(workflowTemplates.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getWorkflowTemplates(filters?: { category?: string; difficulty?: string }): Promise<WorkflowTemplate[]> {
+    let query = db.select().from(workflowTemplates);
+    const conditions: any[] = [];
+
+    if (filters?.category) {
+      conditions.push(eq(workflowTemplates.category, filters.category));
+    }
+    if (filters?.difficulty) {
+      conditions.push(eq(workflowTemplates.difficulty, filters.difficulty));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createWorkflowTemplate(template: InsertWorkflowTemplate): Promise<WorkflowTemplate> {
+    const result = await db.insert(workflowTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateWorkflowTemplate(id: string, updates: Partial<WorkflowTemplate>): Promise<WorkflowTemplate | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getWorkflowTemplate(id);
+    const result = await db.update(workflowTemplates).set(cleaned).where(eq(workflowTemplates.id, id)).returning();
+    return result[0];
+  }
+
+  // Human Approval methods
+  async getHumanApproval(id: string): Promise<HumanApproval | undefined> {
+    const result = await db.select().from(humanApprovals).where(eq(humanApprovals.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getHumanApprovals(filters?: { executionId?: string; status?: string }): Promise<HumanApproval[]> {
+    let query = db.select().from(humanApprovals);
+    const conditions: any[] = [];
+
+    if (filters?.executionId) {
+      conditions.push(eq(humanApprovals.executionId, filters.executionId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(humanApprovals.status, filters.status));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createHumanApproval(approval: InsertHumanApproval): Promise<HumanApproval> {
+    const result = await db.insert(humanApprovals).values(approval).returning();
+    return result[0];
+  }
+
+  async updateHumanApproval(id: string, updates: Partial<HumanApproval>): Promise<HumanApproval | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getHumanApproval(id);
+    const result = await db.update(humanApprovals).set(cleaned).where(eq(humanApprovals.id, id)).returning();
+    return result[0];
   }
 }
 

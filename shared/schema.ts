@@ -116,6 +116,85 @@ export const insights = pgTable("insights", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Workflows and AI Agents
+export const workflows = pgTable("workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  nlpDescription: text("nlp_description"), // Natural language description used to generate workflow
+  status: text("status").notNull().default("draft"), // draft, active, paused, archived
+  triggerType: text("trigger_type").notNull(), // manual, schedule, webhook, event, form
+  triggerConfig: jsonb("trigger_config"), // Configuration for the trigger
+  nodes: jsonb("nodes").notNull(), // Array of workflow nodes
+  edges: jsonb("edges").notNull(), // Array of connections between nodes
+  settings: jsonb("settings"), // Workflow settings (approval requirements, etc.)
+  category: text("category"), // sales, marketing, support, operations
+  isTemplate: boolean("is_template").default(false),
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").references(() => workflows.id),
+  status: text("status").notNull().default("running"), // running, paused, completed, failed, cancelled
+  currentNodeId: text("current_node_id"),
+  context: jsonb("context"), // Execution context and variables
+  logs: jsonb("logs"), // Execution logs for each step
+  error: text("error"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  executionTime: integer("execution_time"), // milliseconds
+});
+
+export const agentTypes = pgTable("agent_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  category: text("category").notNull(), // research, writing, analysis, communication, data
+  capabilities: jsonb("capabilities"), // List of specific capabilities
+  inputs: jsonb("inputs"), // Required input schema
+  outputs: jsonb("outputs"), // Expected output schema
+  modelPreference: text("model_preference"), // gpt-4, claude-3, etc.
+  maxTokens: integer("max_tokens").default(2000),
+  temperature: decimal("temperature", { precision: 2, scale: 1 }).default(0.7),
+  systemPrompt: text("system_prompt"),
+  examples: jsonb("examples"), // Few-shot examples
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const workflowTemplates = pgTable("workflow_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // sales, marketing, support, operations
+  useCase: text("use_case"),
+  difficulty: text("difficulty"), // beginner, intermediate, advanced
+  estimatedTime: text("estimated_time"), // "5 mins", "30 mins", etc.
+  thumbnail: text("thumbnail"), // URL or icon name
+  workflowDefinition: jsonb("workflow_definition").notNull(), // Full workflow JSON
+  requiredIntegrations: text("required_integrations").array(),
+  tags: text("tags").array(),
+  usageCount: integer("usage_count").default(0),
+  rating: decimal("rating", { precision: 2, scale: 1 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const humanApprovals = pgTable("human_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  executionId: varchar("execution_id").references(() => workflowExecutions.id),
+  nodeId: text("node_id").notNull(),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, timeout
+  requestData: jsonb("request_data"), // Data to be approved
+  approverNotes: text("approver_notes"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  respondedAt: timestamp("responded_at"),
+  timeoutAt: timestamp("timeout_at"),
+});
+
 export const personas = pgTable("personas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -518,6 +597,36 @@ export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({
   createdAt: true,
 });
 
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutions).omit({
+  id: true,
+  startedAt: true,
+  completedAt: true,
+  executionTime: true,
+});
+
+export const insertAgentTypeSchema = createInsertSchema(agentTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkflowTemplateSchema = createInsertSchema(workflowTemplates).omit({
+  id: true,
+  createdAt: true,
+  usageCount: true,
+});
+
+export const insertHumanApprovalSchema = createInsertSchema(humanApprovals).omit({
+  id: true,
+  requestedAt: true,
+  respondedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -581,6 +690,21 @@ export type InsertLeadScoringModel = z.infer<typeof insertLeadScoringModelSchema
 
 export type LeadScore = typeof leadScores.$inferSelect;
 export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
+
+export type Workflow = typeof workflows.$inferSelect;
+export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+export type InsertWorkflowExecution = z.infer<typeof insertWorkflowExecutionSchema>;
+
+export type AgentType = typeof agentTypes.$inferSelect;
+export type InsertAgentType = z.infer<typeof insertAgentTypeSchema>;
+
+export type WorkflowTemplate = typeof workflowTemplates.$inferSelect;
+export type InsertWorkflowTemplate = z.infer<typeof insertWorkflowTemplateSchema>;
+
+export type HumanApproval = typeof humanApprovals.$inferSelect;
+export type InsertHumanApproval = z.infer<typeof insertHumanApprovalSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;
