@@ -11,6 +11,7 @@ import { discoverInsights, generateInsightRecommendations, scoreInsightRelevance
 import { generatePersonalizedEmail, categorizeEmailResponse } from "./services/openai";
 import { initiateCall, getCallAnalytics, scheduleCallCampaign, getOrGenerateCallScript } from "./services/cloudDialer";
 import { canSendEmail, incrementSendCount, getWarmupSchedule, checkDomainReputation, validateEmailContent, getSendingRecommendations } from "./services/emailLimits";
+import { parseNLPToWorkflow, executeWorkflow, resumeWorkflow } from "./services/workflowEngine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -1349,149 +1350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/workflows/parse-nlp", async (req, res) => {
     try {
       const { input } = req.body;
-      
-      // Simple NLP parsing logic - in production this would use OpenAI
-      const nodes: any[] = [];
-      const edges: any[] = [];
-      
-      // Parse triggers
-      if (input.toLowerCase().includes('when') || input.toLowerCase().includes('every')) {
-        const triggerId = 'trigger-1';
-        let triggerType = 'webhook';
-        
-        if (input.toLowerCase().includes('email')) {
-          triggerType = 'email_received';
-        } else if (input.toLowerCase().includes('form')) {
-          triggerType = 'form_submission';
-        } else if (input.toLowerCase().includes('morning') || input.toLowerCase().includes('daily')) {
-          triggerType = 'schedule';
-        }
-        
-        nodes.push({
-          id: triggerId,
-          type: 'trigger',
-          agentType: triggerType,
-          label: 'Trigger',
-          config: {},
-          position: { x: 100, y: 100 }
-        });
-      }
-      
-      // Parse actions
-      let currentY = 200;
-      let lastNodeId = nodes.length > 0 ? nodes[0].id : null;
-      
-      if (input.toLowerCase().includes('research') || input.toLowerCase().includes('enrich')) {
-        const nodeId = `agent-${nodes.length + 1}`;
-        nodes.push({
-          id: nodeId,
-          type: 'agent',
-          agentType: 'data_researcher',
-          label: 'Research & Enrich',
-          config: {},
-          position: { x: 100, y: currentY }
-        });
-        
-        if (lastNodeId) {
-          edges.push({
-            id: `edge-${edges.length + 1}`,
-            source: lastNodeId,
-            target: nodeId
-          });
-        }
-        lastNodeId = nodeId;
-        currentY += 100;
-      }
-      
-      if (input.toLowerCase().includes('score')) {
-        const nodeId = `agent-${nodes.length + 1}`;
-        nodes.push({
-          id: nodeId,
-          type: 'agent',
-          agentType: 'lead_scorer',
-          label: 'Score Lead',
-          config: {},
-          position: { x: 100, y: currentY }
-        });
-        
-        if (lastNodeId) {
-          edges.push({
-            id: `edge-${edges.length + 1}`,
-            source: lastNodeId,
-            target: nodeId
-          });
-        }
-        lastNodeId = nodeId;
-        currentY += 100;
-      }
-      
-      if (input.toLowerCase().includes('send') && input.toLowerCase().includes('email')) {
-        const nodeId = `action-${nodes.length + 1}`;
-        nodes.push({
-          id: nodeId,
-          type: 'action',
-          agentType: 'send_email',
-          label: 'Send Email',
-          config: {},
-          position: { x: 100, y: currentY }
-        });
-        
-        if (lastNodeId) {
-          edges.push({
-            id: `edge-${edges.length + 1}`,
-            source: lastNodeId,
-            target: nodeId
-          });
-        }
-        lastNodeId = nodeId;
-        currentY += 100;
-      }
-      
-      if (input.toLowerCase().includes('task') || input.toLowerCase().includes('follow')) {
-        const nodeId = `action-${nodes.length + 1}`;
-        nodes.push({
-          id: nodeId,
-          type: 'action',
-          agentType: 'create_task',
-          label: 'Create Task',
-          config: {},
-          position: { x: 100, y: currentY }
-        });
-        
-        if (lastNodeId) {
-          edges.push({
-            id: `edge-${edges.length + 1}`,
-            source: lastNodeId,
-            target: nodeId
-          });
-        }
-        lastNodeId = nodeId;
-        currentY += 100;
-      }
-      
-      if (input.toLowerCase().includes('slack')) {
-        const nodeId = `action-${nodes.length + 1}`;
-        nodes.push({
-          id: nodeId,
-          type: 'action',
-          agentType: 'send_slack',
-          label: 'Send to Slack',
-          config: {},
-          position: { x: 100, y: currentY }
-        });
-        
-        if (lastNodeId) {
-          edges.push({
-            id: `edge-${edges.length + 1}`,
-            source: lastNodeId,
-            target: nodeId
-          });
-        }
-        lastNodeId = nodeId;
-        currentY += 100;
-      }
-      
-      res.json({ nodes, edges });
+      const result = await parseNLPToWorkflow(input);
+      res.json(result);
     } catch (error) {
       console.error("Error parsing NLP:", error);
       res.status(500).json({ error: "Failed to parse workflow description" });
@@ -1690,6 +1550,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating human approval:", error);
       res.status(500).json({ error: "Failed to update approval" });
+    }
+  });
+
+  // Execute a workflow
+  app.post("/api/workflows/:id/execute", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { context } = req.body;
+      
+      const execution = await executeWorkflow(id, context || {});
+      res.json(execution);
+    } catch (error) {
+      console.error("Error executing workflow:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Workflow execution failed' });
+    }
+  });
+
+  // Resume a paused workflow
+  app.post("/api/workflow-executions/:executionId/resume", async (req, res) => {
+    try {
+      const { executionId } = req.params;
+      const { approvalId, approved, feedback } = req.body;
+      
+      const execution = await resumeWorkflow(executionId, approvalId, approved, feedback);
+      res.json(execution);
+    } catch (error) {
+      console.error("Error resuming workflow:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to resume workflow' });
     }
   });
 
