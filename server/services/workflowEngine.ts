@@ -102,7 +102,7 @@ function fallbackNLPParser(input: string): { nodes: any[], edges: any[] } {
     nodes.push({
       id: nodeId,
       type: 'agent',
-      agentType: 'data_researcher',
+      agentType: 'data-researcher-1',
       label: 'Research Data',
       config: {},
       position: { x: 100, y: currentY }
@@ -125,7 +125,7 @@ function fallbackNLPParser(input: string): { nodes: any[], edges: any[] } {
     nodes.push({
       id: nodeId,
       type: 'agent',
-      agentType: 'lead_scorer',
+      agentType: 'lead-scorer-1',
       label: 'Score Lead',
       config: {},
       position: { x: 100, y: currentY }
@@ -344,6 +344,9 @@ async function executeAgentNode(
 
 // Get default prompts for built-in agent types
 function getDefaultAgentPrompt(agentType: string): string {
+  // Map both formats (with and without suffix) to the same prompts
+  const normalizedType = agentType.replace(/-\d+$/, '').replace(/-/g, '_');
+  
   const prompts: Record<string, string> = {
     email_composer: `You are an email composition specialist. Create personalized, engaging emails based on the context provided. Return a JSON object with 'subject' and 'body' fields.`,
     
@@ -356,11 +359,14 @@ function getDefaultAgentPrompt(agentType: string): string {
     content_creator: `You are a content creation specialist. Generate relevant content based on the context and requirements. Return a JSON object with 'title', 'content', and 'metadata' fields.`
   };
 
-  return prompts[agentType] || "You are an AI assistant. Process the input and provide a helpful response.";
+  return prompts[normalizedType] || "You are an AI assistant. Process the input and provide a helpful response.";
 }
 
 // Fallback agent execution without AI
 function executeFallbackAgent(node: any, context: Record<string, any>): { success: boolean; output: any } {
+  // Normalize agent type ID to match mock output keys
+  const normalizedType = (node.agentType || '').replace(/-\d+$/, '').replace(/-/g, '_');
+  
   const mockOutputs: Record<string, any> = {
     email_composer: {
       subject: "Following up on our conversation",
@@ -391,7 +397,7 @@ function executeFallbackAgent(node: any, context: Record<string, any>): { succes
 
   return {
     success: true,
-    output: { ...context, agentOutput: mockOutputs[node.agentType] || {} }
+    output: { ...context, agentOutput: mockOutputs[normalizedType] || {} }
   };
 }
 
@@ -598,6 +604,10 @@ export async function executeWorkflow(
       let agentType: AgentType | undefined;
       if (currentNode.type === 'agent' && currentNode.agentType) {
         agentType = await storage.getAgentType(currentNode.agentType);
+        if (!agentType) {
+          console.warn(`Agent type ${currentNode.agentType} not found, using default configuration`);
+          // Continue with undefined agentType - will use fallback
+        }
       }
 
       // Execute the node

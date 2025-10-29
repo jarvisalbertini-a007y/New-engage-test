@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeWorkflowData } from "./services/workflowTemplates";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -126,6 +127,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize workflow data (templates and agent types)
+  try {
+    await initializeWorkflowData();
+  } catch (error) {
+    console.error("Failed to initialize workflow data:", error);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

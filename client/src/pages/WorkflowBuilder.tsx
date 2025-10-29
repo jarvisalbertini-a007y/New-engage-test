@@ -49,11 +49,11 @@ const nodeTypes = [
   {
     category: 'AI Agents',
     items: [
-      { type: 'agent', subtype: 'email_composer', label: 'Email Composer', icon: Mail, description: 'Write personalized emails' },
-      { type: 'agent', subtype: 'data_researcher', label: 'Data Researcher', icon: Search, description: 'Research and gather data' },
-      { type: 'agent', subtype: 'lead_scorer', label: 'Lead Scorer', icon: Users, description: 'Score and qualify leads' },
-      { type: 'agent', subtype: 'meeting_scheduler', label: 'Meeting Scheduler', icon: Calendar, description: 'Schedule meetings' },
-      { type: 'agent', subtype: 'content_creator', label: 'Content Creator', icon: FileText, description: 'Create content' },
+      { type: 'agent', subtype: 'email-composer-1', label: 'Email Composer', icon: Mail, description: 'Write personalized emails' },
+      { type: 'agent', subtype: 'data-researcher-1', label: 'Data Researcher', icon: Search, description: 'Research and gather data' },
+      { type: 'agent', subtype: 'lead-scorer-1', label: 'Lead Scorer', icon: Users, description: 'Score and qualify leads' },
+      { type: 'agent', subtype: 'meeting-scheduler-1', label: 'Meeting Scheduler', icon: Calendar, description: 'Schedule meetings' },
+      { type: 'agent', subtype: 'content-creator-1', label: 'Content Creator', icon: FileText, description: 'Create content' },
     ]
   },
   {
