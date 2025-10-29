@@ -110,17 +110,10 @@ export default function WorkflowBuilder() {
   // Save workflow mutation
   const saveWorkflowMutation = useMutation({
     mutationFn: async (data: { id?: string; workflow: Partial<Workflow> }) => {
-      if (data.id) {
-        return await apiRequest(`/api/workflows/${data.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(data.workflow)
-        });
-      } else {
-        return await apiRequest('/api/workflows', {
-          method: 'POST',
-          body: JSON.stringify(data.workflow)
-        });
-      }
+      const response = data.id
+        ? await apiRequest('PATCH', `/api/workflows/${data.id}`, data.workflow)
+        : await apiRequest('POST', '/api/workflows', data.workflow);
+      return await response.json();
     },
     onSuccess: () => {
       toast({
@@ -141,10 +134,8 @@ export default function WorkflowBuilder() {
   // Parse NLP input to create workflow
   const parseNLPMutation = useMutation({
     mutationFn: async (input: string) => {
-      return await apiRequest('/api/workflows/parse-nlp', {
-        method: 'POST',
-        body: JSON.stringify({ input })
-      });
+      const response = await apiRequest('POST', '/api/workflows/parse-nlp', { input });
+      return await response.json();
     },
     onSuccess: (data: any) => {
       if (data.nodes && data.edges) {
@@ -709,8 +700,10 @@ export default function WorkflowBuilder() {
                   key={template.id}
                   className="cursor-pointer hover:border-primary transition-colors"
                   onClick={() => {
-                    setNodes(template.nodes as CanvasNode[] || []);
-                    setEdges(template.edges as CanvasEdge[] || []);
+                    // Template config contains the nodes and edges
+                    const templateConfig = template.config as any || {};
+                    setNodes(templateConfig.nodes || []);
+                    setEdges(templateConfig.edges || []);
                     setIsNLPMode(false);
                     setShowTemplates(false);
                     toast({
