@@ -1272,6 +1272,427 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====== Workflow Automation ======
+  
+  // Workflows
+  app.get("/api/workflows", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const filters: any = {};
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.category) filters.category = req.query.category as string;
+      if (req.query.isTemplate !== undefined) filters.isTemplate = req.query.isTemplate === 'true';
+      if (userId) filters.createdBy = userId;
+      
+      const workflows = await storage.getWorkflows(filters);
+      res.json(workflows);
+    } catch (error) {
+      console.error("Error fetching workflows:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/workflows/:id", async (req, res) => {
+    try {
+      const workflow = await storage.getWorkflow(req.params.id);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      res.json(workflow);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/workflows", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const workflowData = {
+        ...req.body,
+        createdBy: userId || 'system',
+        status: req.body.status || 'draft'
+      };
+      const workflow = await storage.createWorkflow(workflowData);
+      res.json(workflow);
+    } catch (error) {
+      console.error("Error creating workflow:", error);
+      res.status(400).json({ error: "Invalid workflow data" });
+    }
+  });
+
+  app.patch("/api/workflows/:id", async (req, res) => {
+    try {
+      const workflow = await storage.updateWorkflow(req.params.id, req.body);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      res.json(workflow);
+    } catch (error) {
+      console.error("Error updating workflow:", error);
+      res.status(500).json({ error: "Failed to update workflow" });
+    }
+  });
+
+  app.delete("/api/workflows/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteWorkflow(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Parse NLP to workflow
+  app.post("/api/workflows/parse-nlp", async (req, res) => {
+    try {
+      const { input } = req.body;
+      
+      // Simple NLP parsing logic - in production this would use OpenAI
+      const nodes: any[] = [];
+      const edges: any[] = [];
+      
+      // Parse triggers
+      if (input.toLowerCase().includes('when') || input.toLowerCase().includes('every')) {
+        const triggerId = 'trigger-1';
+        let triggerType = 'webhook';
+        
+        if (input.toLowerCase().includes('email')) {
+          triggerType = 'email_received';
+        } else if (input.toLowerCase().includes('form')) {
+          triggerType = 'form_submission';
+        } else if (input.toLowerCase().includes('morning') || input.toLowerCase().includes('daily')) {
+          triggerType = 'schedule';
+        }
+        
+        nodes.push({
+          id: triggerId,
+          type: 'trigger',
+          agentType: triggerType,
+          label: 'Trigger',
+          config: {},
+          position: { x: 100, y: 100 }
+        });
+      }
+      
+      // Parse actions
+      let currentY = 200;
+      let lastNodeId = nodes.length > 0 ? nodes[0].id : null;
+      
+      if (input.toLowerCase().includes('research') || input.toLowerCase().includes('enrich')) {
+        const nodeId = `agent-${nodes.length + 1}`;
+        nodes.push({
+          id: nodeId,
+          type: 'agent',
+          agentType: 'data_researcher',
+          label: 'Research & Enrich',
+          config: {},
+          position: { x: 100, y: currentY }
+        });
+        
+        if (lastNodeId) {
+          edges.push({
+            id: `edge-${edges.length + 1}`,
+            source: lastNodeId,
+            target: nodeId
+          });
+        }
+        lastNodeId = nodeId;
+        currentY += 100;
+      }
+      
+      if (input.toLowerCase().includes('score')) {
+        const nodeId = `agent-${nodes.length + 1}`;
+        nodes.push({
+          id: nodeId,
+          type: 'agent',
+          agentType: 'lead_scorer',
+          label: 'Score Lead',
+          config: {},
+          position: { x: 100, y: currentY }
+        });
+        
+        if (lastNodeId) {
+          edges.push({
+            id: `edge-${edges.length + 1}`,
+            source: lastNodeId,
+            target: nodeId
+          });
+        }
+        lastNodeId = nodeId;
+        currentY += 100;
+      }
+      
+      if (input.toLowerCase().includes('send') && input.toLowerCase().includes('email')) {
+        const nodeId = `action-${nodes.length + 1}`;
+        nodes.push({
+          id: nodeId,
+          type: 'action',
+          agentType: 'send_email',
+          label: 'Send Email',
+          config: {},
+          position: { x: 100, y: currentY }
+        });
+        
+        if (lastNodeId) {
+          edges.push({
+            id: `edge-${edges.length + 1}`,
+            source: lastNodeId,
+            target: nodeId
+          });
+        }
+        lastNodeId = nodeId;
+        currentY += 100;
+      }
+      
+      if (input.toLowerCase().includes('task') || input.toLowerCase().includes('follow')) {
+        const nodeId = `action-${nodes.length + 1}`;
+        nodes.push({
+          id: nodeId,
+          type: 'action',
+          agentType: 'create_task',
+          label: 'Create Task',
+          config: {},
+          position: { x: 100, y: currentY }
+        });
+        
+        if (lastNodeId) {
+          edges.push({
+            id: `edge-${edges.length + 1}`,
+            source: lastNodeId,
+            target: nodeId
+          });
+        }
+        lastNodeId = nodeId;
+        currentY += 100;
+      }
+      
+      if (input.toLowerCase().includes('slack')) {
+        const nodeId = `action-${nodes.length + 1}`;
+        nodes.push({
+          id: nodeId,
+          type: 'action',
+          agentType: 'send_slack',
+          label: 'Send to Slack',
+          config: {},
+          position: { x: 100, y: currentY }
+        });
+        
+        if (lastNodeId) {
+          edges.push({
+            id: `edge-${edges.length + 1}`,
+            source: lastNodeId,
+            target: nodeId
+          });
+        }
+        lastNodeId = nodeId;
+        currentY += 100;
+      }
+      
+      res.json({ nodes, edges });
+    } catch (error) {
+      console.error("Error parsing NLP:", error);
+      res.status(500).json({ error: "Failed to parse workflow description" });
+    }
+  });
+
+  // Workflow Executions
+  app.get("/api/workflow-executions", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.workflowId) filters.workflowId = req.query.workflowId as string;
+      if (req.query.status) filters.status = req.query.status as string;
+      
+      const executions = await storage.getWorkflowExecutions(filters);
+      res.json(executions);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/workflow-executions/:id", async (req, res) => {
+    try {
+      const execution = await storage.getWorkflowExecution(req.params.id);
+      if (!execution) {
+        return res.status(404).json({ error: "Execution not found" });
+      }
+      res.json(execution);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/workflow-executions", async (req, res) => {
+    try {
+      const execution = await storage.createWorkflowExecution(req.body);
+      res.json(execution);
+    } catch (error) {
+      console.error("Error creating workflow execution:", error);
+      res.status(400).json({ error: "Invalid execution data" });
+    }
+  });
+
+  app.patch("/api/workflow-executions/:id", async (req, res) => {
+    try {
+      const execution = await storage.updateWorkflowExecution(req.params.id, req.body);
+      if (!execution) {
+        return res.status(404).json({ error: "Execution not found" });
+      }
+      res.json(execution);
+    } catch (error) {
+      console.error("Error updating workflow execution:", error);
+      res.status(500).json({ error: "Failed to update execution" });
+    }
+  });
+
+  // Agent Types
+  app.get("/api/agent-types", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.category) filters.category = req.query.category as string;
+      
+      const agentTypes = await storage.getAgentTypes(filters);
+      res.json(agentTypes);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/agent-types/:id", async (req, res) => {
+    try {
+      const agentType = await storage.getAgentType(req.params.id);
+      if (!agentType) {
+        return res.status(404).json({ error: "Agent type not found" });
+      }
+      res.json(agentType);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/agent-types", async (req, res) => {
+    try {
+      const agentType = await storage.createAgentType(req.body);
+      res.json(agentType);
+    } catch (error) {
+      console.error("Error creating agent type:", error);
+      res.status(400).json({ error: "Invalid agent type data" });
+    }
+  });
+
+  app.patch("/api/agent-types/:id", async (req, res) => {
+    try {
+      const agentType = await storage.updateAgentType(req.params.id, req.body);
+      if (!agentType) {
+        return res.status(404).json({ error: "Agent type not found" });
+      }
+      res.json(agentType);
+    } catch (error) {
+      console.error("Error updating agent type:", error);
+      res.status(500).json({ error: "Failed to update agent type" });
+    }
+  });
+
+  // Workflow Templates
+  app.get("/api/workflow-templates", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.category) filters.category = req.query.category as string;
+      if (req.query.difficulty) filters.difficulty = req.query.difficulty as string;
+      
+      const templates = await storage.getWorkflowTemplates(filters);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/workflow-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getWorkflowTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/workflow-templates", async (req, res) => {
+    try {
+      const template = await storage.createWorkflowTemplate(req.body);
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating workflow template:", error);
+      res.status(400).json({ error: "Invalid template data" });
+    }
+  });
+
+  app.patch("/api/workflow-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.updateWorkflowTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating workflow template:", error);
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  // Human Approvals
+  app.get("/api/human-approvals", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.executionId) filters.executionId = req.query.executionId as string;
+      if (req.query.status) filters.status = req.query.status as string;
+      
+      const approvals = await storage.getHumanApprovals(filters);
+      res.json(approvals);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/human-approvals/:id", async (req, res) => {
+    try {
+      const approval = await storage.getHumanApproval(req.params.id);
+      if (!approval) {
+        return res.status(404).json({ error: "Approval not found" });
+      }
+      res.json(approval);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/human-approvals", async (req, res) => {
+    try {
+      const approval = await storage.createHumanApproval(req.body);
+      res.json(approval);
+    } catch (error) {
+      console.error("Error creating human approval:", error);
+      res.status(400).json({ error: "Invalid approval data" });
+    }
+  });
+
+  app.patch("/api/human-approvals/:id", async (req, res) => {
+    try {
+      const approval = await storage.updateHumanApproval(req.params.id, req.body);
+      if (!approval) {
+        return res.status(404).json({ error: "Approval not found" });
+      }
+      res.json(approval);
+    } catch (error) {
+      console.error("Error updating human approval:", error);
+      res.status(500).json({ error: "Failed to update approval" });
+    }
+  });
+
   app.post("/api/autopilot/campaigns/:id/toggle", async (req, res) => {
     const { id } = req.params;
     try {

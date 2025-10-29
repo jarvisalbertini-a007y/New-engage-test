@@ -49,6 +49,7 @@ const navigation = [
       { name: "Performance Coaching", href: "/performance-coaching", icon: GraduationCap },
       { name: "Team Collaboration", href: "/team-collaboration", icon: Users },
       { name: "Lead Scoring", href: "/lead-scoring", icon: Brain },
+      { name: "Workflow Builder", href: "/workflows", icon: Zap },
       { name: "Workflow Triggers", href: "/workflow-triggers", icon: Zap },
       { name: "Deliverability", href: "/deliverability", icon: Shield },
       { name: "Analytics", href: "/analytics", icon: BarChart },

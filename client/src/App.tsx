@@ -24,6 +24,7 @@ import Deliverability from "@/pages/deliverability";
 import AIAgents from "@/pages/agents";
 import Onboarding from "@/pages/onboarding";
 import MagicSetup from "@/pages/magic-setup";
+import WorkflowBuilder from "@/pages/WorkflowBuilder";
 import { PlaybooksPage } from "@/pages/playbooks";
 import { AutopilotPage } from "@/pages/autopilot";
 import { WorkflowTriggersPage } from "@/pages/workflow-triggers";
@@ -98,6 +99,7 @@ function Router() {
           <Route path="/deliverability" component={Deliverability} />
           <Route path="/agents" component={AIAgents} />
           <Route path="/magic-setup" component={MagicSetup} />
+          <Route path="/workflows" component={WorkflowBuilder} />
           <Route path="/playbooks" component={PlaybooksPage} />
           <Route path="/autopilot" component={AutopilotPage} />
           <Route path="/workflow-triggers" component={WorkflowTriggersPage} />
