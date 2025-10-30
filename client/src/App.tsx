@@ -35,7 +35,7 @@ import { PerformanceCoachingPage } from "@/pages/performance-coaching";
 import { TeamCollaborationPage } from "@/pages/team-collaboration";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
-import Sidebar from "@/components/sidebar";
+import CollapsibleSidebar from "@/components/collapsible-sidebar";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -78,9 +78,9 @@ function Router() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden dark">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-screen overflow-hidden">
+      <CollapsibleSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden ml-0 md:ml-0 transition-all-soft">
         <Switch>
           <Route path="/" component={DashboardAi} />
           <Route path="/dashboard" component={Dashboard} />
