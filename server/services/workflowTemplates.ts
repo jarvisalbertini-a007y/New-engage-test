@@ -3,7 +3,7 @@ import type { InsertWorkflowTemplate, InsertAgentType } from "@shared/schema";
 
 // Seed specialist AI agent types
 export async function seedAgentTypes() {
-  const agentTypes: InsertAgentType[] = [
+  const agentTypes = [
     {
       id: "email-composer-1",
       name: "Email Composer Pro",
@@ -21,9 +21,9 @@ export async function seedAgentTypes() {
         body: "string"
       },
       model: "gpt-4o-mini",
-      temperature: 0.7,
+      temperature: "0.7",
       maxTokens: 2000,
-      successRate: 0.92
+      successRate: "0.92"
     },
     {
       id: "data-researcher-1",
@@ -41,9 +41,9 @@ export async function seedAgentTypes() {
         confidence: "number"
       },
       model: "gpt-4o-mini",
-      temperature: 0.3,
+      temperature: "0.3",
       maxTokens: 2000,
-      successRate: 0.88
+      successRate: "0.88"
     },
     {
       id: "lead-scorer-1",
@@ -61,9 +61,9 @@ export async function seedAgentTypes() {
         reasons: "array"
       },
       model: "gpt-4o-mini",
-      temperature: 0.2,
+      temperature: "0.2",
       maxTokens: 1000,
-      successRate: 0.95
+      successRate: "0.95"
     },
     {
       id: "meeting-scheduler-1",
@@ -83,9 +83,9 @@ export async function seedAgentTypes() {
         calendarLink: "string"
       },
       model: "gpt-4o-mini",
-      temperature: 0.5,
+      temperature: "0.5",
       maxTokens: 1500,
-      successRate: 0.90
+      successRate: "0.90"
     },
     {
       id: "content-creator-1",
@@ -105,17 +105,22 @@ export async function seedAgentTypes() {
         metadata: "object"
       },
       model: "gpt-4o-mini",
-      temperature: 0.8,
+      temperature: "0.8",
       maxTokens: 3000,
-      successRate: 0.87
+      successRate: "0.87"
     }
   ];
 
   for (const agentType of agentTypes) {
     try {
-      const existing = await storage.getAgentType(agentType.id);
-      if (!existing) {
-        await storage.createAgentType(agentType);
+      // Check if agent type exists by name since name is unique
+      const existing = await storage.getAgentTypes();
+      const exists = existing.some(a => a.name === agentType.name);
+      
+      if (!exists) {
+        // Remove id field before creating since it's auto-generated
+        const { id, ...agentTypeData } = agentType;
+        await storage.createAgentType(agentTypeData as InsertAgentType);
         console.log(`Created agent type: ${agentType.name}`);
       }
     } catch (error) {
@@ -126,7 +131,7 @@ export async function seedAgentTypes() {
 
 // Seed workflow templates
 export async function seedWorkflowTemplates() {
-  const templates: InsertWorkflowTemplate[] = [
+  const templates = [
     {
       name: "Lead Qualification Flow",
       description: "Automatically research, score, and route new leads to the right sales rep",
@@ -451,7 +456,22 @@ export async function seedWorkflowTemplates() {
       const exists = existing.some(t => t.name === template.name);
       
       if (!exists) {
-        await storage.createWorkflowTemplate(template);
+        // Map the template structure to match the database schema
+        const templateData = {
+          name: template.name,
+          description: template.description,
+          category: template.category,
+          difficulty: template.difficulty,
+          workflowDefinition: {
+            nodes: template.nodes,
+            edges: template.edges,
+            config: template.config || {}
+          },
+          requiredIntegrations: [],
+          tags: [],
+          usageCount: 0
+        };
+        await storage.createWorkflowTemplate(templateData);
         console.log(`Created workflow template: ${template.name}`);
       }
     } catch (error) {

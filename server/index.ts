@@ -128,12 +128,8 @@ app.use((req, res, next) => {
 
 (async () => {
   // Initialize workflow data (templates and agent types)
-  try {
-    await initializeWorkflowData();
-  } catch (error) {
-    console.error("Failed to initialize workflow data:", error);
-  }
-
+  // Temporarily disabled to debug startup issues
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
