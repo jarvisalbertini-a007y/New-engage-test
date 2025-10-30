@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workflow Builder Access Test</title>
+</head>
+<body>
+    <h1>Direct Access Test</h1>
+    <p>Click the link below to go directly to the Workflow Builder:</p>
+    <a href="/workflows" style="font-size: 24px; color: blue;">Go to Workflow Builder</a>
+    
+    <script>
+        // Test if the route is accessible
+        console.log('Testing Workflow Builder route...');
+        
+        // Try to navigate directly
+        setTimeout(() => {
+            console.log('Current path:', window.location.pathname);
+            if (window.location.pathname !== '/workflows') {
+                console.log('Attempting direct navigation to /workflows...');
+                // Uncomment to auto-navigate:
+                // window.location.href = '/workflows';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
