@@ -82,13 +82,14 @@ export default function Analytics() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Analytics</h1>
-            <p className="text-muted-foreground">Track performance and optimize your sales engagement</p>
-          </div>
-          <div className="flex items-center space-x-4">
+      <header className="bg-card border-b border-border px-4 md:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Analytics</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Track performance and optimize your sales engagement</p>
+            </div>
+            <div className="flex items-center gap-2 md:gap-4">
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="w-32" data-testid="select-time-range">
                 <SelectValue />
@@ -100,97 +101,100 @@ export default function Analytics() {
                 <SelectItem value="1y">Last year</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" data-testid="button-export-report">
-              Export Report
+            <Button variant="outline" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-export-report">
+              <span className="hidden sm:inline">Export Report</span>
+              <span className="sm:hidden">Export</span>
             </Button>
           </div>
+        </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-6 space-y-6">
+      <main className="flex-1 overflow-auto px-4 md:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Emails Sent</p>
-                  <p className="text-3xl font-bold" data-testid="text-emails-sent">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Emails Sent</p>
+                  <p className="text-2xl md:text-3xl font-bold" data-testid="text-emails-sent">
                     {Math.floor(Math.random() * 5000 + 15000).toLocaleString()}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-chart-1" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
+                  <Mail className="h-5 w-5 md:h-6 md:w-6 text-chart-1" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center text-sm">
-                <TrendingUp className="h-4 w-4 text-chart-1 mr-1" />
+              <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm">
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-chart-1 mr-1" />
                 <span className="text-chart-1 font-medium">+12.5%</span>
-                <span className="text-muted-foreground ml-2">from last month</span>
+                <span className="text-muted-foreground ml-1 md:ml-2 hidden sm:inline">from last month</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Reply Rate</p>
-                  <p className="text-3xl font-bold text-chart-2" data-testid="text-reply-rate">
+                  <p className="text-xs md:text-sm text-muted-foreground">Reply Rate</p>
+                  <p className="text-2xl md:text-3xl font-bold text-chart-2" data-testid="text-reply-rate">
                     34.2%
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-chart-2/10 rounded-lg flex items-center justify-center">
-                  <Reply className="h-6 w-6 text-chart-2" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-chart-2/10 rounded-lg flex items-center justify-center">
+                  <Reply className="h-5 w-5 md:h-6 md:w-6 text-chart-2" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center text-sm">
-                <TrendingUp className="h-4 w-4 text-chart-2 mr-1" />
+              <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm">
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-chart-2 mr-1" />
                 <span className="text-chart-2 font-medium">+8.3%</span>
-                <span className="text-muted-foreground ml-2">from last month</span>
+                <span className="text-muted-foreground ml-1 md:ml-2 hidden sm:inline">from last month</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Meetings Booked</p>
-                  <p className="text-3xl font-bold text-chart-3" data-testid="text-meetings-booked">
+                  <p className="text-xs md:text-sm text-muted-foreground">Meetings Booked</p>
+                  <p className="text-2xl md:text-3xl font-bold text-chart-3" data-testid="text-meetings-booked">
                     {Math.floor(Math.random() * 50 + 125)}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center">
-                  <Calendar className="h-6 w-6 text-chart-3" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-chart-3/10 rounded-lg flex items-center justify-center">
+                  <Calendar className="h-5 w-5 md:h-6 md:w-6 text-chart-3" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center text-sm">
-                <TrendingUp className="h-4 w-4 text-chart-3 mr-1" />
+              <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm">
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-chart-3 mr-1" />
                 <span className="text-chart-3 font-medium">+22.1%</span>
-                <span className="text-muted-foreground ml-2">from last month</span>
+                <span className="text-muted-foreground ml-1 md:ml-2 hidden sm:inline">from last month</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Pipeline Value</p>
-                  <p className="text-3xl font-bold text-chart-4" data-testid="text-pipeline-value">
+                  <p className="text-xs md:text-sm text-muted-foreground">Pipeline Value</p>
+                  <p className="text-xl md:text-3xl font-bold text-chart-4" data-testid="text-pipeline-value">
                     {formatCurrency(dashboardStats?.pipelineValue || 2400000)}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-chart-4/10 rounded-lg flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-chart-4" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-chart-4/10 rounded-lg flex items-center justify-center">
+                  <DollarSign className="h-5 w-5 md:h-6 md:w-6 text-chart-4" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center text-sm">
-                <TrendingUp className="h-4 w-4 text-chart-4 mr-1" />
+              <div className="mt-3 md:mt-4 flex items-center text-xs md:text-sm">
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-chart-4 mr-1" />
                 <span className="text-chart-4 font-medium">+18.7%</span>
-                <span className="text-muted-foreground ml-2">from last month</span>
+                <span className="text-muted-foreground ml-1 md:ml-2 hidden sm:inline">from last month</span>
               </div>
             </CardContent>
           </Card>
@@ -205,11 +209,11 @@ export default function Analytics() {
             <TabsTrigger value="pipeline" data-testid="tab-pipeline">Pipeline</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="performance" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
+          <TabsContent value="performance" className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
                 <CardHeader>
-                  <CardTitle>Email Performance Over Time</CardTitle>
+                  <CardTitle className="text-sm md:text-base">Email Performance Over Time</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -232,9 +236,9 @@ export default function Analytics() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
                 <CardHeader>
-                  <CardTitle>Reply Rate Trend</CardTitle>
+                  <CardTitle className="text-sm md:text-base">Reply Rate Trend</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -263,10 +267,10 @@ export default function Analytics() {
             </div>
           </TabsContent>
 
-          <TabsContent value="sequences" className="space-y-6">
-            <Card>
+          <TabsContent value="sequences" className="space-y-4 md:space-y-6">
+            <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
               <CardHeader>
-                <CardTitle>Sequence Performance</CardTitle>
+                <CardTitle className="text-sm md:text-base">Sequence Performance</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -289,11 +293,11 @@ export default function Analytics() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="channels" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
+          <TabsContent value="channels" className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
                 <CardHeader>
-                  <CardTitle>Channel Distribution</CardTitle>
+                  <CardTitle className="text-sm md:text-base">Channel Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -317,9 +321,9 @@ export default function Analytics() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
                 <CardHeader>
-                  <CardTitle>Channel Performance Metrics</CardTitle>
+                  <CardTitle className="text-sm md:text-base">Channel Performance Metrics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {channelPerformanceData.map((channel) => (

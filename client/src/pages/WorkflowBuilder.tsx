@@ -237,14 +237,15 @@ export default function WorkflowBuilder() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
       {/* Left Sidebar - Workflows List */}
-      <div className="w-64 border-r bg-background p-4">
+      <div className="w-full md:w-64 border-b md:border-b-0 md:border-r bg-background p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Workflows</h3>
+          <h3 className="text-sm md:text-base font-semibold">Workflows</h3>
           <Button
             size="sm"
             variant="ghost"
+            className="hover:soft-shadow-hover transition-all-soft"
             onClick={() => {
               setSelectedWorkflow(null);
               setNodes([]);
@@ -263,7 +264,7 @@ export default function WorkflowBuilder() {
             {workflows.map((workflow) => (
               <Card
                 key={workflow.id}
-                className={`cursor-pointer transition-colors ${selectedWorkflow === workflow.id ? 'border-primary' : ''}`}
+                className={`cursor-pointer rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft ${selectedWorkflow === workflow.id ? 'border-primary' : ''}`}
                 onClick={() => {
                   setSelectedWorkflow(workflow.id);
                   setNodes(workflow.nodes as CanvasNode[] || []);
@@ -289,7 +290,7 @@ export default function WorkflowBuilder() {
         </ScrollArea>
 
         <Button
-          className="w-full mt-4"
+          className="w-full mt-4 rounded-lg hover:soft-shadow-hover transition-all-soft"
           variant="outline"
           onClick={() => setShowTemplates(true)}
           data-testid="button-browse-templates"
@@ -301,25 +302,27 @@ export default function WorkflowBuilder() {
       {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col">
         {/* Toolbar */}
-        <div className="h-14 border-b bg-background px-4 flex items-center justify-between">
+        <div className="h-auto md:h-14 border-b bg-background px-4 py-2 md:py-0 flex flex-col md:flex-row items-center justify-between gap-2 md:gap-0">
           <div className="flex items-center gap-2">
             <Button
               variant={isNLPMode ? "default" : "outline"}
               size="sm"
               onClick={() => setIsNLPMode(true)}
+              className="rounded-lg hover:soft-shadow-hover transition-all-soft"
               data-testid="button-nlp-mode"
             >
-              <Bot className="h-4 w-4 mr-2" />
-              NLP Mode
+              <Bot className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">NLP Mode</span>
             </Button>
             <Button
               variant={!isNLPMode ? "default" : "outline"}
               size="sm"
               onClick={() => setIsNLPMode(false)}
+              className="rounded-lg hover:soft-shadow-hover transition-all-soft"
               data-testid="button-visual-mode"
             >
-              <GitBranch className="h-4 w-4 mr-2" />
-              Visual Mode
+              <GitBranch className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Visual Mode</span>
             </Button>
           </div>
 
@@ -333,30 +336,32 @@ export default function WorkflowBuilder() {
                   description: "Workflow test execution started"
                 });
               }}
+              className="rounded-lg hover:soft-shadow-hover transition-all-soft"
               data-testid="button-test-workflow"
             >
-              <Play className="h-4 w-4 mr-2" />
-              Test
+              <Play className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Test</span>
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
               disabled={saveWorkflowMutation.isPending}
+              className="rounded-lg hover:soft-shadow-hover transition-all-soft"
               data-testid="button-save-workflow"
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save
+              <Save className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Save</span>
             </Button>
           </div>
         </div>
 
         {/* NLP Input Mode */}
         {isNLPMode ? (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <Card className="w-full max-w-2xl">
+          <div className="flex-1 flex items-center justify-center p-4 md:p-8">
+            <Card className="w-full max-w-2xl rounded-xl soft-shadow">
               <CardHeader>
-                <CardTitle>Describe Your Workflow</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base md:text-lg">Describe Your Workflow</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   Tell me what you want to automate in plain English, and I'll create the workflow for you.
                 </CardDescription>
               </CardHeader>
@@ -397,7 +402,7 @@ export default function WorkflowBuilder() {
                 </div>
 
                 <Button
-                  className="w-full"
+                  className="w-full rounded-lg hover:soft-shadow-hover transition-all-soft"
                   onClick={() => parseNLPMutation.mutate(nlpInput)}
                   disabled={!nlpInput || parseNLPMutation.isPending}
                   data-testid="button-create-workflow"
@@ -410,9 +415,9 @@ export default function WorkflowBuilder() {
           </div>
         ) : (
           /* Visual Builder Mode */
-          <div className="flex-1 flex">
+          <div className="flex-1 flex flex-col md:flex-row">
             {/* Node Palette */}
-            <div className="w-64 border-r bg-background p-4">
+            <div className="w-full md:w-64 border-b md:border-b-0 md:border-r bg-background p-4">
               <div className="mb-4">
                 <Input
                   placeholder="Search nodes..."
@@ -434,13 +439,13 @@ export default function WorkflowBuilder() {
                             key={`${item.type}-${item.subtype}`}
                             draggable
                             onDragStart={(e) => handleDragStart(e, item)}
-                            className="flex items-center gap-2 p-2 rounded-md border bg-card cursor-move hover:bg-accent"
+                            className="flex items-center gap-2 p-2 rounded-lg border bg-card cursor-move hover:bg-accent soft-shadow hover:soft-shadow-hover transition-all-soft"
                             data-testid={`node-${item.subtype}`}
                           >
                             <item.icon className="h-4 w-4" />
                             <div className="flex-1">
-                              <div className="text-sm font-medium">{item.label}</div>
-                              <div className="text-xs text-muted-foreground">{item.description}</div>
+                              <div className="text-xs md:text-sm font-medium">{item.label}</div>
+                              <div className="text-xs text-muted-foreground hidden md:block">{item.description}</div>
                             </div>
                           </div>
                         ))}
@@ -475,7 +480,7 @@ export default function WorkflowBuilder() {
                   return (
                     <div
                       key={node.id}
-                      className="absolute bg-card border-2 rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
+                      className="absolute bg-card border-2 rounded-lg p-3 cursor-pointer hover:border-primary soft-shadow hover:soft-shadow-hover transition-all-soft"
                       style={{
                         left: node.position.x + canvasPosition.x,
                         top: node.position.y + canvasPosition.y,

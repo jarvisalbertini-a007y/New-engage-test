@@ -33,15 +33,15 @@ function KpiCard({
   const trendColor = trend === "up" ? "text-positive" : trend === "down" ? "text-danger" : "text-muted-foreground";
   
   return (
-    <Card className="p-4 hover:shadow-lg transition-shadow">
+    <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-3 md:p-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-muted-foreground mb-1">{title}</p>
-          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-xs md:text-sm text-muted-foreground mb-1">{title}</p>
+          <p className="text-xl md:text-2xl font-bold">{value}</p>
           <p className={cn("text-xs mt-2", trendColor)}>{change}</p>
         </div>
-        <div className="p-3 rounded-lg bg-primary/10">
-          <Icon className="h-5 w-5 text-primary" />
+        <div className="p-2 md:p-3 rounded-lg bg-primary/10">
+          <Icon className="h-4 md:h-5 w-4 md:w-5 text-primary" />
         </div>
       </div>
     </Card>
@@ -126,12 +126,12 @@ export default function DashboardAi() {
   return (
     <div className="min-h-screen bg-background">
       {/* Top Section with AI Command Bar */}
-      <div className="px-6 pt-6 pb-4">
+      <div className="px-4 md:px-6 lg:px-8 pt-6 pb-4">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6 flex items-start justify-between">
+          <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div>
-              <h1 className="font-display text-3xl mb-2">Welcome back, Alex</h1>
-              <p className="text-muted-foreground">Here's what your AI copilot found today</p>
+              <h1 className="font-display text-2xl md:text-3xl mb-2">Welcome back, Alex</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Here's what your AI copilot found today</p>
             </div>
             <div className="flex items-center gap-3">
               <EmailLimitsBadge />
@@ -145,7 +145,7 @@ export default function DashboardAi() {
           />
           
           {/* KPI Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <KpiCard
               title="Replies Today"
               value="12"
@@ -179,7 +179,7 @@ export default function DashboardAi() {
       </div>
 
       {/* Filter Bar */}
-      <div className="px-6 pb-4 sticky top-0 bg-background/95 backdrop-blur z-20 border-b">
+      <div className="px-4 md:px-6 lg:px-8 pb-4 sticky top-0 bg-background/95 backdrop-blur z-20 border-b">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
             <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -195,7 +195,7 @@ export default function DashboardAi() {
                       : [...prev, filter]
                   );
                 }}
-                className="flex-shrink-0"
+                className="flex-shrink-0 rounded-lg hover:soft-shadow-hover transition-all-soft"
                 data-testid={`filter-${filter.toLowerCase()}`}
               >
                 {filter}
@@ -206,11 +206,11 @@ export default function DashboardAi() {
       </div>
 
       {/* AI Cards Section */}
-      <div className="px-6 py-8">
+      <div className="px-4 md:px-6 lg:px-8 py-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-4">
-            <h2 className="font-h2 text-xl mb-1">AI Drafts Ready for Review</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-h2 text-lg md:text-xl mb-1">AI Drafts Ready for Review</h2>
+            <p className="text-xs md:text-sm text-muted-foreground">
               Swipe right to approve, left to skip, up to edit
             </p>
           </div>
@@ -249,27 +249,27 @@ export default function DashboardAi() {
 
           {/* Recent Activity */}
           <div className="mt-12">
-            <h2 className="font-h2 text-xl mb-4">Live Visitor Intelligence</h2>
-            <div className="grid gap-3">
+            <h2 className="font-h2 text-lg md:text-xl mb-4">Live Visitor Intelligence</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.isArray(visitors) ? visitors.slice(0, 3).map((visitor: any) => (
-                <Card key={visitor.id} className="p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <Building2 className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-semibold">{visitor.companyName}</p>
-                        <p className="text-sm text-muted-foreground">
+                <Card key={visitor.id} className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm md:text-base truncate">{visitor.companyName}</p>
+                        <p className="text-xs md:text-sm text-muted-foreground truncate">
                           {visitor.page} · {visitor.timeAgo}
                         </p>
                       </div>
                     </div>
-                    <Badge variant={visitor.intent === "high" ? "default" : "secondary"}>
+                    <Badge variant={visitor.intent === "high" ? "default" : "secondary"} className="rounded-lg">
                       {visitor.intent} intent
                     </Badge>
                   </div>
                 </Card>
               )) : (
-                <Card className="p-8 text-center">
+                <Card className="rounded-xl soft-shadow col-span-full p-8 text-center">
                   <Users className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">No recent visitors</p>
                 </Card>

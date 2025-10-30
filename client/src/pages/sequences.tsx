@@ -93,18 +93,19 @@ export default function Sequences() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Sequences</h1>
-            <p className="text-muted-foreground">Manage your multi-channel outreach sequences</p>
-          </div>
-          <div className="flex items-center space-x-4">
+      <header className="bg-card border-b border-border px-4 md:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Sequences</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Manage your multi-channel outreach sequences</p>
+            </div>
+            <div className="flex items-center gap-4">
             <Dialog open={isBuilderOpen} onOpenChange={setIsBuilderOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-create-sequence">
+                <Button className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-create-sequence">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Sequence
+                  <span className="hidden sm:inline">Create Sequence</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -119,73 +120,75 @@ export default function Sequences() {
             </Dialog>
           </div>
         </div>
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-6 space-y-6">
+      <main className="flex-1 overflow-auto px-4 md:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Sequences</p>
-                  <p className="text-3xl font-bold" data-testid="text-total-sequences">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Sequences</p>
+                  <p className="text-2xl md:text-3xl font-bold" data-testid="text-total-sequences">
                     {sequences?.length || 0}
                   </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-chart-1" />
+                <TrendingUp className="h-6 md:h-8 w-6 md:w-8 text-chart-1" />
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Sequences</p>
-                  <p className="text-3xl font-bold text-chart-1" data-testid="text-active-sequences">
+                  <p className="text-xs md:text-sm text-muted-foreground">Active Sequences</p>
+                  <p className="text-2xl md:text-3xl font-bold text-chart-1" data-testid="text-active-sequences">
                     {sequences?.filter((s: any) => s.status === 'active').length || 0}
                   </p>
                 </div>
-                <Play className="h-8 w-8 text-chart-1" />
+                <Play className="h-6 md:h-8 w-6 md:w-8 text-chart-1" />
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Contacts</p>
-                  <p className="text-3xl font-bold text-chart-2" data-testid="text-total-contacts">
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Contacts</p>
+                  <p className="text-2xl md:text-3xl font-bold text-chart-2" data-testid="text-total-contacts">
                     {totalContacts}
                   </p>
                 </div>
-                <Users className="h-8 w-8 text-chart-2" />
+                <Users className="h-6 md:h-8 w-6 md:w-8 text-chart-2" />
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Avg Reply Rate</p>
-                  <p className="text-3xl font-bold text-chart-3" data-testid="text-reply-rate">
+                  <p className="text-xs md:text-sm text-muted-foreground">Avg Reply Rate</p>
+                  <p className="text-2xl md:text-3xl font-bold text-chart-3" data-testid="text-reply-rate">
                     {avgReplyRate}%
                   </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-chart-3" />
+                <TrendingUp className="h-6 md:h-8 w-6 md:w-8 text-chart-3" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Sequence Tabs */}
-        <Card>
+        <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
           <CardHeader>
-            <CardTitle>Your Sequences</CardTitle>
+            <CardTitle className="text-sm md:text-base">Your Sequences</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -201,9 +204,9 @@ export default function Sequences() {
                 {isLoading ? (
                   <div className="text-center py-8 text-muted-foreground">Loading sequences...</div>
                 ) : filteredSequences?.length ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredSequences.map((sequence: any) => (
-                      <Card key={sequence.id} className="relative">
+                      <Card key={sequence.id} className="relative rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -291,17 +294,17 @@ export default function Sequences() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
-                      <Users className="h-12 w-12 text-muted-foreground" />
+                    <div className="mx-auto w-20 h-20 md:w-24 md:h-24 bg-muted rounded-full flex items-center justify-center mb-4">
+                      <Users className="h-10 md:h-12 w-10 md:w-12 text-muted-foreground" />
                     </div>
-                    <h3 className="text-lg font-medium mb-2">No sequences found</h3>
-                    <p className="text-muted-foreground mb-4">
+                    <h3 className="text-base md:text-lg font-medium mb-2">No sequences found</h3>
+                    <p className="text-sm md:text-base text-muted-foreground mb-4">
                       {selectedStatus === "all" 
                         ? "Create your first sequence to start automating your outreach"
                         : `No ${selectedStatus} sequences found`
                       }
                     </p>
-                    <Button onClick={() => setIsBuilderOpen(true)} data-testid="button-create-first-sequence">
+                    <Button onClick={() => setIsBuilderOpen(true)} className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-create-first-sequence">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Sequence
                     </Button>
@@ -311,6 +314,7 @@ export default function Sequences() {
             </Tabs>
           </CardContent>
         </Card>
+        </div>
       </main>
     </div>
   );

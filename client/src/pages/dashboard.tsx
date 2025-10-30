@@ -51,27 +51,30 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, Alex. Here's what's happening with your sales today.</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="secondary" data-testid="button-new-sequence">
-              <Plus className="h-4 w-4 mr-2" />
-              New Sequence
-            </Button>
-            <Button data-testid="button-ai-generate">
-              <Wand2 className="h-4 w-4 mr-2" />
-              AI Generate
-            </Button>
+      <header className="bg-card border-b border-border px-4 md:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
+              <p className="text-sm md:text-base text-muted-foreground">Welcome back, Alex. Here's what's happening with your sales today.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button variant="secondary" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-new-sequence">
+                <Plus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">New Sequence</span>
+              </Button>
+              <Button className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-ai-generate">
+                <Wand2 className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">AI Generate</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-6 space-y-6">
+      <main className="flex-1 overflow-auto px-4 md:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatsCard
@@ -109,20 +112,20 @@ export default function Dashboard() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Visitor Intelligence */}
-            <Card>
+            <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
               <CardHeader className="border-b border-border">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Live Visitor Intelligence</CardTitle>
-                  <Button variant="link" size="sm" data-testid="button-view-all-visitors">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <CardTitle className="text-sm md:text-base">Live Visitor Intelligence</CardTitle>
+                  <Button variant="link" size="sm" className="hover:soft-shadow-hover transition-all-soft" data-testid="button-view-all-visitors">
                     View All →
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 {visitorsLoading ? (
                   <div className="p-4 text-center text-muted-foreground">Loading visitors...</div>
                 ) : activeVisitors?.length ? (
@@ -161,18 +164,18 @@ Alex"
           </div>
 
           {/* Right Column */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Active Sequences */}
-            <Card>
+            <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
               <CardHeader className="border-b border-border">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Active Sequences</CardTitle>
-                  <Button variant="ghost" size="sm" data-testid="button-add-sequence">
+                  <CardTitle className="text-sm md:text-base">Active Sequences</CardTitle>
+                  <Button variant="ghost" size="sm" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-add-sequence">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 {sequencesLoading ? (
                   <div className="p-4 text-center text-muted-foreground">Loading sequences...</div>
                 ) : sequences?.length ? (
@@ -202,11 +205,11 @@ Alex"
             </Card>
 
             {/* Recent Insights */}
-            <Card>
+            <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
               <CardHeader className="border-b border-border">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Recent Insights</CardTitle>
-                  <Button variant="link" size="sm" data-testid="button-view-all-insights">
+                  <CardTitle className="text-sm md:text-base">Recent Insights</CardTitle>
+                  <Button variant="link" size="sm" className="hover:soft-shadow-hover transition-all-soft" data-testid="button-view-all-insights">
                     View All →
                   </Button>
                 </div>
@@ -234,11 +237,11 @@ Alex"
             </Card>
 
             {/* Today's Tasks */}
-            <Card>
+            <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
               <CardHeader className="border-b border-border">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Today's Tasks</CardTitle>
-                  <Badge variant="secondary">
+                  <CardTitle className="text-sm md:text-base">Today's Tasks</CardTitle>
+                  <Badge variant="secondary" className="rounded-lg">
                     {tasks?.length || 0} pending
                   </Badge>
                 </div>
@@ -275,33 +278,34 @@ Alex"
         </div>
 
         {/* Recent Activity */}
-        <Card>
+        <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="text-sm md:text-base">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-8 h-8 bg-chart-1/10 rounded-lg flex items-center justify-center">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-8 h-8 bg-chart-1/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Bot className="h-4 w-4 text-chart-1" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm">AI Agent sent 23 personalized emails to SaaS prospects</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm truncate">AI Agent sent 23 personalized emails to SaaS prospects</p>
                   <p className="text-xs text-muted-foreground">2 minutes ago</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <div className="w-8 h-8 bg-chart-2/10 rounded-lg flex items-center justify-center">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-8 h-8 bg-chart-2/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Reply className="h-4 w-4 text-chart-2" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm">Received interested reply from DataFlow Inc CTO</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm truncate">Received interested reply from DataFlow Inc CTO</p>
                   <p className="text-xs text-muted-foreground">15 minutes ago</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+        </div>
       </main>
     </div>
   );

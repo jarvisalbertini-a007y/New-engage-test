@@ -167,22 +167,22 @@ export default function Leads() {
   const sizes = Array.from(new Set(companies.map((c: any) => c.size).filter(Boolean)));
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Lead Database</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl md:text-3xl font-bold">Lead Database</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Manage companies and contacts with enrichment
             </p>
           </div>
           <div className="flex gap-2">
             <Dialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-company">
+                <Button className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-add-company">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Company
+                  <span className="hidden sm:inline">Add Company</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
@@ -324,9 +324,9 @@ export default function Leads() {
 
             <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" data-testid="button-add-contact">
+                <Button variant="outline" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-add-contact">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Contact
+                  <span className="hidden sm:inline">Add Contact</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -455,55 +455,55 @@ export default function Leads() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Companies</p>
-                <p className="text-2xl font-bold" data-testid="text-total-companies">{companies.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total Companies</p>
+                <p className="text-xl md:text-2xl font-bold" data-testid="text-total-companies">{companies.length}</p>
               </div>
-              <Building2 className="h-8 w-8 text-primary" />
+              <Building2 className="h-6 md:h-8 w-6 md:w-8 text-primary" />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Contacts</p>
-                <p className="text-2xl font-bold" data-testid="text-total-contacts">{contacts.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total Contacts</p>
+                <p className="text-xl md:text-2xl font-bold" data-testid="text-total-contacts">{contacts.length}</p>
               </div>
-              <Users className="h-8 w-8 text-primary" />
+              <Users className="h-6 md:h-8 w-6 md:w-8 text-primary" />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Verified Contacts</p>
-                <p className="text-2xl font-bold">{contacts.filter((c: any) => c.isVerified).length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Verified Contacts</p>
+                <p className="text-xl md:text-2xl font-bold">{contacts.filter((c: any) => c.isVerified).length}</p>
               </div>
-              <Mail className="h-8 w-8 text-green-500" />
+              <Mail className="h-6 md:h-8 w-6 md:w-8 text-green-500" />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="rounded-xl soft-shadow hover:soft-shadow-hover transition-all-soft p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Industries</p>
-                <p className="text-2xl font-bold">{industries.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Industries</p>
+                <p className="text-xl md:text-2xl font-bold">{industries.length}</p>
               </div>
-              <Briefcase className="h-8 w-8 text-purple-500" />
+              <Briefcase className="h-6 md:h-8 w-6 md:w-8 text-purple-500" />
             </div>
           </Card>
         </div>
 
         {/* Search and Filters */}
-        <Card className="p-4">
-          <div className="flex gap-4">
+        <Card className="rounded-xl soft-shadow p-4">
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search companies, contacts, domains..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 rounded-lg"
                 data-testid="input-search-leads"
               />
             </div>
