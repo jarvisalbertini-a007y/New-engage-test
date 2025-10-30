@@ -3,24 +3,29 @@
 @tailwind utilities;
 
 :root {
-  /* Design System Colors */
-  --color-bg: #FFFFFF;
-  --color-bg-muted: #F6F7F8;
-  --color-ink: #0B0C0E;
-  --color-ink-muted: #6B7280;
-  --color-accent: #0A84FF;
-  --color-accent-muted: #CFE8FF;
-  --color-positive: #0BB07B;
-  --color-warning: #FFB020;
-  --color-danger: #E5484D;
-  --color-border: #E5E7EB;
+  /* Soft, Calming Color System - Optimized for Extended Work */
+  --color-bg: #FAFBFC;
+  --color-bg-muted: #F7F8FA;
+  --color-bg-soft: #FFFEF7;
+  --color-ink: #4A5568;
+  --color-ink-muted: #718096;
+  --color-accent: #5B9FE6;
+  --color-accent-muted: #E3F2FD;
+  --color-accent-soft: #BBDEFB;
+  --color-positive: #48BB78;
+  --color-warning: #F6AD55;
+  --color-danger: #FC8181;
+  --color-border: #E8EAED;
   --color-card: #FFFFFF;
+  --color-overlay: rgba(255, 255, 255, 0.85);
   
-  /* Design System Shadows */
-  --shadow-card: 0 4px 16px 0 rgba(0,0,0,0.06);
-  --shadow-elevated: 0 10px 24px 0 rgba(0,0,0,0.12);
+  /* Soft Shadow System */
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 2px 8px 0 rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 20px 0 rgba(91, 159, 230, 0.15);
   
-  /* Design System Radius */
+  /* Rounded Corner System */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -50,39 +55,39 @@
   --font-mono-line: 16px;
   --font-mono-weight: 500;
   
-  /* Map to shadcn variables */
-  --background: hsl(0, 0%, 100%);
-  --foreground: hsl(224, 19%, 6%);
+  /* Map to shadcn variables - Soft Light Theme */
+  --background: hsl(210, 25%, 98%);
+  --foreground: hsl(215, 20%, 35%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(224, 19%, 6%);
+  --card-foreground: hsl(215, 20%, 35%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(224, 19%, 6%);
-  --primary: hsl(211, 100%, 52%);
+  --popover-foreground: hsl(215, 20%, 35%);
+  --primary: hsl(211, 70%, 63%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(210, 5%, 97%);
-  --secondary-foreground: hsl(224, 19%, 6%);
-  --muted: hsl(210, 5%, 97%);
-  --muted-foreground: hsl(215, 13%, 44%);
-  --accent: hsl(211, 100%, 52%);
+  --secondary: hsl(210, 30%, 96%);
+  --secondary-foreground: hsl(215, 20%, 35%);
+  --muted: hsl(210, 25%, 95%);
+  --muted-foreground: hsl(215, 15%, 50%);
+  --accent: hsl(211, 70%, 63%);
   --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(357, 73%, 60%);
+  --destructive: hsl(0, 60%, 75%);
   --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(214, 8%, 91%);
-  --input: hsl(214, 8%, 91%);
-  --ring: hsl(211, 100%, 52%);
-  --chart-1: hsl(173, 58%, 39%);
-  --chart-2: hsl(43, 74%, 66%);
-  --chart-3: hsl(197, 37%, 24%);
-  --chart-4: hsl(27, 87%, 67%);
-  --chart-5: hsl(336, 69%, 58%);
-  --sidebar: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(224, 19%, 6%);
-  --sidebar-primary: hsl(211, 100%, 52%);
+  --border: hsl(210, 18%, 92%);
+  --input: hsl(210, 18%, 92%);
+  --ring: hsl(211, 70%, 63%);
+  --chart-1: hsl(173, 45%, 55%);
+  --chart-2: hsl(43, 60%, 70%);
+  --chart-3: hsl(197, 30%, 60%);
+  --chart-4: hsl(27, 70%, 72%);
+  --chart-5: hsl(336, 50%, 68%);
+  --sidebar: hsl(210, 30%, 98%);
+  --sidebar-foreground: hsl(215, 20%, 35%);
+  --sidebar-primary: hsl(211, 70%, 63%);
   --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(210, 5%, 97%);
-  --sidebar-accent-foreground: hsl(224, 19%, 6%);
-  --sidebar-border: hsl(214, 8%, 91%);
-  --sidebar-ring: hsl(211, 100%, 52%);
+  --sidebar-accent: hsl(210, 30%, 96%);
+  --sidebar-accent-foreground: hsl(215, 20%, 35%);
+  --sidebar-border: hsl(210, 18%, 92%);
+  --sidebar-ring: hsl(211, 70%, 63%);
   --font-sans: "Inter", "SF Pro Text", "system-ui", "Arial", "sans-serif";
   --font-serif: Georgia, serif;
   --font-mono: "SF Mono", "Monaco", "Consolas", "Courier New", monospace;
@@ -90,52 +95,63 @@
   --spacing: 0.25rem;
 }
 
-.dark {
-  /* Design System Dark Mode Colors */
-  --color-bg: #0F1114;
-  --color-bg-muted: #1A1D21;
-  --color-ink: #F8F9FA;
-  --color-ink-muted: #94A3B8;
-  --color-accent: #0A84FF;
-  --color-accent-muted: #003D82;
-  --color-positive: #0BB07B;
-  --color-warning: #FFB020;
-  --color-danger: #E5484D;
-  --color-border: #2C3137;
-  --color-card: #1A1D21;
+/* Global Smooth Animations */
+@layer base {
+  * {
+    @apply transition-colors duration-200 ease-in-out;
+  }
   
-  --background: hsl(220, 15%, 7%);
-  --foreground: hsl(210, 20%, 98%);
-  --card: hsl(217, 14%, 10%);
-  --card-foreground: hsl(210, 20%, 98%);
-  --popover: hsl(217, 14%, 10%);
-  --popover-foreground: hsl(210, 20%, 98%);
-  --primary: hsl(211, 100%, 52%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(215, 27.9%, 16.9%);
-  --secondary-foreground: hsl(210, 20%, 98%);
-  --muted: hsl(215, 27.9%, 16.9%);
-  --muted-foreground: hsl(213, 24%, 59%);
-  --accent: hsl(211, 100%, 52%);
-  --accent-foreground: hsl(0, 0%, 100%);
-  --destructive: hsl(357, 73%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(215, 14%, 19%);
-  --input: hsl(215, 14%, 19%);
-  --ring: hsl(211, 100%, 52%);
-  --chart-1: hsl(220, 70%, 50%);
-  --chart-2: hsl(160, 60%, 45%);
-  --chart-3: hsl(30, 80%, 55%);
-  --chart-4: hsl(280, 65%, 60%);
-  --chart-5: hsl(340, 75%, 55%);
-  --sidebar: hsl(217, 14%, 10%);
-  --sidebar-foreground: hsl(210, 20%, 98%);
-  --sidebar-primary: hsl(211, 100%, 52%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(215, 27.9%, 16.9%);
-  --sidebar-accent-foreground: hsl(210, 20%, 98%);
-  --sidebar-border: hsl(215, 14%, 19%);
-  --sidebar-ring: hsl(211, 100%, 52%);
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-optical-sizing: auto;
+  }
+}
+
+/* Responsive Utility Classes */
+@layer utilities {
+  /* Soft UI Effects */
+  .soft-shadow {
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .soft-shadow-hover:hover {
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .glass-effect {
+    background: var(--color-overlay);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
+  /* Smooth Animations */
+  .transition-all-soft {
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Responsive Text */
+  .text-responsive {
+    @apply text-sm md:text-base;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Soft borders */
+  .border-soft {
+    border-color: var(--color-border);
+  }
 }
 
 @layer base {
