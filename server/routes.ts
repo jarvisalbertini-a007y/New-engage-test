@@ -18,6 +18,8 @@ import { dealIntelligenceEngine } from "./services/dealIntelligence";
 import { revenueOpsCenter } from "./services/revenueOps";
 import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScript, getVoiceScripts, getCallAnalytics, getCampaignAnalytics } from "./services/voiceAI";
 import { browserExtensionService } from "./services/browserExtension";
+import { crowdIntelNetwork } from "./services/crowdIntel";
+import { insertSharedIntelSchema, insertIntelRatingSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -3083,6 +3085,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error finding contacts:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to find contacts' });
+    }
+  });
+  
+  // Crowd Intelligence Routes
+  // Browse shared intelligence
+  app.get("/api/crowd-intel", async (req: any, res) => {
+    try {
+      const category = req.query.category as string;
+      const industry = req.query.industry as string;
+      const companySize = req.query.companySize as string;
+      const tags = req.query.tags ? (req.query.tags as string).split(',') : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      const intel = await storage.getSharedIntelList({
+        category,
+        industry,
+        companySize,
+        tags,
+        limit
+      });
+      
+      res.json(intel);
+    } catch (error) {
+      console.error("Error fetching crowd intel:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch intel' });
+    }
+  });
+  
+  // Get network statistics
+  app.get("/api/crowd-intel/stats", async (req, res) => {
+    try {
+      const stats = await crowdIntelNetwork.getNetworkStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching crowd intel stats:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch stats' });
+    }
+  });
+  
+  // Contribute anonymized intelligence
+  app.post("/api/crowd-intel/contribute", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { category, content, effectiveness, industry, companySize, tags, performanceData } = req.body;
+      
+      if (!category || !content) {
+        return res.status(400).json({ error: "Category and content are required" });
+      }
+      
+      const intel = await crowdIntelNetwork.contributeIntel(userId, {
+        category,
+        content,
+        effectiveness,
+        industry,
+        companySize,
+        tags,
+        performanceData
+      });
+      
+      res.json(intel);
+    } catch (error) {
+      console.error("Error contributing intel:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to contribute intel' });
+    }
+  });
+  
+  // Get industry benchmarks
+  app.get("/api/crowd-intel/benchmarks", async (req, res) => {
+    try {
+      const metric = req.query.metric as string;
+      const industry = req.query.industry as string;
+      const companySize = req.query.companySize as string;
+      const channel = req.query.channel as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      const benchmarks = await storage.getBenchmarkDataList({
+        metric,
+        industry,
+        companySize,
+        channel,
+        limit
+      });
+      
+      res.json(benchmarks);
+    } catch (error) {
+      console.error("Error fetching benchmarks:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch benchmarks' });
+    }
+  });
+  
+  // Improve content with crowd wisdom
+  app.post("/api/crowd-intel/improve", async (req, res) => {
+    try {
+      const { content, category, industry, companySize, tags } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+      
+      const improved = await crowdIntelNetwork.improveFromCrowd(content, {
+        category,
+        industry,
+        companySize,
+        tags
+      });
+      
+      res.json(improved);
+    } catch (error) {
+      console.error("Error improving content:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to improve content' });
+    }
+  });
+  
+  // Rate shared intelligence
+  app.post("/api/crowd-intel/rate", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { intelId, rating, feedback, usefulnessScore } = req.body;
+      
+      if (!intelId || !rating) {
+        return res.status(400).json({ error: "Intel ID and rating are required" });
+      }
+      
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      const ratingResult = await crowdIntelNetwork.rateIntel(
+        userId,
+        intelId,
+        rating,
+        feedback,
+        usefulnessScore
+      );
+      
+      res.json(ratingResult);
+    } catch (error) {
+      console.error("Error rating intel:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to rate intel' });
+    }
+  });
+  
+  // Get personalized recommendations
+  app.get("/api/crowd-intel/recommendations", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const industry = req.query.industry as string;
+      const companySize = req.query.companySize as string;
+      const recentCategories = req.query.categories 
+        ? (req.query.categories as string).split(',')
+        : undefined;
+      
+      const recommendations = await crowdIntelNetwork.recommendIntel({
+        userId,
+        industry,
+        companySize,
+        recentCategories
+      });
+      
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error getting recommendations:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get recommendations' });
+    }
+  });
+  
+  // Aggregate benchmarks (admin endpoint)
+  app.post("/api/crowd-intel/aggregate-benchmarks", async (req: any, res) => {
+    try {
+      // This could be restricted to admin users
+      await crowdIntelNetwork.aggregateBenchmarks();
+      res.json({ success: true, message: "Benchmarks aggregated successfully" });
+    } catch (error) {
+      console.error("Error aggregating benchmarks:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to aggregate benchmarks' });
     }
   });
 

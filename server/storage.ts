@@ -56,7 +56,11 @@ import {
   type EnrichmentCache, type InsertEnrichmentCache,
   type ExtensionActivity, type InsertExtensionActivity,
   type QuickAction, type InsertQuickAction,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions
+  type SharedIntel, type InsertSharedIntel,
+  type IntelContribution, type InsertIntelContribution,
+  type IntelRating, type InsertIntelRating,
+  type BenchmarkData, type InsertBenchmarkData,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -431,6 +435,30 @@ export interface IStorage {
   getQuickAction(id: string): Promise<QuickAction | undefined>;
   getQuickActions(filters?: { userId?: string; actionType?: string; limit?: number }): Promise<QuickAction[]>;
   createQuickAction(action: InsertQuickAction): Promise<QuickAction>;
+  
+  // Crowd Intelligence
+  // Shared Intel
+  getSharedIntel(id: string): Promise<SharedIntel | undefined>;
+  getSharedIntelList(filters?: { category?: string; industry?: string; companySize?: string; tags?: string[]; limit?: number }): Promise<SharedIntel[]>;
+  createSharedIntel(intel: InsertSharedIntel): Promise<SharedIntel>;
+  updateSharedIntel(id: string, updates: Partial<SharedIntel>): Promise<SharedIntel | undefined>;
+  
+  // Intel Contributions
+  getIntelContribution(id: string): Promise<IntelContribution | undefined>;
+  getIntelContributions(filters?: { intelId?: string; userId?: string; contributionType?: string; limit?: number }): Promise<IntelContribution[]>;
+  createIntelContribution(contribution: InsertIntelContribution): Promise<IntelContribution>;
+  
+  // Intel Ratings
+  getIntelRating(id: string): Promise<IntelRating | undefined>;
+  getIntelRatings(filters?: { intelId?: string; userId?: string; minRating?: number; limit?: number }): Promise<IntelRating[]>;
+  createIntelRating(rating: InsertIntelRating): Promise<IntelRating>;
+  updateIntelRating(id: string, updates: Partial<IntelRating>): Promise<IntelRating | undefined>;
+  
+  // Benchmark Data
+  getBenchmarkData(id: string): Promise<BenchmarkData | undefined>;
+  getBenchmarkDataList(filters?: { metric?: string; industry?: string; companySize?: string; channel?: string; limit?: number }): Promise<BenchmarkData[]>;
+  createBenchmarkData(benchmark: InsertBenchmarkData): Promise<BenchmarkData>;
+  updateBenchmarkData(id: string, updates: Partial<BenchmarkData>): Promise<BenchmarkData | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -470,6 +498,10 @@ export class MemStorage implements IStorage {
   private enrichmentCaches: Map<string, EnrichmentCache> = new Map();
   private extensionActivities: Map<string, ExtensionActivity> = new Map();
   private quickActions: Map<string, QuickAction> = new Map();
+  private sharedIntel: Map<string, SharedIntel> = new Map();
+  private intelContributions: Map<string, IntelContribution> = new Map();
+  private intelRatings: Map<string, IntelRating> = new Map();
+  private benchmarkDataMap: Map<string, BenchmarkData> = new Map();
 
   constructor() {
     this.seedData();
@@ -3501,6 +3533,164 @@ export class DbStorage implements IStorage {
 
   async createQuickAction(action: InsertQuickAction): Promise<QuickAction> {
     const result = await db.insert(quickActions).values(action).returning();
+    return result[0];
+  }
+  
+  // Crowd Intelligence methods
+  async getSharedIntel(id: string): Promise<SharedIntel | undefined> {
+    const result = await db.select().from(sharedIntel).where(eq(sharedIntel.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSharedIntelList(filters?: { category?: string; industry?: string; companySize?: string; tags?: string[]; limit?: number }): Promise<SharedIntel[]> {
+    let query = db.select().from(sharedIntel);
+    
+    if (filters?.category) {
+      query = query.where(eq(sharedIntel.category, filters.category)) as any;
+    }
+    
+    if (filters?.industry) {
+      query = query.where(eq(sharedIntel.industry, filters.industry)) as any;
+    }
+    
+    if (filters?.companySize) {
+      query = query.where(eq(sharedIntel.companySize, filters.companySize)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createSharedIntel(intel: InsertSharedIntel): Promise<SharedIntel> {
+    const result = await db.insert(sharedIntel).values(intel).returning();
+    return result[0];
+  }
+
+  async updateSharedIntel(id: string, updates: Partial<SharedIntel>): Promise<SharedIntel | undefined> {
+    const result = await db
+      .update(sharedIntel)
+      .set({...cleanPartial(updates), lastUpdated: new Date()})
+      .where(eq(sharedIntel.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getIntelContribution(id: string): Promise<IntelContribution | undefined> {
+    const result = await db.select().from(intelContributions).where(eq(intelContributions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getIntelContributions(filters?: { intelId?: string; userId?: string; contributionType?: string; limit?: number }): Promise<IntelContribution[]> {
+    let query = db.select().from(intelContributions);
+    
+    if (filters?.intelId) {
+      query = query.where(eq(intelContributions.intelId, filters.intelId)) as any;
+    }
+    
+    if (filters?.userId) {
+      query = query.where(eq(intelContributions.userId, filters.userId)) as any;
+    }
+    
+    if (filters?.contributionType) {
+      query = query.where(eq(intelContributions.contributionType, filters.contributionType)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createIntelContribution(contribution: InsertIntelContribution): Promise<IntelContribution> {
+    const result = await db.insert(intelContributions).values(contribution).returning();
+    return result[0];
+  }
+
+  async getIntelRating(id: string): Promise<IntelRating | undefined> {
+    const result = await db.select().from(intelRatings).where(eq(intelRatings.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getIntelRatings(filters?: { intelId?: string; userId?: string; minRating?: number; limit?: number }): Promise<IntelRating[]> {
+    let query = db.select().from(intelRatings);
+    
+    if (filters?.intelId) {
+      query = query.where(eq(intelRatings.intelId, filters.intelId)) as any;
+    }
+    
+    if (filters?.userId) {
+      query = query.where(eq(intelRatings.userId, filters.userId)) as any;
+    }
+    
+    // Note: For minRating filter, would need gte operator which isn't imported here
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createIntelRating(rating: InsertIntelRating): Promise<IntelRating> {
+    const result = await db.insert(intelRatings).values(rating).returning();
+    return result[0];
+  }
+
+  async updateIntelRating(id: string, updates: Partial<IntelRating>): Promise<IntelRating | undefined> {
+    const result = await db
+      .update(intelRatings)
+      .set(cleanPartial(updates))
+      .where(eq(intelRatings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBenchmarkData(id: string): Promise<BenchmarkData | undefined> {
+    const result = await db.select().from(benchmarkData).where(eq(benchmarkData.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getBenchmarkDataList(filters?: { metric?: string; industry?: string; companySize?: string; channel?: string; limit?: number }): Promise<BenchmarkData[]> {
+    let query = db.select().from(benchmarkData);
+    
+    if (filters?.metric) {
+      query = query.where(eq(benchmarkData.metric, filters.metric)) as any;
+    }
+    
+    if (filters?.industry) {
+      query = query.where(eq(benchmarkData.industry, filters.industry)) as any;
+    }
+    
+    if (filters?.companySize) {
+      query = query.where(eq(benchmarkData.companySize, filters.companySize)) as any;
+    }
+    
+    if (filters?.channel) {
+      query = query.where(eq(benchmarkData.channel, filters.channel)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createBenchmarkData(benchmark: InsertBenchmarkData): Promise<BenchmarkData> {
+    const result = await db.insert(benchmarkData).values(benchmark).returning();
+    return result[0];
+  }
+
+  async updateBenchmarkData(id: string, updates: Partial<BenchmarkData>): Promise<BenchmarkData | undefined> {
+    const result = await db
+      .update(benchmarkData)
+      .set({...cleanPartial(updates), lastCalculated: new Date()})
+      .where(eq(benchmarkData.id, id))
+      .returning();
     return result[0];
   }
 }

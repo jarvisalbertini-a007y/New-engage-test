@@ -906,6 +906,53 @@ export const callAnalytics = pgTable("call_analytics", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Crowd Intelligence Tables
+export const sharedIntel = pgTable("shared_intel", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(), // email_templates, objection_handlers, sequences, tactics
+  content: jsonb("content").notNull(), // The actual content being shared
+  effectiveness: decimal("effectiveness", { precision: 5, scale: 2 }), // 0-100
+  industry: text("industry"),
+  companySize: text("company_size"), // "1-10", "11-50", etc.
+  useCount: integer("use_count").default(0),
+  successRate: decimal("success_rate", { precision: 5, scale: 2 }),
+  tags: text("tags").array(),
+  contributorCount: integer("contributor_count").default(1),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const intelContributions = pgTable("intel_contributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  intelId: varchar("intel_id").references(() => sharedIntel.id).notNull(),
+  userId: text("user_id").notNull(), // Hashed for privacy
+  contributionType: text("contribution_type").notNull(), // created, improved, validated
+  performanceData: jsonb("performance_data"), // Anonymous performance metrics
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const intelRatings = pgTable("intel_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  intelId: varchar("intel_id").references(() => sharedIntel.id).notNull(),
+  userId: text("user_id").notNull(), // Hashed for privacy
+  rating: integer("rating").notNull(), // 1-5
+  feedback: text("feedback"),
+  usefulnessScore: integer("usefulness_score"), // 0-100
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const benchmarkData = pgTable("benchmark_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  metric: text("metric").notNull(), // open_rate, reply_rate, conversion_rate
+  industry: text("industry"),
+  companySize: text("company_size"),
+  channel: text("channel"), // email, phone, linkedin, etc.
+  value: decimal("value", { precision: 10, scale: 4 }).notNull(),
+  sampleSize: integer("sample_size").notNull(),
+  lastCalculated: timestamp("last_calculated").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -1243,6 +1290,31 @@ export const insertCallAnalyticsSchema = createInsertSchema(callAnalytics).omit(
   createdAt: true,
 });
 
+// Crowd Intelligence Insert Schemas
+export const insertSharedIntelSchema = createInsertSchema(sharedIntel).omit({
+  id: true,
+  createdAt: true,
+  lastUpdated: true,
+  useCount: true,
+  contributorCount: true,
+});
+
+export const insertIntelContributionSchema = createInsertSchema(intelContributions).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertIntelRatingSchema = createInsertSchema(intelRatings).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBenchmarkDataSchema = createInsertSchema(benchmarkData).omit({
+  id: true,
+  createdAt: true,
+  lastCalculated: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1420,6 +1492,19 @@ export type InsertExtensionActivity = z.infer<typeof insertExtensionActivitySche
 
 export type QuickAction = typeof quickActions.$inferSelect;
 export type InsertQuickAction = z.infer<typeof insertQuickActionSchema>;
+
+// Crowd Intelligence Types
+export type SharedIntel = typeof sharedIntel.$inferSelect;
+export type InsertSharedIntel = z.infer<typeof insertSharedIntelSchema>;
+
+export type IntelContribution = typeof intelContributions.$inferSelect;
+export type InsertIntelContribution = z.infer<typeof insertIntelContributionSchema>;
+
+export type IntelRating = typeof intelRatings.$inferSelect;
+export type InsertIntelRating = z.infer<typeof insertIntelRatingSchema>;
+
+export type BenchmarkData = typeof benchmarkData.$inferSelect;
+export type InsertBenchmarkData = z.infer<typeof insertBenchmarkDataSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;

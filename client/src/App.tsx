@@ -44,6 +44,7 @@ import RevenueOpsPage from "@/pages/revenue-ops";
 import MultiChannelPage from "@/pages/multi-channel";
 import VoiceAIPage from "@/pages/voice-ai";
 import { BrowserExtension } from "@/pages/browser-extension";
+import CrowdIntelPage from "@/pages/crowd-intel";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -124,6 +125,7 @@ function Router() {
           <Route path="/multi-channel" component={MultiChannelPage} />
           <Route path="/voice-ai" component={VoiceAIPage} />
           <Route path="/browser-extension" component={BrowserExtension} />
+          <Route path="/crowd-intel" component={CrowdIntelPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
