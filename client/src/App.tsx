@@ -38,6 +38,7 @@ import LandingPage from "@/pages/landing";
 import CollapsibleSidebar from "@/components/collapsible-sidebar";
 import MarketplacePage from "@/pages/marketplace";
 import DigitalTwins from "@/pages/digital-twins";
+import SDRTeamsPage from "@/pages/sdr-teams";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -112,6 +113,7 @@ function Router() {
           <Route path="/performance-coaching" component={PerformanceCoachingPage} />
           <Route path="/team-collaboration" component={TeamCollaborationPage} />
           <Route path="/digital-twins" component={DigitalTwins} />
+          <Route path="/sdr-teams" component={SDRTeamsPage} />
           <Route component={NotFound} />
         </Switch>
       </div>

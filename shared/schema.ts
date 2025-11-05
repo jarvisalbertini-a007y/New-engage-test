@@ -506,6 +506,63 @@ export const playbooks = pgTable("playbooks", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// SDR Teams Tables
+export const sdrTeams = pgTable("sdr_teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  teamType: text("team_type").notNull().default("hybrid"), // hunter, farmer, hybrid
+  memberRoles: jsonb("member_roles").notNull(), // Array of roles: researcher, writer, qualifier, scheduler, manager
+  strategy: jsonb("strategy"), // Team strategy configuration
+  performanceMetrics: jsonb("performance_metrics"), // Team performance data
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const sdrTeamMembers = pgTable("sdr_team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull().references(() => sdrTeams.id),
+  role: text("role").notNull(), // researcher, writer, qualifier, scheduler, manager
+  agentTypeId: varchar("agent_type_id").references(() => agentTypes.id),
+  personalityProfile: jsonb("personality_profile"), // AI persona configuration
+  skills: text("skills").array(), // Specialized skills for this team member
+  currentLoad: integer("current_load").default(0), // Number of active tasks
+  performance: jsonb("performance"), // Individual performance metrics
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const teamCollaborations = pgTable("team_collaborations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull().references(() => sdrTeams.id),
+  dealId: varchar("deal_id"), // Reference to deal/opportunity
+  contactId: varchar("contact_id").references(() => contacts.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  collaborationType: text("collaboration_type").notNull(), // research, outreach, qualification, scheduling, review
+  participantRoles: text("participant_roles").array(), // Array of participating member roles
+  decisions: jsonb("decisions"), // AI decisions made during collaboration
+  outcome: text("outcome"), // success, failed, pending
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  duration: integer("duration"), // Duration in seconds
+});
+
+export const teamPerformance = pgTable("team_performance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull().references(() => sdrTeams.id),
+  period: text("period").notNull(), // daily, weekly, monthly
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  metrics: jsonb("metrics").notNull(), // Detailed performance metrics
+  wins: integer("wins").default(0),
+  losses: integer("losses").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }), // Percentage
+  avgDealSize: decimal("avg_deal_size", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const onboardingProfiles = pgTable("onboarding_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").unique(),  // Removed foreign key for demo purposes
@@ -697,6 +754,29 @@ export const insertPlaybookSchema = createInsertSchema(playbooks).omit({
   createdAt: true,
 });
 
+// SDR Teams insert schemas
+export const insertSdrTeamSchema = createInsertSchema(sdrTeams).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSdrTeamMemberSchema = createInsertSchema(sdrTeamMembers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamCollaborationSchema = createInsertSchema(teamCollaborations).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertTeamPerformanceSchema = createInsertSchema(teamPerformance).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertAutopilotCampaignSchema = createInsertSchema(autopilotCampaigns).omit({
   id: true,
   createdAt: true,
@@ -843,6 +923,19 @@ export type InsertWorkflowTrigger = z.infer<typeof insertWorkflowTriggerSchema>;
 
 export type Playbook = typeof playbooks.$inferSelect;
 export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
+
+// SDR Teams types
+export type SdrTeam = typeof sdrTeams.$inferSelect;
+export type InsertSdrTeam = z.infer<typeof insertSdrTeamSchema>;
+
+export type SdrTeamMember = typeof sdrTeamMembers.$inferSelect;
+export type InsertSdrTeamMember = z.infer<typeof insertSdrTeamMemberSchema>;
+
+export type TeamCollaboration = typeof teamCollaborations.$inferSelect;
+export type InsertTeamCollaboration = z.infer<typeof insertTeamCollaborationSchema>;
+
+export type TeamPerformance = typeof teamPerformance.$inferSelect;
+export type InsertTeamPerformance = z.infer<typeof insertTeamPerformanceSchema>;
 
 export type AutopilotCampaign = typeof autopilotCampaigns.$inferSelect;
 export type InsertAutopilotCampaign = z.infer<typeof insertAutopilotCampaignSchema>;

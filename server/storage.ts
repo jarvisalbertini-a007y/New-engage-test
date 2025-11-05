@@ -32,7 +32,11 @@ import {
   type DigitalTwin, type InsertDigitalTwin,
   type TwinInteraction, type InsertTwinInteraction,
   type TwinPrediction, type InsertTwinPrediction,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions
+  type SdrTeam, type InsertSdrTeam,
+  type SdrTeamMember, type InsertSdrTeamMember,
+  type TeamCollaboration, type InsertTeamCollaboration,
+  type TeamPerformance, type InsertTeamPerformance,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -254,6 +258,33 @@ export interface IStorage {
   getTwinPredictions(twinId: string, type?: string): Promise<TwinPrediction[]>;
   createTwinPrediction(prediction: InsertTwinPrediction): Promise<TwinPrediction>;
   updateTwinPrediction(id: string, updates: Partial<TwinPrediction>): Promise<TwinPrediction | undefined>;
+  
+  // SDR Teams
+  getSdrTeam(id: string): Promise<SdrTeam | undefined>;
+  getSdrTeams(filters?: { teamType?: string; isActive?: boolean; createdBy?: string }): Promise<SdrTeam[]>;
+  createSdrTeam(team: InsertSdrTeam): Promise<SdrTeam>;
+  updateSdrTeam(id: string, updates: Partial<SdrTeam>): Promise<SdrTeam | undefined>;
+  deleteSdrTeam(id: string): Promise<boolean>;
+  
+  // SDR Team Members
+  getSdrTeamMember(id: string): Promise<SdrTeamMember | undefined>;
+  getSdrTeamMembersByTeam(teamId: string): Promise<SdrTeamMember[]>;
+  getSdrTeamMembersByRole(role: string): Promise<SdrTeamMember[]>;
+  createSdrTeamMember(member: InsertSdrTeamMember): Promise<SdrTeamMember>;
+  updateSdrTeamMember(id: string, updates: Partial<SdrTeamMember>): Promise<SdrTeamMember | undefined>;
+  deleteSdrTeamMember(id: string): Promise<boolean>;
+  
+  // Team Collaborations
+  getTeamCollaboration(id: string): Promise<TeamCollaboration | undefined>;
+  getTeamCollaborations(filters?: { teamId?: string; dealId?: string; contactId?: string; outcome?: string }): Promise<TeamCollaboration[]>;
+  createTeamCollaboration(collaboration: InsertTeamCollaboration): Promise<TeamCollaboration>;
+  updateTeamCollaboration(id: string, updates: Partial<TeamCollaboration>): Promise<TeamCollaboration | undefined>;
+  
+  // Team Performance
+  getTeamPerformance(id: string): Promise<TeamPerformance | undefined>;
+  getTeamPerformanceByTeam(teamId: string, period?: string): Promise<TeamPerformance[]>;
+  createTeamPerformance(performance: InsertTeamPerformance): Promise<TeamPerformance>;
+  updateTeamPerformance(id: string, updates: Partial<TeamPerformance>): Promise<TeamPerformance | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -269,6 +300,10 @@ export class MemStorage implements IStorage {
   private digitalTwins: Map<string, DigitalTwin> = new Map();
   private twinInteractions: Map<string, TwinInteraction> = new Map();
   private twinPredictions: Map<string, TwinPrediction> = new Map();
+  private sdrTeams: Map<string, SdrTeam> = new Map();
+  private sdrTeamMembers: Map<string, SdrTeamMember> = new Map();
+  private teamCollaborations: Map<string, TeamCollaboration> = new Map();
+  private teamPerformances: Map<string, TeamPerformance> = new Map();
 
   constructor() {
     this.seedData();
@@ -1190,6 +1225,204 @@ export class MemStorage implements IStorage {
     
     const updated = { ...prediction, ...cleanPartial(updates) };
     this.twinPredictions.set(id, updated);
+    return updated;
+  }
+  
+  // SDR Teams methods
+  async getSdrTeam(id: string): Promise<SdrTeam | undefined> {
+    return this.sdrTeams.get(id);
+  }
+  
+  async getSdrTeams(filters?: { teamType?: string; isActive?: boolean; createdBy?: string }): Promise<SdrTeam[]> {
+    let teams = Array.from(this.sdrTeams.values());
+    
+    if (filters?.teamType) {
+      teams = teams.filter(t => t.teamType === filters.teamType);
+    }
+    if (filters?.isActive !== undefined) {
+      teams = teams.filter(t => t.isActive === filters.isActive);
+    }
+    if (filters?.createdBy) {
+      teams = teams.filter(t => t.createdBy === filters.createdBy);
+    }
+    
+    return teams;
+  }
+  
+  async createSdrTeam(team: InsertSdrTeam): Promise<SdrTeam> {
+    const id = randomUUID();
+    const now = new Date();
+    const newTeam: SdrTeam = {
+      id,
+      name: team.name,
+      description: team.description || null,
+      teamType: team.teamType || 'hybrid',
+      memberRoles: team.memberRoles,
+      strategy: team.strategy || null,
+      performanceMetrics: team.performanceMetrics || null,
+      isActive: team.isActive !== undefined ? team.isActive : true,
+      createdBy: team.createdBy || null,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.sdrTeams.set(id, newTeam);
+    return newTeam;
+  }
+  
+  async updateSdrTeam(id: string, updates: Partial<SdrTeam>): Promise<SdrTeam | undefined> {
+    const team = this.sdrTeams.get(id);
+    if (!team) return undefined;
+    
+    const updated = { ...team, ...cleanPartial(updates), updatedAt: new Date() };
+    this.sdrTeams.set(id, updated);
+    return updated;
+  }
+  
+  async deleteSdrTeam(id: string): Promise<boolean> {
+    return this.sdrTeams.delete(id);
+  }
+  
+  // SDR Team Members methods
+  async getSdrTeamMember(id: string): Promise<SdrTeamMember | undefined> {
+    return this.sdrTeamMembers.get(id);
+  }
+  
+  async getSdrTeamMembersByTeam(teamId: string): Promise<SdrTeamMember[]> {
+    return Array.from(this.sdrTeamMembers.values())
+      .filter(m => m.teamId === teamId);
+  }
+  
+  async getSdrTeamMembersByRole(role: string): Promise<SdrTeamMember[]> {
+    return Array.from(this.sdrTeamMembers.values())
+      .filter(m => m.role === role);
+  }
+  
+  async createSdrTeamMember(member: InsertSdrTeamMember): Promise<SdrTeamMember> {
+    const id = randomUUID();
+    const now = new Date();
+    const newMember: SdrTeamMember = {
+      id,
+      teamId: member.teamId,
+      role: member.role,
+      agentTypeId: member.agentTypeId || null,
+      personalityProfile: member.personalityProfile || null,
+      skills: member.skills || null,
+      currentLoad: member.currentLoad || 0,
+      performance: member.performance || null,
+      isActive: member.isActive !== undefined ? member.isActive : true,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.sdrTeamMembers.set(id, newMember);
+    return newMember;
+  }
+  
+  async updateSdrTeamMember(id: string, updates: Partial<SdrTeamMember>): Promise<SdrTeamMember | undefined> {
+    const member = this.sdrTeamMembers.get(id);
+    if (!member) return undefined;
+    
+    const updated = { ...member, ...cleanPartial(updates), updatedAt: new Date() };
+    this.sdrTeamMembers.set(id, updated);
+    return updated;
+  }
+  
+  async deleteSdrTeamMember(id: string): Promise<boolean> {
+    return this.sdrTeamMembers.delete(id);
+  }
+  
+  // Team Collaborations methods
+  async getTeamCollaboration(id: string): Promise<TeamCollaboration | undefined> {
+    return this.teamCollaborations.get(id);
+  }
+  
+  async getTeamCollaborations(filters?: { teamId?: string; dealId?: string; contactId?: string; outcome?: string }): Promise<TeamCollaboration[]> {
+    let collaborations = Array.from(this.teamCollaborations.values());
+    
+    if (filters?.teamId) {
+      collaborations = collaborations.filter(c => c.teamId === filters.teamId);
+    }
+    if (filters?.dealId) {
+      collaborations = collaborations.filter(c => c.dealId === filters.dealId);
+    }
+    if (filters?.contactId) {
+      collaborations = collaborations.filter(c => c.contactId === filters.contactId);
+    }
+    if (filters?.outcome) {
+      collaborations = collaborations.filter(c => c.outcome === filters.outcome);
+    }
+    
+    return collaborations;
+  }
+  
+  async createTeamCollaboration(collaboration: InsertTeamCollaboration): Promise<TeamCollaboration> {
+    const id = randomUUID();
+    const newCollaboration: TeamCollaboration = {
+      id,
+      teamId: collaboration.teamId,
+      dealId: collaboration.dealId || null,
+      contactId: collaboration.contactId || null,
+      companyId: collaboration.companyId || null,
+      collaborationType: collaboration.collaborationType,
+      participantRoles: collaboration.participantRoles || null,
+      decisions: collaboration.decisions || null,
+      outcome: collaboration.outcome || null,
+      timestamp: new Date(),
+      duration: collaboration.duration || null
+    };
+    this.teamCollaborations.set(id, newCollaboration);
+    return newCollaboration;
+  }
+  
+  async updateTeamCollaboration(id: string, updates: Partial<TeamCollaboration>): Promise<TeamCollaboration | undefined> {
+    const collaboration = this.teamCollaborations.get(id);
+    if (!collaboration) return undefined;
+    
+    const updated = { ...collaboration, ...cleanPartial(updates) };
+    this.teamCollaborations.set(id, updated);
+    return updated;
+  }
+  
+  // Team Performance methods
+  async getTeamPerformance(id: string): Promise<TeamPerformance | undefined> {
+    return this.teamPerformances.get(id);
+  }
+  
+  async getTeamPerformanceByTeam(teamId: string, period?: string): Promise<TeamPerformance[]> {
+    let performances = Array.from(this.teamPerformances.values())
+      .filter(p => p.teamId === teamId);
+    
+    if (period) {
+      performances = performances.filter(p => p.period === period);
+    }
+    
+    return performances;
+  }
+  
+  async createTeamPerformance(performance: InsertTeamPerformance): Promise<TeamPerformance> {
+    const id = randomUUID();
+    const newPerformance: TeamPerformance = {
+      id,
+      teamId: performance.teamId,
+      period: performance.period,
+      startDate: performance.startDate,
+      endDate: performance.endDate,
+      metrics: performance.metrics,
+      wins: performance.wins || 0,
+      losses: performance.losses || 0,
+      conversionRate: performance.conversionRate || null,
+      avgDealSize: performance.avgDealSize || null,
+      createdAt: new Date()
+    };
+    this.teamPerformances.set(id, newPerformance);
+    return newPerformance;
+  }
+  
+  async updateTeamPerformance(id: string, updates: Partial<TeamPerformance>): Promise<TeamPerformance | undefined> {
+    const performance = this.teamPerformances.get(id);
+    if (!performance) return undefined;
+    
+    const updated = { ...performance, ...cleanPartial(updates) };
+    this.teamPerformances.set(id, updated);
     return updated;
   }
 }

@@ -12,6 +12,8 @@ import { generatePersonalizedEmail, categorizeEmailResponse } from "./services/o
 import { initiateCall, getCallAnalytics, scheduleCallCampaign, getOrGenerateCallScript } from "./services/cloudDialer";
 import { canSendEmail, incrementSendCount, getWarmupSchedule, checkDomainReputation, validateEmailContent, getSendingRecommendations } from "./services/emailLimits";
 import { parseNLPToWorkflow, executeWorkflow, resumeWorkflow } from "./services/workflowEngine";
+import { sdrTeamManager } from "./services/sdrTeams";
+import { insertSdrTeamSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -2058,6 +2060,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching predictions:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch predictions' });
+    }
+  });
+
+  // SDR Teams Routes
+  app.get("/api/sdr-teams", async (req: any, res) => {
+    try {
+      const { teamType, isActive } = req.query;
+      const filters: any = {};
+      
+      if (teamType) filters.teamType = teamType;
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+      if (req.user?.claims?.sub) filters.createdBy = req.user.claims.sub;
+      
+      const teams = await sdrTeamManager.getAllTeamsWithMetrics();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching SDR teams:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch teams' });
+    }
+  });
+
+  app.post("/api/sdr-teams", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, teamType, roles, strategy } = req.body;
+      
+      if (!name || !roles || !Array.isArray(roles) || roles.length === 0) {
+        return res.status(400).json({ error: "Name and roles are required" });
+      }
+      
+      const team = await sdrTeamManager.createTeam({
+        name,
+        description,
+        teamType,
+        roles,
+        strategy,
+        createdBy: userId
+      });
+      
+      res.json(team);
+    } catch (error) {
+      console.error("Error creating SDR team:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create team' });
+    }
+  });
+
+  app.get("/api/sdr-teams/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const teamDetails = await sdrTeamManager.getTeamDetails(id);
+      res.json(teamDetails);
+    } catch (error) {
+      console.error("Error fetching team details:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch team details' });
+    }
+  });
+
+  app.post("/api/sdr-teams/:id/assign", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { dealId, contactId, companyId } = req.body;
+      
+      if (!dealId && !contactId && !companyId) {
+        return res.status(400).json({ error: "At least one of dealId, contactId, or companyId is required" });
+      }
+      
+      const collaboration = await sdrTeamManager.assignDeal(id, {
+        dealId,
+        contactId,
+        companyId
+      });
+      
+      res.json(collaboration);
+    } catch (error) {
+      console.error("Error assigning deal to team:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to assign deal' });
+    }
+  });
+
+  app.get("/api/sdr-teams/:id/performance", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { period = 'weekly' } = req.query;
+      
+      const performance = await sdrTeamManager.reviewPerformance(
+        id, 
+        period as 'daily' | 'weekly' | 'monthly'
+      );
+      
+      res.json(performance);
+    } catch (error) {
+      console.error("Error fetching team performance:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch performance' });
+    }
+  });
+
+  app.post("/api/sdr-teams/:id/collaborate", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type, context, targetContactId, targetCompanyId } = req.body;
+      
+      if (!type || !context) {
+        return res.status(400).json({ error: "Type and context are required" });
+      }
+      
+      const validTypes = ["research", "outreach", "qualification", "scheduling", "review"];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(", ")}` });
+      }
+      
+      const result = await sdrTeamManager.orchestrateCollaboration(id, {
+        type: type as any,
+        context,
+        targetContactId,
+        targetCompanyId
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error orchestrating collaboration:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to orchestrate collaboration' });
+    }
+  });
+
+  app.put("/api/sdr-teams/:id/optimize", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const optimization = await sdrTeamManager.optimizeTeamComposition(id);
+      res.json(optimization);
+    } catch (error) {
+      console.error("Error optimizing team:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to optimize team' });
     }
   });
 
