@@ -43,6 +43,7 @@ import DealIntelligence from "@/pages/deal-intelligence";
 import RevenueOpsPage from "@/pages/revenue-ops";
 import MultiChannelPage from "@/pages/multi-channel";
 import VoiceAIPage from "@/pages/voice-ai";
+import { BrowserExtension } from "@/pages/browser-extension";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -122,6 +123,7 @@ function Router() {
           <Route path="/revenue-ops" component={RevenueOpsPage} />
           <Route path="/multi-channel" component={MultiChannelPage} />
           <Route path="/voice-ai" component={VoiceAIPage} />
+          <Route path="/browser-extension" component={BrowserExtension} />
           <Route component={NotFound} />
         </Switch>
       </div>

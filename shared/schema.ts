@@ -798,6 +798,47 @@ export const channelOrchestration = pgTable("channel_orchestration", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Browser Extension Tables
+export const extensionUsers = pgTable("extension_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  extensionId: text("extension_id").notNull(),
+  installedAt: timestamp("installed_at").defaultNow().notNull(),
+  lastActiveAt: timestamp("last_active_at").defaultNow().notNull(),
+  settings: jsonb("settings").notNull().default('{}'),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const enrichmentCache = pgTable("enrichment_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  domain: text("domain").notNull(),
+  companyData: jsonb("company_data"),
+  contactData: jsonb("contact_data"),
+  technologies: jsonb("technologies"),
+  socialProfiles: jsonb("social_profiles"),
+  cachedAt: timestamp("cached_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const extensionActivities = pgTable("extension_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  activityType: text("activity_type").notNull(), // view, enrich, save
+  url: text("url"),
+  domain: text("domain"),
+  enrichedData: jsonb("enriched_data"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const quickActions = pgTable("quick_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  actionType: text("action_type").notNull(), // add_to_sequence, send_email, save_lead
+  targetData: jsonb("target_data").notNull(),
+  executedAt: timestamp("executed_at").defaultNow().notNull(),
+  result: jsonb("result"),
+});
+
 // Voice AI Tables
 export const voiceCampaigns = pgTable("voice_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1155,6 +1196,28 @@ export const insertChannelOrchestrationSchema = createInsertSchema(channelOrches
   updatedAt: true,
 });
 
+// Browser Extension Insert Schemas
+export const insertExtensionUserSchema = createInsertSchema(extensionUsers).omit({
+  id: true,
+  installedAt: true,
+  lastActiveAt: true,
+});
+
+export const insertEnrichmentCacheSchema = createInsertSchema(enrichmentCache).omit({
+  id: true,
+  cachedAt: true,
+});
+
+export const insertExtensionActivitySchema = createInsertSchema(extensionActivities).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertQuickActionSchema = createInsertSchema(quickActions).omit({
+  id: true,
+  executedAt: true,
+});
+
 // Voice AI Insert Schemas
 export const insertVoiceCampaignSchema = createInsertSchema(voiceCampaigns).omit({
   id: true,
@@ -1344,6 +1407,19 @@ export type InsertVoiceScript = z.infer<typeof insertVoiceScriptSchema>;
 
 export type CallAnalytics = typeof callAnalytics.$inferSelect;
 export type InsertCallAnalytics = z.infer<typeof insertCallAnalyticsSchema>;
+
+// Browser Extension Types
+export type ExtensionUser = typeof extensionUsers.$inferSelect;
+export type InsertExtensionUser = z.infer<typeof insertExtensionUserSchema>;
+
+export type EnrichmentCache = typeof enrichmentCache.$inferSelect;
+export type InsertEnrichmentCache = z.infer<typeof insertEnrichmentCacheSchema>;
+
+export type ExtensionActivity = typeof extensionActivities.$inferSelect;
+export type InsertExtensionActivity = z.infer<typeof insertExtensionActivitySchema>;
+
+export type QuickAction = typeof quickActions.$inferSelect;
+export type InsertQuickAction = z.infer<typeof insertQuickActionSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;

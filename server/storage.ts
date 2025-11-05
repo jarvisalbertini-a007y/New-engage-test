@@ -52,7 +52,11 @@ import {
   type VoiceCall, type InsertVoiceCall,
   type VoiceScript, type InsertVoiceScript,
   type CallAnalytics, type InsertCallAnalytics,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics
+  type ExtensionUser, type InsertExtensionUser,
+  type EnrichmentCache, type InsertEnrichmentCache,
+  type ExtensionActivity, type InsertExtensionActivity,
+  type QuickAction, type InsertQuickAction,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -404,6 +408,29 @@ export interface IStorage {
   getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]>;
   createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics>;
   updateCallAnalytics(id: string, updates: Partial<CallAnalytics>): Promise<CallAnalytics | undefined>;
+  
+  // Browser Extension
+  // Extension Users
+  getExtensionUser(id: string): Promise<ExtensionUser | undefined>;
+  getExtensionUserByUserId(userId: string): Promise<ExtensionUser | undefined>;
+  createExtensionUser(user: InsertExtensionUser): Promise<ExtensionUser>;
+  updateExtensionUser(id: string, updates: Partial<ExtensionUser>): Promise<ExtensionUser | undefined>;
+  
+  // Enrichment Cache
+  getEnrichmentCache(id: string): Promise<EnrichmentCache | undefined>;
+  getEnrichmentCacheByDomain(domain: string): Promise<EnrichmentCache | undefined>;
+  createEnrichmentCache(cache: InsertEnrichmentCache): Promise<EnrichmentCache>;
+  updateEnrichmentCache(id: string, updates: Partial<EnrichmentCache>): Promise<EnrichmentCache | undefined>;
+  
+  // Extension Activities
+  getExtensionActivity(id: string): Promise<ExtensionActivity | undefined>;
+  getExtensionActivities(filters?: { userId?: string; activityType?: string; limit?: number }): Promise<ExtensionActivity[]>;
+  createExtensionActivity(activity: InsertExtensionActivity): Promise<ExtensionActivity>;
+  
+  // Quick Actions
+  getQuickAction(id: string): Promise<QuickAction | undefined>;
+  getQuickActions(filters?: { userId?: string; actionType?: string; limit?: number }): Promise<QuickAction[]>;
+  createQuickAction(action: InsertQuickAction): Promise<QuickAction>;
 }
 
 export class MemStorage implements IStorage {
@@ -439,6 +466,10 @@ export class MemStorage implements IStorage {
   private voiceCalls: Map<string, VoiceCall> = new Map();
   private voiceScripts: Map<string, VoiceScript> = new Map();
   private callAnalyticsMap: Map<string, CallAnalytics> = new Map();
+  private extensionUsers: Map<string, ExtensionUser> = new Map();
+  private enrichmentCaches: Map<string, EnrichmentCache> = new Map();
+  private extensionActivities: Map<string, ExtensionActivity> = new Map();
+  private quickActions: Map<string, QuickAction> = new Map();
 
   constructor() {
     this.seedData();
@@ -1904,6 +1935,154 @@ export class MemStorage implements IStorage {
     this.coachingInsights.set(id, updated);
     return updated;
   }
+  
+  // Browser Extension methods
+  async getExtensionUser(id: string): Promise<ExtensionUser | undefined> {
+    return this.extensionUsers.get(id);
+  }
+
+  async getExtensionUserByUserId(userId: string): Promise<ExtensionUser | undefined> {
+    return Array.from(this.extensionUsers.values()).find(eu => eu.userId === userId);
+  }
+
+  async createExtensionUser(user: InsertExtensionUser): Promise<ExtensionUser> {
+    const id = randomUUID();
+    const extensionUser: ExtensionUser = {
+      id,
+      userId: user.userId,
+      extensionId: user.extensionId,
+      installedAt: new Date(),
+      lastActiveAt: new Date(),
+      settings: user.settings || {},
+      isActive: user.isActive ?? true
+    };
+    this.extensionUsers.set(id, extensionUser);
+    return extensionUser;
+  }
+
+  async updateExtensionUser(id: string, updates: Partial<ExtensionUser>): Promise<ExtensionUser | undefined> {
+    const user = this.extensionUsers.get(id);
+    if (!user) return undefined;
+    
+    const updated = { ...user, ...cleanPartial(updates), lastActiveAt: new Date() };
+    this.extensionUsers.set(id, updated);
+    return updated;
+  }
+
+  async getEnrichmentCache(id: string): Promise<EnrichmentCache | undefined> {
+    return this.enrichmentCaches.get(id);
+  }
+
+  async getEnrichmentCacheByDomain(domain: string): Promise<EnrichmentCache | undefined> {
+    const now = new Date();
+    return Array.from(this.enrichmentCaches.values()).find(cache => 
+      cache.domain === domain && new Date(cache.expiresAt) > now
+    );
+  }
+
+  async createEnrichmentCache(cache: InsertEnrichmentCache): Promise<EnrichmentCache> {
+    const id = randomUUID();
+    const enrichmentCache: EnrichmentCache = {
+      id,
+      domain: cache.domain,
+      companyData: cache.companyData || null,
+      contactData: cache.contactData || null,
+      technologies: cache.technologies || null,
+      socialProfiles: cache.socialProfiles || null,
+      cachedAt: new Date(),
+      expiresAt: cache.expiresAt
+    };
+    this.enrichmentCaches.set(id, enrichmentCache);
+    return enrichmentCache;
+  }
+
+  async updateEnrichmentCache(id: string, updates: Partial<EnrichmentCache>): Promise<EnrichmentCache | undefined> {
+    const cache = this.enrichmentCaches.get(id);
+    if (!cache) return undefined;
+    
+    const updated = { ...cache, ...cleanPartial(updates) };
+    this.enrichmentCaches.set(id, updated);
+    return updated;
+  }
+
+  async getExtensionActivity(id: string): Promise<ExtensionActivity | undefined> {
+    return this.extensionActivities.get(id);
+  }
+
+  async getExtensionActivities(filters?: { userId?: string; activityType?: string; limit?: number }): Promise<ExtensionActivity[]> {
+    let activities = Array.from(this.extensionActivities.values());
+    
+    if (filters?.userId) {
+      activities = activities.filter(a => a.userId === filters.userId);
+    }
+    
+    if (filters?.activityType) {
+      activities = activities.filter(a => a.activityType === filters.activityType);
+    }
+    
+    // Sort by timestamp descending
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    if (filters?.limit) {
+      activities = activities.slice(0, filters.limit);
+    }
+    
+    return activities;
+  }
+
+  async createExtensionActivity(activity: InsertExtensionActivity): Promise<ExtensionActivity> {
+    const id = randomUUID();
+    const extensionActivity: ExtensionActivity = {
+      id,
+      userId: activity.userId,
+      activityType: activity.activityType,
+      url: activity.url || null,
+      domain: activity.domain || null,
+      enrichedData: activity.enrichedData || null,
+      timestamp: new Date()
+    };
+    this.extensionActivities.set(id, extensionActivity);
+    return extensionActivity;
+  }
+
+  async getQuickAction(id: string): Promise<QuickAction | undefined> {
+    return this.quickActions.get(id);
+  }
+
+  async getQuickActions(filters?: { userId?: string; actionType?: string; limit?: number }): Promise<QuickAction[]> {
+    let actions = Array.from(this.quickActions.values());
+    
+    if (filters?.userId) {
+      actions = actions.filter(a => a.userId === filters.userId);
+    }
+    
+    if (filters?.actionType) {
+      actions = actions.filter(a => a.actionType === filters.actionType);
+    }
+    
+    // Sort by executedAt descending
+    actions.sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime());
+    
+    if (filters?.limit) {
+      actions = actions.slice(0, filters.limit);
+    }
+    
+    return actions;
+  }
+
+  async createQuickAction(action: InsertQuickAction): Promise<QuickAction> {
+    const id = randomUUID();
+    const quickAction: QuickAction = {
+      id,
+      userId: action.userId,
+      actionType: action.actionType,
+      targetData: action.targetData,
+      executedAt: new Date(),
+      result: action.result || null
+    };
+    this.quickActions.set(id, quickAction);
+    return quickAction;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -3211,6 +3390,117 @@ export class DbStorage implements IStorage {
       .set(cleanPartial(updates))
       .where(eq(callAnalytics.id, id))
       .returning();
+    return result[0];
+  }
+  
+  // Browser Extension methods
+  async getExtensionUser(id: string): Promise<ExtensionUser | undefined> {
+    const result = await db.select().from(extensionUsers).where(eq(extensionUsers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getExtensionUserByUserId(userId: string): Promise<ExtensionUser | undefined> {
+    const result = await db.select().from(extensionUsers).where(eq(extensionUsers.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async createExtensionUser(user: InsertExtensionUser): Promise<ExtensionUser> {
+    const result = await db.insert(extensionUsers).values(user).returning();
+    return result[0];
+  }
+
+  async updateExtensionUser(id: string, updates: Partial<ExtensionUser>): Promise<ExtensionUser | undefined> {
+    const result = await db
+      .update(extensionUsers)
+      .set({...cleanPartial(updates), lastActiveAt: new Date()})
+      .where(eq(extensionUsers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getEnrichmentCache(id: string): Promise<EnrichmentCache | undefined> {
+    const result = await db.select().from(enrichmentCache).where(eq(enrichmentCache.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getEnrichmentCacheByDomain(domain: string): Promise<EnrichmentCache | undefined> {
+    const now = new Date();
+    const result = await db.select().from(enrichmentCache)
+      .where(and(
+        eq(enrichmentCache.domain, domain),
+        // Add expiry check here if needed
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createEnrichmentCache(cache: InsertEnrichmentCache): Promise<EnrichmentCache> {
+    const result = await db.insert(enrichmentCache).values(cache).returning();
+    return result[0];
+  }
+
+  async updateEnrichmentCache(id: string, updates: Partial<EnrichmentCache>): Promise<EnrichmentCache | undefined> {
+    const result = await db
+      .update(enrichmentCache)
+      .set(cleanPartial(updates))
+      .where(eq(enrichmentCache.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getExtensionActivity(id: string): Promise<ExtensionActivity | undefined> {
+    const result = await db.select().from(extensionActivities).where(eq(extensionActivities.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getExtensionActivities(filters?: { userId?: string; activityType?: string; limit?: number }): Promise<ExtensionActivity[]> {
+    let query = db.select().from(extensionActivities);
+    
+    if (filters?.userId) {
+      query = query.where(eq(extensionActivities.userId, filters.userId)) as any;
+    }
+    
+    if (filters?.activityType) {
+      query = query.where(eq(extensionActivities.activityType, filters.activityType)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createExtensionActivity(activity: InsertExtensionActivity): Promise<ExtensionActivity> {
+    const result = await db.insert(extensionActivities).values(activity).returning();
+    return result[0];
+  }
+
+  async getQuickAction(id: string): Promise<QuickAction | undefined> {
+    const result = await db.select().from(quickActions).where(eq(quickActions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getQuickActions(filters?: { userId?: string; actionType?: string; limit?: number }): Promise<QuickAction[]> {
+    let query = db.select().from(quickActions);
+    
+    if (filters?.userId) {
+      query = query.where(eq(quickActions.userId, filters.userId)) as any;
+    }
+    
+    if (filters?.actionType) {
+      query = query.where(eq(quickActions.actionType, filters.actionType)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async createQuickAction(action: InsertQuickAction): Promise<QuickAction> {
+    const result = await db.insert(quickActions).values(action).returning();
     return result[0];
   }
 }

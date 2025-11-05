@@ -71,6 +71,7 @@ const navigation = [
     name: "Tools",
     items: [
       { name: "Setup Assistant", href: "/setup-assistant", icon: MessageSquare },
+      { name: "Browser Extension", href: "/browser-extension", icon: Globe },
       { name: "Performance Coaching", href: "/performance-coaching", icon: GraduationCap },
       { name: "Team Collaboration", href: "/team-collaboration", icon: Users },
       { name: "Lead Scoring", href: "/lead-scoring", icon: Brain },

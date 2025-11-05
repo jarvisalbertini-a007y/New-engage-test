@@ -17,6 +17,7 @@ import { insertSdrTeamSchema } from "@shared/schema";
 import { dealIntelligenceEngine } from "./services/dealIntelligence";
 import { revenueOpsCenter } from "./services/revenueOps";
 import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScript, getVoiceScripts, getCallAnalytics, getCampaignAnalytics } from "./services/voiceAI";
+import { browserExtensionService } from "./services/browserExtension";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -2861,6 +2862,227 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error scheduling callback:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to schedule callback' });
+    }
+  });
+
+  // ====== Browser Extension API Routes ======
+  
+  // Authenticate extension and get/generate API key
+  app.post("/api/extension/auth", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const result = await browserExtensionService.authenticateExtension(userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error authenticating extension:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to authenticate extension' });
+    }
+  });
+  
+  // Enrich prospect/company data
+  app.post("/api/extension/enrich", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { url, domain, type } = req.body;
+      
+      if (!url && !domain) {
+        return res.status(400).json({ error: "URL or domain is required" });
+      }
+      
+      let result;
+      if (type === 'company' && domain) {
+        result = await browserExtensionService.enrichCompany(domain, userId);
+      } else if (type === 'technologies' && domain) {
+        result = await browserExtensionService.detectTechnologies(domain, userId);
+      } else if (url) {
+        result = await browserExtensionService.enrichProfile(url, userId);
+      } else {
+        return res.status(400).json({ error: "Invalid enrichment type" });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error enriching data:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to enrich data' });
+    }
+  });
+  
+  // Get cached enrichment data for a domain
+  app.get("/api/extension/cached/:domain", async (req: any, res) => {
+    try {
+      const { domain } = req.params;
+      const cache = await storage.getEnrichmentCacheByDomain(domain);
+      
+      if (!cache) {
+        return res.status(404).json({ error: "No cached data found" });
+      }
+      
+      res.json(cache);
+    } catch (error) {
+      console.error("Error fetching cached data:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch cached data' });
+    }
+  });
+  
+  // Save enriched lead to database
+  app.post("/api/extension/save", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const data = req.body;
+      const result = await browserExtensionService.saveToDatabase(data, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error saving enriched data:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to save data' });
+    }
+  });
+  
+  // Execute quick action from extension
+  app.post("/api/extension/action", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { action, data } = req.body;
+      
+      if (!action) {
+        return res.status(400).json({ error: "Action type is required" });
+      }
+      
+      const result = await browserExtensionService.executeQuickAction(action, data, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing quick action:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to execute action' });
+    }
+  });
+  
+  // Get user's extension settings
+  app.get("/api/extension/settings", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const settings = await browserExtensionService.getExtensionSettings(userId);
+      
+      if (!settings) {
+        return res.status(404).json({ error: "Extension not configured" });
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching extension settings:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch settings' });
+    }
+  });
+  
+  // Update extension settings
+  app.patch("/api/extension/settings", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const settings = req.body;
+      const updated = await browserExtensionService.updateExtensionSettings(userId, settings);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Extension not configured" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating extension settings:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update settings' });
+    }
+  });
+  
+  // Get extension usage statistics
+  app.get("/api/extension/stats", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const stats = await browserExtensionService.getExtensionStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching extension stats:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch stats' });
+    }
+  });
+  
+  // Get recent extension activities
+  app.get("/api/extension/activities", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const activities = await storage.getExtensionActivities({ userId, limit });
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching extension activities:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch activities' });
+    }
+  });
+  
+  // Get quick actions history
+  app.get("/api/extension/quick-actions", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const actions = await storage.getQuickActions({ userId, limit });
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching quick actions:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch quick actions' });
+    }
+  });
+  
+  // Find contacts at a company
+  app.post("/api/extension/find-contacts", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { companyDomain } = req.body;
+      
+      if (!companyDomain) {
+        return res.status(400).json({ error: "Company domain is required" });
+      }
+      
+      const contacts = await browserExtensionService.findContacts(companyDomain, userId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error finding contacts:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to find contacts' });
     }
   });
 
