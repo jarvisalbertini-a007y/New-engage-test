@@ -1315,6 +1315,98 @@ export const insertBenchmarkDataSchema = createInsertSchema(benchmarkData).omit(
   lastCalculated: true,
 });
 
+// Enterprise Tables
+export const whiteLabels = pgTable("white_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().unique(),
+  brandName: text("brand_name").notNull(),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color").notNull().default("#0066FF"),
+  secondaryColor: text("secondary_color").notNull().default("#00D4FF"),
+  customDomain: text("custom_domain"),
+  customCSS: text("custom_css"),
+  features: jsonb("features").notNull().default('{}'), // Features enabled for this white-label
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const enterpriseSecurity = pgTable("enterprise_security", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().unique(),
+  ssoEnabled: boolean("sso_enabled").notNull().default(false),
+  ssoProvider: text("sso_provider"), // saml, oauth2, okta, azure-ad, google, etc
+  ssoConfig: jsonb("sso_config"), // SSO configuration details (encrypted)
+  ipWhitelist: text("ip_whitelist").array(),
+  mfaRequired: boolean("mfa_required").notNull().default(false),
+  mfaMethod: text("mfa_method"), // totp, sms, email
+  dataResidency: text("data_residency").notNull().default("us"), // us, eu, asia, custom
+  encryptionKey: text("encryption_key"), // Encrypted key for sensitive data
+  auditLogRetention: integer("audit_log_retention").notNull().default(90), // Days
+  complianceMode: text("compliance_mode"), // soc2, gdpr, ccpa, hipaa, none
+  passwordPolicy: jsonb("password_policy"), // Min length, complexity, expiry, etc
+  sessionTimeout: integer("session_timeout").notNull().default(1440), // Minutes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", 
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").references(() => users.id),
+    organizationId: varchar("organization_id"),
+    action: text("action").notNull(), // create, read, update, delete, login, logout, export, etc
+    resource: text("resource").notNull(), // contact, sequence, email, report, settings, etc
+    resourceId: text("resource_id"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    metadata: jsonb("metadata"), // Additional context about the action
+    severity: text("severity").notNull().default("info"), // info, warning, error, critical
+    outcome: text("outcome").notNull().default("success"), // success, failure
+  },
+  (table) => [index("IDX_audit_logs_user").on(table.userId),
+              index("IDX_audit_logs_timestamp").on(table.timestamp),
+              index("IDX_audit_logs_resource").on(table.resource)]
+);
+
+export const accessControls = pgTable("access_controls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull(),
+  roleName: text("role_name").notNull(),
+  description: text("description"),
+  permissions: jsonb("permissions").notNull().default('[]'), // Array of permission strings
+  userIds: text("user_ids").array(), // Array of user IDs with this role
+  isSystemRole: boolean("is_system_role").notNull().default(false), // Can't be deleted
+  priority: integer("priority").notNull().default(0), // Higher priority overrides lower
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Enterprise Insert Schemas
+export const insertWhiteLabelSchema = createInsertSchema(whiteLabels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEnterpriseSecuritySchema = createInsertSchema(enterpriseSecurity).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertAccessControlSchema = createInsertSchema(accessControls).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1509,3 +1601,16 @@ export type InsertBenchmarkData = z.infer<typeof insertBenchmarkDataSchema>;
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Enterprise Types
+export type WhiteLabel = typeof whiteLabels.$inferSelect;
+export type InsertWhiteLabel = z.infer<typeof insertWhiteLabelSchema>;
+
+export type EnterpriseSecurity = typeof enterpriseSecurity.$inferSelect;
+export type InsertEnterpriseSecurity = z.infer<typeof insertEnterpriseSecuritySchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type AccessControl = typeof accessControls.$inferSelect;
+export type InsertAccessControl = z.infer<typeof insertAccessControlSchema>;

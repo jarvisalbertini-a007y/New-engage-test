@@ -60,7 +60,11 @@ import {
   type IntelContribution, type InsertIntelContribution,
   type IntelRating, type InsertIntelRating,
   type BenchmarkData, type InsertBenchmarkData,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData
+  type WhiteLabel, type InsertWhiteLabel,
+  type EnterpriseSecurity, type InsertEnterpriseSecurity,
+  type AuditLog, type InsertAuditLog,
+  type AccessControl, type InsertAccessControl,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -459,6 +463,35 @@ export interface IStorage {
   getBenchmarkDataList(filters?: { metric?: string; industry?: string; companySize?: string; channel?: string; limit?: number }): Promise<BenchmarkData[]>;
   createBenchmarkData(benchmark: InsertBenchmarkData): Promise<BenchmarkData>;
   updateBenchmarkData(id: string, updates: Partial<BenchmarkData>): Promise<BenchmarkData | undefined>;
+
+  // Enterprise - White Labels
+  getWhiteLabel(organizationId: string): Promise<WhiteLabel | undefined>;
+  getWhiteLabels(): Promise<WhiteLabel[]>;
+  createWhiteLabel(whiteLabel: InsertWhiteLabel): Promise<WhiteLabel>;
+  updateWhiteLabel(organizationId: string, updates: Partial<WhiteLabel>): Promise<WhiteLabel | undefined>;
+  deleteWhiteLabel(organizationId: string): Promise<boolean>;
+
+  // Enterprise - Security Settings
+  getEnterpriseSecurity(organizationId: string): Promise<EnterpriseSecurity | undefined>;
+  getEnterpriseSecuritySettings(): Promise<EnterpriseSecurity[]>;
+  createEnterpriseSecurity(security: InsertEnterpriseSecurity): Promise<EnterpriseSecurity>;
+  updateEnterpriseSecurity(organizationId: string, updates: Partial<EnterpriseSecurity>): Promise<EnterpriseSecurity | undefined>;
+  deleteEnterpriseSecurity(organizationId: string): Promise<boolean>;
+
+  // Enterprise - Audit Logs
+  getAuditLog(id: string): Promise<AuditLog | undefined>;
+  getAuditLogs(filters?: { organizationId?: string; userId?: string; resource?: string; action?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<AuditLog[]>;
+  createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+  deleteOldAuditLogs(retentionDays: number): Promise<number>;
+
+  // Enterprise - Access Controls
+  getAccessControl(id: string): Promise<AccessControl | undefined>;
+  getAccessControls(organizationId: string): Promise<AccessControl[]>;
+  getAccessControlByRole(organizationId: string, roleName: string): Promise<AccessControl | undefined>;
+  getUserAccessControls(organizationId: string, userId: string): Promise<AccessControl[]>;
+  createAccessControl(accessControl: InsertAccessControl): Promise<AccessControl>;
+  updateAccessControl(id: string, updates: Partial<AccessControl>): Promise<AccessControl | undefined>;
+  deleteAccessControl(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -502,6 +535,10 @@ export class MemStorage implements IStorage {
   private intelContributions: Map<string, IntelContribution> = new Map();
   private intelRatings: Map<string, IntelRating> = new Map();
   private benchmarkDataMap: Map<string, BenchmarkData> = new Map();
+  private whiteLabels: Map<string, WhiteLabel> = new Map();
+  private enterpriseSecurity: Map<string, EnterpriseSecurity> = new Map();
+  private auditLogs: Map<string, AuditLog> = new Map();
+  private accessControls: Map<string, AccessControl> = new Map();
 
   constructor() {
     this.seedData();

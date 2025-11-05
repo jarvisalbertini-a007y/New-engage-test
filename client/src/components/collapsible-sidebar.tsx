@@ -5,7 +5,7 @@ import {
   Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, 
   Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut,
   Menu, X, ChevronLeft, ChevronRight, Store, Sparkles, GitBranch, TrendingUp,
-  Globe, Network
+  Globe, Network, Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +81,7 @@ const navigation = [
       { name: "Workflow Triggers", href: "/workflow-triggers", icon: Zap },
       { name: "Deliverability", href: "/deliverability", icon: Shield },
       { name: "Analytics", href: "/analytics", icon: BarChart },
+      { name: "Enterprise", href: "/enterprise", icon: Building2 },
     ],
   },
 ];

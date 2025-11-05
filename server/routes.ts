@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema, insertWhiteLabelSchema, insertEnterpriseSecuritySchema, insertAccessControlSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -20,6 +20,7 @@ import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScri
 import { browserExtensionService } from "./services/browserExtension";
 import { crowdIntelNetwork } from "./services/crowdIntel";
 import { insertSharedIntelSchema, insertIntelRatingSchema } from "@shared/schema";
+import { enterpriseManager } from "./services/enterprise";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -3260,6 +3261,260 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error aggregating benchmarks:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to aggregate benchmarks' });
+    }
+  });
+
+  // Enterprise Routes
+  
+  // Configure White-Label
+  app.post("/api/enterprise/white-label", async (req: any, res) => {
+    try {
+      const validatedData = insertWhiteLabelSchema.parse(req.body);
+      const whiteLabel = await enterpriseManager.configureWhiteLabel(validatedData);
+      res.json(whiteLabel);
+    } catch (error) {
+      console.error("Error configuring white-label:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to configure white-label' });
+    }
+  });
+  
+  // Get White-Label Configuration
+  app.get("/api/enterprise/white-label/:organizationId", async (req, res) => {
+    try {
+      const { organizationId } = req.params;
+      const whiteLabel = await storage.getWhiteLabel(organizationId);
+      if (!whiteLabel) {
+        return res.status(404).json({ error: "White-label configuration not found" });
+      }
+      res.json(whiteLabel);
+    } catch (error) {
+      console.error("Error fetching white-label:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch white-label' });
+    }
+  });
+  
+  // Get All White-Labels (Admin)
+  app.get("/api/enterprise/white-labels", async (req, res) => {
+    try {
+      const whiteLabels = await storage.getWhiteLabels();
+      res.json(whiteLabels);
+    } catch (error) {
+      console.error("Error fetching white-labels:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch white-labels' });
+    }
+  });
+  
+  // Update Security Settings
+  app.post("/api/enterprise/security", async (req: any, res) => {
+    try {
+      const validatedData = insertEnterpriseSecuritySchema.parse(req.body);
+      const security = await enterpriseManager.applySecuritySettings(validatedData);
+      res.json(security);
+    } catch (error) {
+      console.error("Error applying security settings:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to apply security settings' });
+    }
+  });
+  
+  // Get Security Settings
+  app.get("/api/enterprise/security/:organizationId", async (req, res) => {
+    try {
+      const { organizationId } = req.params;
+      const security = await storage.getEnterpriseSecurity(organizationId);
+      if (!security) {
+        return res.status(404).json({ error: "Security settings not found" });
+      }
+      res.json(security);
+    } catch (error) {
+      console.error("Error fetching security settings:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch security settings' });
+    }
+  });
+  
+  // Get Audit Logs
+  app.get("/api/enterprise/audit-log", async (req: any, res) => {
+    try {
+      const { organizationId, userId, resource, action, startDate, endDate, limit } = req.query;
+      
+      const filters: any = {};
+      if (organizationId) filters.organizationId = organizationId as string;
+      if (userId) filters.userId = userId as string;
+      if (resource) filters.resource = resource as string;
+      if (action) filters.action = action as string;
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+      if (limit) filters.limit = parseInt(limit as string);
+      
+      const auditLogs = await storage.getAuditLogs(filters);
+      res.json(auditLogs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch audit logs' });
+    }
+  });
+  
+  // Create Access Control Role
+  app.post("/api/enterprise/roles", async (req: any, res) => {
+    try {
+      const validatedData = insertAccessControlSchema.parse(req.body);
+      const accessControl = await storage.createAccessControl(validatedData);
+      
+      // Log audit event
+      await enterpriseManager.logAuditEvent({
+        userId: req.user.claims.sub,
+        organizationId: validatedData.organizationId,
+        action: "create",
+        resource: "access_control",
+        resourceId: accessControl.id,
+        metadata: { roleName: validatedData.roleName },
+      });
+      
+      res.json(accessControl);
+    } catch (error) {
+      console.error("Error creating access control:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create access control' });
+    }
+  });
+  
+  // Get Access Control Roles
+  app.get("/api/enterprise/roles/:organizationId", async (req, res) => {
+    try {
+      const { organizationId } = req.params;
+      const accessControls = await storage.getAccessControls(organizationId);
+      res.json(accessControls);
+    } catch (error) {
+      console.error("Error fetching access controls:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch access controls' });
+    }
+  });
+  
+  // Update Access Control Role
+  app.put("/api/enterprise/roles/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const updated = await storage.updateAccessControl(id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Access control not found" });
+      }
+      
+      // Log audit event
+      await enterpriseManager.logAuditEvent({
+        userId: req.user.claims.sub,
+        organizationId: updated.organizationId,
+        action: "update",
+        resource: "access_control",
+        resourceId: id,
+        metadata: { changes: Object.keys(updates) },
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating access control:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update access control' });
+    }
+  });
+  
+  // Delete Access Control Role
+  app.delete("/api/enterprise/roles/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get the role first for audit logging
+      const role = await storage.getAccessControl(id);
+      if (!role) {
+        return res.status(404).json({ error: "Access control not found" });
+      }
+      
+      if (role.isSystemRole) {
+        return res.status(403).json({ error: "Cannot delete system role" });
+      }
+      
+      const deleted = await storage.deleteAccessControl(id);
+      
+      // Log audit event
+      await enterpriseManager.logAuditEvent({
+        userId: req.user.claims.sub,
+        organizationId: role.organizationId,
+        action: "delete",
+        resource: "access_control",
+        resourceId: id,
+        metadata: { roleName: role.roleName },
+        severity: "warning",
+      });
+      
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting access control:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete access control' });
+    }
+  });
+  
+  // Generate Compliance Report
+  app.get("/api/enterprise/compliance", async (req: any, res) => {
+    try {
+      const { organizationId, startDate, endDate } = req.query;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "Organization ID is required" });
+      }
+      
+      const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      
+      const report = await enterpriseManager.generateComplianceReport(
+        organizationId as string,
+        start,
+        end
+      );
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating compliance report:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate compliance report' });
+    }
+  });
+  
+  // Configure SSO
+  app.post("/api/enterprise/sso", async (req: any, res) => {
+    try {
+      const { organizationId, provider, config } = req.body;
+      
+      if (!organizationId || !provider || !config) {
+        return res.status(400).json({ error: "Organization ID, provider, and config are required" });
+      }
+      
+      const security = await enterpriseManager.manageSSOIntegration(organizationId, provider, config);
+      
+      res.json(security);
+    } catch (error) {
+      console.error("Error configuring SSO:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to configure SSO' });
+    }
+  });
+  
+  // Check Permissions (internal use)
+  app.post("/api/enterprise/check-permission", async (req: any, res) => {
+    try {
+      const { organizationId, action, resource } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!organizationId || !action || !resource) {
+        return res.status(400).json({ error: "Organization ID, action, and resource are required" });
+      }
+      
+      const hasPermission = await enterpriseManager.enforcePermissions(
+        organizationId,
+        userId,
+        action,
+        resource
+      );
+      
+      res.json({ hasPermission });
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to check permissions' });
     }
   });
 
