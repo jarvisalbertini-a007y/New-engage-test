@@ -47,6 +47,7 @@ const navigation = [
     name: "Outreach",
     items: [
       { name: "Multi-Channel", href: "/multi-channel", icon: GitBranch },
+      { name: "Voice AI", href: "/voice-ai", icon: Phone },
       { name: "AI Autopilot", href: "/autopilot", icon: Zap },
       { name: "Playbooks", href: "/playbooks", icon: BookOpen },
       { name: "Sequences", href: "/sequences", icon: NotebookPen },

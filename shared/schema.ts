@@ -798,6 +798,73 @@ export const channelOrchestration = pgTable("channel_orchestration", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Voice AI Tables
+export const voiceCampaigns = pgTable("voice_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  script: text("script"),
+  targetList: jsonb("target_list"), // Array of contact IDs or criteria
+  callSchedule: jsonb("call_schedule"), // Schedule configuration
+  status: text("status").notNull().default("draft"), // draft, active, paused, completed
+  voiceSettings: jsonb("voice_settings"), // { voiceType: string, speed: number, pitch: number }
+  complianceSettings: jsonb("compliance_settings"), // Do-not-call list, consent requirements
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const voiceCalls = pgTable("voice_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => voiceCampaigns.id),
+  contactId: varchar("contact_id").references(() => contacts.id),
+  phoneNumber: text("phone_number").notNull(),
+  callStatus: text("call_status").notNull().default("initiated"), // initiated, ringing, answered, voicemail, failed
+  duration: integer("duration"), // Duration in seconds
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  recordingUrl: text("recording_url"),
+  transcript: text("transcript"),
+  sentiment: jsonb("sentiment"), // Sentiment analysis results
+  outcome: text("outcome"), // interested, not_interested, callback_scheduled, voicemail_left
+  consentObtained: boolean("consent_obtained").default(false),
+  doNotCallStatus: boolean("do_not_call_status").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const voiceScripts = pgTable("voice_scripts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  scriptType: text("script_type").notNull(), // cold_call, follow_up, demo_booking
+  introduction: text("introduction").notNull(),
+  mainContent: text("main_content").notNull(),
+  objectionHandlers: jsonb("objection_handlers"), // Map of objections to responses
+  closingStatement: text("closing_statement"),
+  fallbackResponses: jsonb("fallback_responses"), // Default responses for unexpected inputs
+  variables: jsonb("variables"), // Placeholders that can be personalized
+  performanceMetrics: jsonb("performance_metrics"), // Success rate, avg duration, etc.
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const callAnalytics = pgTable("call_analytics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callId: varchar("call_id").references(() => voiceCalls.id),
+  keyMoments: jsonb("key_moments"), // Array of important moments in the conversation
+  speakingRatio: decimal("speaking_ratio", { precision: 3, scale: 2 }), // Prospect vs AI speaking ratio
+  interruptionCount: integer("interruption_count").default(0),
+  talkSpeed: integer("talk_speed"), // Words per minute
+  emotionalTone: jsonb("emotional_tone"), // Detected emotions throughout the call
+  conversionPoints: jsonb("conversion_points"), // Moments where prospect showed interest
+  objectionCount: integer("objection_count").default(0),
+  positiveSignals: integer("positive_signals").default(0),
+  negativeSignals: integer("negative_signals").default(0),
+  nextBestAction: text("next_best_action"), // Recommended follow-up action
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -1088,6 +1155,31 @@ export const insertChannelOrchestrationSchema = createInsertSchema(channelOrches
   updatedAt: true,
 });
 
+// Voice AI Insert Schemas
+export const insertVoiceCampaignSchema = createInsertSchema(voiceCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVoiceCallSchema = createInsertSchema(voiceCalls).omit({
+  id: true,
+  createdAt: true,
+  startTime: true,
+  endTime: true,
+});
+
+export const insertVoiceScriptSchema = createInsertSchema(voiceScripts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCallAnalyticsSchema = createInsertSchema(callAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1239,6 +1331,19 @@ export type InsertChannelMessage = z.infer<typeof insertChannelMessageSchema>;
 
 export type ChannelOrchestration = typeof channelOrchestration.$inferSelect;
 export type InsertChannelOrchestration = z.infer<typeof insertChannelOrchestrationSchema>;
+
+// Voice AI Types
+export type VoiceCampaign = typeof voiceCampaigns.$inferSelect;
+export type InsertVoiceCampaign = z.infer<typeof insertVoiceCampaignSchema>;
+
+export type VoiceCall = typeof voiceCalls.$inferSelect;
+export type InsertVoiceCall = z.infer<typeof insertVoiceCallSchema>;
+
+export type VoiceScript = typeof voiceScripts.$inferSelect;
+export type InsertVoiceScript = z.infer<typeof insertVoiceScriptSchema>;
+
+export type CallAnalytics = typeof callAnalytics.$inferSelect;
+export type InsertCallAnalytics = z.infer<typeof insertCallAnalyticsSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;

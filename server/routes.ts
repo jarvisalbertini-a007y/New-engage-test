@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -16,6 +16,7 @@ import { sdrTeamManager } from "./services/sdrTeams";
 import { insertSdrTeamSchema } from "@shared/schema";
 import { dealIntelligenceEngine } from "./services/dealIntelligence";
 import { revenueOpsCenter } from "./services/revenueOps";
+import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScript, getVoiceScripts, getCallAnalytics, getCampaignAnalytics } from "./services/voiceAI";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -2594,6 +2595,272 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error tracking engagement:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to track engagement' });
+    }
+  });
+
+  // Voice AI Routes
+  // Create voice campaign
+  app.post("/api/voice/campaigns", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertVoiceCampaignSchema.parse({ ...req.body, createdBy: userId });
+      const campaign = await createVoiceCampaign(validatedData);
+      res.json(campaign);
+    } catch (error) {
+      console.error("Error creating voice campaign:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to create voice campaign' });
+    }
+  });
+  
+  // Get voice campaigns
+  app.get("/api/voice/campaigns", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status } = req.query;
+      const campaigns = await getVoiceCampaigns({ 
+        status: status as string,
+        createdBy: userId 
+      });
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Error fetching voice campaigns:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch voice campaigns' });
+    }
+  });
+  
+  // Initiate single call
+  app.post("/api/voice/call", async (req: any, res) => {
+    try {
+      const { contactId, scriptId, campaignId } = req.body;
+      
+      if (!contactId || !scriptId) {
+        return res.status(400).json({ error: "Contact ID and Script ID are required" });
+      }
+      
+      // Check compliance before initiating call
+      const contact = await storage.getContact(contactId);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      
+      const complianceCheck = await voiceAIManager.checkCompliance(contact.phoneNumber || '');
+      if (!complianceCheck.canCall) {
+        return res.status(403).json({ 
+          error: "Cannot initiate call", 
+          reason: complianceCheck.reason 
+        });
+      }
+      
+      const call = await voiceAIManager.initiateCall(contactId, scriptId, campaignId);
+      res.json(call);
+    } catch (error) {
+      console.error("Error initiating call:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to initiate call' });
+    }
+  });
+  
+  // Get call details
+  app.get("/api/voice/calls/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const call = await storage.getVoiceCall(id);
+      
+      if (!call) {
+        return res.status(404).json({ error: "Call not found" });
+      }
+      
+      res.json(call);
+    } catch (error) {
+      console.error("Error fetching call details:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch call details' });
+    }
+  });
+  
+  // Get all calls
+  app.get("/api/voice/calls", async (req, res) => {
+    try {
+      const { campaignId, contactId, status } = req.query;
+      const calls = await storage.getVoiceCalls({
+        campaignId: campaignId as string,
+        contactId: contactId as string,
+        callStatus: status as string,
+      });
+      res.json(calls);
+    } catch (error) {
+      console.error("Error fetching calls:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch calls' });
+    }
+  });
+  
+  // Get call transcript
+  app.get("/api/voice/transcript/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const call = await storage.getVoiceCall(id);
+      
+      if (!call) {
+        return res.status(404).json({ error: "Call not found" });
+      }
+      
+      // If no transcript yet, generate one for demo
+      if (!call.transcript) {
+        const transcript = await voiceAIManager.transcribeCall(call.recordingUrl || '');
+        await storage.updateVoiceCall(id, { transcript });
+        return res.json({ transcript });
+      }
+      
+      res.json({ transcript: call.transcript });
+    } catch (error) {
+      console.error("Error fetching transcript:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch transcript' });
+    }
+  });
+  
+  // Analyze call performance
+  app.post("/api/voice/analyze", async (req, res) => {
+    try {
+      const { callId } = req.body;
+      
+      if (!callId) {
+        return res.status(400).json({ error: "Call ID is required" });
+      }
+      
+      const analytics = await voiceAIManager.analyzeCall(callId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error analyzing call:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to analyze call' });
+    }
+  });
+  
+  // Get voice channel analytics
+  app.get("/api/voice/analytics", async (req, res) => {
+    try {
+      const { campaignId, period } = req.query;
+      
+      let analytics;
+      if (campaignId) {
+        analytics = await getCampaignAnalytics(campaignId as string);
+      } else {
+        // Get all recent analytics
+        const calls = await storage.getVoiceCalls({});
+        const analyticsPromises = calls
+          .slice(0, 100) // Limit to recent 100 calls
+          .map(call => getCallAnalytics(call.id));
+        
+        const results = await Promise.all(analyticsPromises);
+        analytics = results.filter(Boolean);
+      }
+      
+      // Calculate aggregate metrics
+      const aggregateMetrics = {
+        totalCalls: analytics.length,
+        avgDuration: analytics.reduce((acc: number, a: any) => {
+          const call = analytics.find((c: any) => c.callId === a.callId);
+          return acc + (call?.duration || 0);
+        }, 0) / analytics.length || 0,
+        avgSpeakingRatio: analytics.reduce((acc: number, a: any) => 
+          acc + parseFloat(a.speakingRatio || 0), 0) / analytics.length || 0,
+        totalObjections: analytics.reduce((acc: number, a: any) => 
+          acc + (a.objectionCount || 0), 0),
+        positiveSignals: analytics.reduce((acc: number, a: any) => 
+          acc + (a.positiveSignals || 0), 0),
+        negativeSignals: analytics.reduce((acc: number, a: any) => 
+          acc + (a.negativeSignals || 0), 0),
+      };
+      
+      res.json({
+        analytics,
+        aggregateMetrics,
+        period: period || 'all_time',
+      });
+    } catch (error) {
+      console.error("Error fetching voice analytics:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch voice analytics' });
+    }
+  });
+  
+  // Create/edit voice scripts
+  app.post("/api/voice/scripts", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertVoiceScriptSchema.parse({ ...req.body, createdBy: userId });
+      const script = await createVoiceScript(validatedData);
+      res.json(script);
+    } catch (error) {
+      console.error("Error creating voice script:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to create voice script' });
+    }
+  });
+  
+  // Get voice scripts
+  app.get("/api/voice/scripts", async (req: any, res) => {
+    try {
+      const { scriptType, isActive } = req.query;
+      const scripts = await getVoiceScripts({
+        scriptType: scriptType as string,
+        isActive: isActive === 'true',
+      });
+      res.json(scripts);
+    } catch (error) {
+      console.error("Error fetching voice scripts:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch voice scripts' });
+    }
+  });
+  
+  // Update voice script
+  app.patch("/api/voice/scripts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const script = await storage.updateVoiceScript(id, req.body);
+      
+      if (!script) {
+        return res.status(404).json({ error: "Script not found" });
+      }
+      
+      res.json(script);
+    } catch (error) {
+      console.error("Error updating voice script:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update voice script' });
+    }
+  });
+  
+  // Handle real-time conversation (webhook for telephony provider)
+  app.post("/api/voice/conversation", async (req, res) => {
+    try {
+      const { callId, input } = req.body;
+      
+      if (!callId || !input) {
+        return res.status(400).json({ error: "Call ID and input are required" });
+      }
+      
+      const response = await voiceAIManager.handleConversation(callId, input);
+      res.json({ response });
+    } catch (error) {
+      console.error("Error handling conversation:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to handle conversation' });
+    }
+  });
+  
+  // Schedule callback
+  app.post("/api/voice/callback", async (req, res) => {
+    try {
+      const { contactId, time, notes } = req.body;
+      
+      if (!contactId || !time) {
+        return res.status(400).json({ error: "Contact ID and time are required" });
+      }
+      
+      const scheduled = await voiceAIManager.scheduleCallback(
+        contactId, 
+        new Date(time), 
+        notes
+      );
+      
+      res.json({ success: scheduled });
+    } catch (error) {
+      console.error("Error scheduling callback:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to schedule callback' });
     }
   });
 

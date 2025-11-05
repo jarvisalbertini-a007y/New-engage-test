@@ -42,6 +42,7 @@ import SDRTeamsPage from "@/pages/sdr-teams";
 import DealIntelligence from "@/pages/deal-intelligence";
 import RevenueOpsPage from "@/pages/revenue-ops";
 import MultiChannelPage from "@/pages/multi-channel";
+import VoiceAIPage from "@/pages/voice-ai";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -120,6 +121,7 @@ function Router() {
           <Route path="/deal-intelligence" component={DealIntelligence} />
           <Route path="/revenue-ops" component={RevenueOpsPage} />
           <Route path="/multi-channel" component={MultiChannelPage} />
+          <Route path="/voice-ai" component={VoiceAIPage} />
           <Route component={NotFound} />
         </Switch>
       </div>

@@ -48,7 +48,11 @@ import {
   type MultiChannelCampaign, type InsertMultiChannelCampaign,
   type ChannelMessage, type InsertChannelMessage,
   type ChannelOrchestration, type InsertChannelOrchestration,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration
+  type VoiceCampaign, type InsertVoiceCampaign,
+  type VoiceCall, type InsertVoiceCall,
+  type VoiceScript, type InsertVoiceScript,
+  type CallAnalytics, type InsertCallAnalytics,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -373,6 +377,33 @@ export interface IStorage {
   getChannelOrchestrationByCampaign(campaignId: string): Promise<ChannelOrchestration | undefined>;
   createChannelOrchestration(orchestration: InsertChannelOrchestration): Promise<ChannelOrchestration>;
   updateChannelOrchestration(id: string, updates: Partial<ChannelOrchestration>): Promise<ChannelOrchestration | undefined>;
+  
+  // Voice AI
+  // Voice Campaigns
+  getVoiceCampaign(id: string): Promise<VoiceCampaign | undefined>;
+  getVoiceCampaigns(filters?: { status?: string; createdBy?: string }): Promise<VoiceCampaign[]>;
+  createVoiceCampaign(campaign: InsertVoiceCampaign): Promise<VoiceCampaign>;
+  updateVoiceCampaign(id: string, updates: Partial<VoiceCampaign>): Promise<VoiceCampaign | undefined>;
+  deleteVoiceCampaign(id: string): Promise<boolean>;
+  
+  // Voice Calls
+  getVoiceCall(id: string): Promise<VoiceCall | undefined>;
+  getVoiceCalls(filters?: { campaignId?: string; contactId?: string; callStatus?: string }): Promise<VoiceCall[]>;
+  createVoiceCall(call: InsertVoiceCall): Promise<VoiceCall>;
+  updateVoiceCall(id: string, updates: Partial<VoiceCall>): Promise<VoiceCall | undefined>;
+  
+  // Voice Scripts
+  getVoiceScript(id: string): Promise<VoiceScript | undefined>;
+  getVoiceScripts(filters?: { scriptType?: string; isActive?: boolean; createdBy?: string }): Promise<VoiceScript[]>;
+  createVoiceScript(script: InsertVoiceScript): Promise<VoiceScript>;
+  updateVoiceScript(id: string, updates: Partial<VoiceScript>): Promise<VoiceScript | undefined>;
+  deleteVoiceScript(id: string): Promise<boolean>;
+  
+  // Call Analytics
+  getCallAnalytics(callId: string): Promise<CallAnalytics | undefined>;
+  getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]>;
+  createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics>;
+  updateCallAnalytics(id: string, updates: Partial<CallAnalytics>): Promise<CallAnalytics | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -404,6 +435,10 @@ export class MemStorage implements IStorage {
   private multiChannelCampaigns: Map<string, MultiChannelCampaign> = new Map();
   private channelMessagesMap: Map<string, ChannelMessage> = new Map();
   private channelOrchestrations: Map<string, ChannelOrchestration> = new Map();
+  private voiceCampaigns: Map<string, VoiceCampaign> = new Map();
+  private voiceCalls: Map<string, VoiceCall> = new Map();
+  private voiceScripts: Map<string, VoiceScript> = new Map();
+  private callAnalyticsMap: Map<string, CallAnalytics> = new Map();
 
   constructor() {
     this.seedData();
@@ -3007,6 +3042,174 @@ export class DbStorage implements IStorage {
       .update(twinPredictions)
       .set(cleanPartial(updates))
       .where(eq(twinPredictions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Voice AI methods
+  // Voice Campaign methods
+  async getVoiceCampaign(id: string): Promise<VoiceCampaign | undefined> {
+    const result = await db.select().from(voiceCampaigns).where(eq(voiceCampaigns.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getVoiceCampaigns(filters?: { status?: string; createdBy?: string }): Promise<VoiceCampaign[]> {
+    let query = db.select().from(voiceCampaigns);
+    const conditions: any[] = [];
+
+    if (filters?.status) {
+      conditions.push(eq(voiceCampaigns.status, filters.status));
+    }
+    if (filters?.createdBy) {
+      conditions.push(eq(voiceCampaigns.createdBy, filters.createdBy));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createVoiceCampaign(campaign: InsertVoiceCampaign): Promise<VoiceCampaign> {
+    const result = await db.insert(voiceCampaigns).values(campaign).returning();
+    return result[0];
+  }
+
+  async updateVoiceCampaign(id: string, updates: Partial<VoiceCampaign>): Promise<VoiceCampaign | undefined> {
+    const result = await db
+      .update(voiceCampaigns)
+      .set({ ...cleanPartial(updates), updatedAt: new Date() })
+      .where(eq(voiceCampaigns.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteVoiceCampaign(id: string): Promise<boolean> {
+    const result = await db.delete(voiceCampaigns).where(eq(voiceCampaigns.id, id));
+    return !!result.count && result.count > 0;
+  }
+
+  // Voice Call methods
+  async getVoiceCall(id: string): Promise<VoiceCall | undefined> {
+    const result = await db.select().from(voiceCalls).where(eq(voiceCalls.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getVoiceCalls(filters?: { campaignId?: string; contactId?: string; callStatus?: string }): Promise<VoiceCall[]> {
+    let query = db.select().from(voiceCalls);
+    const conditions: any[] = [];
+
+    if (filters?.campaignId) {
+      conditions.push(eq(voiceCalls.campaignId, filters.campaignId));
+    }
+    if (filters?.contactId) {
+      conditions.push(eq(voiceCalls.contactId, filters.contactId));
+    }
+    if (filters?.callStatus) {
+      conditions.push(eq(voiceCalls.callStatus, filters.callStatus));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createVoiceCall(call: InsertVoiceCall): Promise<VoiceCall> {
+    const result = await db.insert(voiceCalls).values(call).returning();
+    return result[0];
+  }
+
+  async updateVoiceCall(id: string, updates: Partial<VoiceCall>): Promise<VoiceCall | undefined> {
+    const result = await db
+      .update(voiceCalls)
+      .set(cleanPartial(updates))
+      .where(eq(voiceCalls.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Voice Script methods
+  async getVoiceScript(id: string): Promise<VoiceScript | undefined> {
+    const result = await db.select().from(voiceScripts).where(eq(voiceScripts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getVoiceScripts(filters?: { scriptType?: string; isActive?: boolean; createdBy?: string }): Promise<VoiceScript[]> {
+    let query = db.select().from(voiceScripts);
+    const conditions: any[] = [];
+
+    if (filters?.scriptType) {
+      conditions.push(eq(voiceScripts.scriptType, filters.scriptType));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(voiceScripts.isActive, filters.isActive));
+    }
+    if (filters?.createdBy) {
+      conditions.push(eq(voiceScripts.createdBy, filters.createdBy));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createVoiceScript(script: InsertVoiceScript): Promise<VoiceScript> {
+    const result = await db.insert(voiceScripts).values(script).returning();
+    return result[0];
+  }
+
+  async updateVoiceScript(id: string, updates: Partial<VoiceScript>): Promise<VoiceScript | undefined> {
+    const result = await db
+      .update(voiceScripts)
+      .set({ ...cleanPartial(updates), updatedAt: new Date() })
+      .where(eq(voiceScripts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteVoiceScript(id: string): Promise<boolean> {
+    const result = await db.delete(voiceScripts).where(eq(voiceScripts.id, id));
+    return !!result.count && result.count > 0;
+  }
+
+  // Call Analytics methods
+  async getCallAnalytics(callId: string): Promise<CallAnalytics | undefined> {
+    const result = await db.select().from(callAnalytics).where(eq(callAnalytics.callId, callId)).limit(1);
+    return result[0];
+  }
+
+  async getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]> {
+    // First get all calls for the campaign
+    const calls = await this.getVoiceCalls({ campaignId });
+    const callIds = calls.map(call => call.id);
+    
+    if (callIds.length === 0) return [];
+    
+    // Then get analytics for those calls
+    const results = await db.select().from(callAnalytics)
+      .where(eq(callAnalytics.callId, callIds[0])); // Would need in() operator for multiple
+    
+    return results;
+  }
+
+  async createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics> {
+    const result = await db.insert(callAnalytics).values(analytics).returning();
+    return result[0];
+  }
+
+  async updateCallAnalytics(id: string, updates: Partial<CallAnalytics>): Promise<CallAnalytics | undefined> {
+    const result = await db
+      .update(callAnalytics)
+      .set(cleanPartial(updates))
+      .where(eq(callAnalytics.id, id))
       .returning();
     return result[0];
   }
