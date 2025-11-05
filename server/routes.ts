@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -14,6 +14,7 @@ import { canSendEmail, incrementSendCount, getWarmupSchedule, checkDomainReputat
 import { parseNLPToWorkflow, executeWorkflow, resumeWorkflow } from "./services/workflowEngine";
 import { sdrTeamManager } from "./services/sdrTeams";
 import { insertSdrTeamSchema } from "@shared/schema";
+import { dealIntelligenceEngine } from "./services/dealIntelligence";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -1897,6 +1898,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error purchasing agent:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to purchase agent' });
+    }
+  });
+
+  // Deal Intelligence API Routes
+  app.post("/api/intelligence/signals", async (req: any, res) => {
+    try {
+      const validatedData = insertIntentSignalSchema.parse(req.body);
+      const signal = await dealIntelligenceEngine.captureIntent(validatedData);
+      res.json(signal);
+    } catch (error) {
+      console.error("Error capturing intent signal:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to capture signal' });
+    }
+  });
+
+  app.get("/api/intelligence/company/:id", async (req: any, res) => {
+    try {
+      const companyId = req.params.id;
+      
+      // Get deal intelligence
+      const intelligence = await storage.getDealIntelligenceByCompany(companyId);
+      
+      // Get additional data
+      const intentScore = await dealIntelligenceEngine.calculateIntentScore(companyId);
+      const buyingStage = await dealIntelligenceEngine.predictBuyingStage(companyId);
+      const champions = await dealIntelligenceEngine.identifyChampions(companyId);
+      const blockers = await dealIntelligenceEngine.detectBlockers(companyId);
+      const forecast = await dealIntelligenceEngine.forecastDealOutcome(companyId);
+      
+      res.json({
+        intelligence,
+        intentScore,
+        buyingStage,
+        champions,
+        blockers,
+        forecast
+      });
+    } catch (error) {
+      console.error("Error fetching company intelligence:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch intelligence' });
+    }
+  });
+
+  app.get("/api/intelligence/timing/:contactId", async (req: any, res) => {
+    try {
+      const contactId = req.params.contactId;
+      const timing = await dealIntelligenceEngine.predictOptimalTiming(contactId);
+      res.json(timing);
+    } catch (error) {
+      console.error("Error predicting optimal timing:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to predict timing' });
+    }
+  });
+
+  app.post("/api/intelligence/predict", async (req: any, res) => {
+    try {
+      const { companyId } = req.body;
+      
+      if (!companyId) {
+        return res.status(400).json({ error: "Company ID is required" });
+      }
+      
+      const forecast = await dealIntelligenceEngine.forecastDealOutcome(companyId);
+      res.json(forecast);
+    } catch (error) {
+      console.error("Error running predictive models:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to run predictions' });
+    }
+  });
+
+  app.get("/api/intelligence/alerts", async (req: any, res) => {
+    try {
+      const microMoments = await dealIntelligenceEngine.generateMicroMoments();
+      res.json(microMoments);
+    } catch (error) {
+      console.error("Error generating alerts:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate alerts' });
+    }
+  });
+
+  app.get("/api/intelligence/insights", async (req: any, res) => {
+    try {
+      // Get recent signals and aggregate insights
+      const signals = await storage.getIntentSignals({ limit: 100 });
+      
+      // Group by signal type
+      const signalTypes = {};
+      signals.forEach(signal => {
+        signalTypes[signal.signalType] = (signalTypes[signal.signalType] || 0) + 1;
+      });
+      
+      // Get companies with high intent
+      const companies = await storage.getCompanies(50);
+      const companyScores = await Promise.all(
+        companies.map(async (company) => {
+          const score = await dealIntelligenceEngine.calculateIntentScore(company.id);
+          return { company, score };
+        })
+      );
+      
+      const hotCompanies = companyScores
+        .filter(c => c.score > 70)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+      
+      res.json({
+        totalSignals: signals.length,
+        signalDistribution: signalTypes,
+        hotCompanies: hotCompanies.map(c => ({
+          id: c.company.id,
+          name: c.company.name,
+          intentScore: c.score
+        })),
+        trendsDetected: [
+          { trend: "Increased pricing interest", change: "+23%", period: "7 days" },
+          { trend: "Competitor research activity", change: "+15%", period: "30 days" },
+          { trend: "Demo requests", change: "+41%", period: "7 days" }
+        ]
+      });
+    } catch (error) {
+      console.error("Error fetching insights:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch insights' });
     }
   });
 

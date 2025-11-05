@@ -36,6 +36,7 @@ const navigation = [
     name: "Intelligence",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: ChartLine },
+      { name: "Deal Intelligence", href: "/deal-intelligence", icon: Brain },
       { name: "Role Views", href: "/role-views", icon: Users },
       { name: "Visitor Intelligence", href: "/visitors", icon: Users },
       { name: "Insights Engine", href: "/insights", icon: Lightbulb },

@@ -647,6 +647,55 @@ export const twinPredictions = pgTable("twin_predictions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Deal Intelligence Tables
+export const intentSignals = pgTable("intent_signals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => contacts.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  signalType: text("signal_type").notNull(), // website_visit, content_download, email_open, price_check, competitor_research
+  signalStrength: integer("signal_strength").notNull().default(5), // 1-10
+  source: text("source"), // web, email, social, search, etc.
+  metadata: jsonb("metadata"), // Additional signal-specific data
+  detectedAt: timestamp("detected_at").defaultNow().notNull(),
+});
+
+export const dealIntelligence = pgTable("deal_intelligence", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  intentScore: integer("intent_score").notNull().default(0), // 0-100
+  buyingStage: text("buying_stage"), // awareness, consideration, decision, purchase
+  competitorMentions: jsonb("competitor_mentions"), // Track competitor research
+  budgetIndicators: jsonb("budget_indicators"), // Budget signals and indicators
+  timelineSignals: jsonb("timeline_signals"), // Timing and urgency signals
+  decisionMakers: jsonb("decision_makers"), // Key decision makers identified
+  blockers: jsonb("blockers"), // Potential deal blockers
+  champions: jsonb("champions"), // Internal champions identified
+  predictedCloseDate: timestamp("predicted_close_date"),
+  predictedDealSize: decimal("predicted_deal_size", { precision: 12, scale: 2 }),
+  winProbability: integer("win_probability"), // 0-100
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+export const timingOptimization = pgTable("timing_optimization", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  bestCallTime: text("best_call_time"), // e.g., "Monday 10:00 AM"
+  bestEmailTime: text("best_email_time"), // e.g., "Tuesday 2:00 PM"
+  bestLinkedInTime: text("best_linkedin_time"), // e.g., "Wednesday 3:00 PM"
+  responsePatterns: jsonb("response_patterns"), // Historical response patterns
+  timezone: text("timezone"), // Contact's timezone
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const predictiveModels = pgTable("predictive_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  modelType: text("model_type").notNull(), // intent_scoring, deal_forecast, timing_prediction, etc.
+  predictions: jsonb("predictions").notNull(), // Model predictions and outputs
+  accuracy: decimal("accuracy", { precision: 5, scale: 2 }), // Model accuracy percentage
+  trainedAt: timestamp("trained_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -863,6 +912,28 @@ export const insertAgentPurchaseSchema = createInsertSchema(agentPurchases).omit
   purchasedAt: true,
 });
 
+// Deal Intelligence insert schemas
+export const insertIntentSignalSchema = createInsertSchema(intentSignals).omit({
+  id: true,
+  detectedAt: true,
+});
+
+export const insertDealIntelligenceSchema = createInsertSchema(dealIntelligence).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertTimingOptimizationSchema = createInsertSchema(timingOptimization).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPredictiveModelSchema = createInsertSchema(predictiveModels).omit({
+  id: true,
+  trainedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -975,6 +1046,19 @@ export type InsertAgentDownload = z.infer<typeof insertAgentDownloadSchema>;
 
 export type AgentPurchase = typeof agentPurchases.$inferSelect;
 export type InsertAgentPurchase = z.infer<typeof insertAgentPurchaseSchema>;
+
+// Deal Intelligence types
+export type IntentSignal = typeof intentSignals.$inferSelect;
+export type InsertIntentSignal = z.infer<typeof insertIntentSignalSchema>;
+
+export type DealIntelligence = typeof dealIntelligence.$inferSelect;
+export type InsertDealIntelligence = z.infer<typeof insertDealIntelligenceSchema>;
+
+export type TimingOptimization = typeof timingOptimization.$inferSelect;
+export type InsertTimingOptimization = z.infer<typeof insertTimingOptimizationSchema>;
+
+export type PredictiveModel = typeof predictiveModels.$inferSelect;
+export type InsertPredictiveModel = z.infer<typeof insertPredictiveModelSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;

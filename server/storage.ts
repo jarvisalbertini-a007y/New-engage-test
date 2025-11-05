@@ -36,7 +36,11 @@ import {
   type SdrTeamMember, type InsertSdrTeamMember,
   type TeamCollaboration, type InsertTeamCollaboration,
   type TeamPerformance, type InsertTeamPerformance,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance
+  type IntentSignal, type InsertIntentSignal,
+  type DealIntelligence, type InsertDealIntelligence,
+  type TimingOptimization, type InsertTimingOptimization,
+  type PredictiveModel, type InsertPredictiveModel,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -285,6 +289,30 @@ export interface IStorage {
   getTeamPerformanceByTeam(teamId: string, period?: string): Promise<TeamPerformance[]>;
   createTeamPerformance(performance: InsertTeamPerformance): Promise<TeamPerformance>;
   updateTeamPerformance(id: string, updates: Partial<TeamPerformance>): Promise<TeamPerformance | undefined>;
+  
+  // Intent Signals
+  getIntentSignal(id: string): Promise<IntentSignal | undefined>;
+  getIntentSignals(filters?: { contactId?: string; companyId?: string; signalType?: string; limit?: number }): Promise<IntentSignal[]>;
+  createIntentSignal(signal: InsertIntentSignal): Promise<IntentSignal>;
+  updateIntentSignal(id: string, updates: Partial<IntentSignal>): Promise<IntentSignal | undefined>;
+  
+  // Deal Intelligence
+  getDealIntelligence(id: string): Promise<DealIntelligence | undefined>;
+  getDealIntelligenceByCompany(companyId: string): Promise<DealIntelligence | undefined>;
+  createDealIntelligence(intelligence: InsertDealIntelligence): Promise<DealIntelligence>;
+  updateDealIntelligence(id: string, updates: Partial<DealIntelligence>): Promise<DealIntelligence | undefined>;
+  
+  // Timing Optimization
+  getTimingOptimization(id: string): Promise<TimingOptimization | undefined>;
+  getTimingOptimizationByContact(contactId: string): Promise<TimingOptimization | undefined>;
+  createTimingOptimization(timing: InsertTimingOptimization): Promise<TimingOptimization>;
+  updateTimingOptimization(id: string, updates: Partial<TimingOptimization>): Promise<TimingOptimization | undefined>;
+  
+  // Predictive Models
+  getPredictiveModel(id: string): Promise<PredictiveModel | undefined>;
+  getPredictiveModels(modelType?: string): Promise<PredictiveModel[]>;
+  createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel>;
+  updatePredictiveModel(id: string, updates: Partial<PredictiveModel>): Promise<PredictiveModel | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -304,6 +332,10 @@ export class MemStorage implements IStorage {
   private sdrTeamMembers: Map<string, SdrTeamMember> = new Map();
   private teamCollaborations: Map<string, TeamCollaboration> = new Map();
   private teamPerformances: Map<string, TeamPerformance> = new Map();
+  private intentSignals: Map<string, IntentSignal> = new Map();
+  private dealIntelligenceMap: Map<string, DealIntelligence> = new Map();
+  private timingOptimizations: Map<string, TimingOptimization> = new Map();
+  private predictiveModels: Map<string, PredictiveModel> = new Map();
 
   constructor() {
     this.seedData();
@@ -1423,6 +1455,174 @@ export class MemStorage implements IStorage {
     
     const updated = { ...performance, ...cleanPartial(updates) };
     this.teamPerformances.set(id, updated);
+    return updated;
+  }
+
+  // Intent Signals methods
+  async getIntentSignal(id: string): Promise<IntentSignal | undefined> {
+    return this.intentSignals.get(id);
+  }
+
+  async getIntentSignals(filters?: { contactId?: string; companyId?: string; signalType?: string; limit?: number }): Promise<IntentSignal[]> {
+    let signals = Array.from(this.intentSignals.values());
+    
+    if (filters?.contactId) {
+      signals = signals.filter(s => s.contactId === filters.contactId);
+    }
+    
+    if (filters?.companyId) {
+      signals = signals.filter(s => s.companyId === filters.companyId);
+    }
+    
+    if (filters?.signalType) {
+      signals = signals.filter(s => s.signalType === filters.signalType);
+    }
+    
+    // Sort by detectedAt descending
+    signals.sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime());
+    
+    if (filters?.limit) {
+      signals = signals.slice(0, filters.limit);
+    }
+    
+    return signals;
+  }
+
+  async createIntentSignal(signal: InsertIntentSignal): Promise<IntentSignal> {
+    const id = randomUUID();
+    const intentSignal: IntentSignal = {
+      id,
+      detectedAt: new Date(),
+      contactId: signal.contactId ?? null,
+      companyId: signal.companyId ?? null,
+      signalType: signal.signalType,
+      signalStrength: signal.signalStrength,
+      source: signal.source ?? null,
+      metadata: signal.metadata ?? null
+    };
+    this.intentSignals.set(id, intentSignal);
+    return intentSignal;
+  }
+
+  async updateIntentSignal(id: string, updates: Partial<IntentSignal>): Promise<IntentSignal | undefined> {
+    const signal = this.intentSignals.get(id);
+    if (!signal) return undefined;
+    const updated = { ...signal, ...cleanPartial(updates) };
+    this.intentSignals.set(id, updated);
+    return updated;
+  }
+
+  // Deal Intelligence methods
+  async getDealIntelligence(id: string): Promise<DealIntelligence | undefined> {
+    return this.dealIntelligenceMap.get(id);
+  }
+
+  async getDealIntelligenceByCompany(companyId: string): Promise<DealIntelligence | undefined> {
+    return Array.from(this.dealIntelligenceMap.values())
+      .find(di => di.companyId === companyId);
+  }
+
+  async createDealIntelligence(intelligence: InsertDealIntelligence): Promise<DealIntelligence> {
+    const id = randomUUID();
+    const dealIntel: DealIntelligence = {
+      id,
+      lastUpdated: new Date(),
+      companyId: intelligence.companyId,
+      intentScore: intelligence.intentScore,
+      buyingStage: intelligence.buyingStage ?? null,
+      competitorMentions: intelligence.competitorMentions ?? null,
+      budgetIndicators: intelligence.budgetIndicators ?? null,
+      timelineSignals: intelligence.timelineSignals ?? null,
+      decisionMakers: intelligence.decisionMakers ?? null,
+      blockers: intelligence.blockers ?? null,
+      champions: intelligence.champions ?? null,
+      predictedCloseDate: intelligence.predictedCloseDate ?? null,
+      predictedDealSize: intelligence.predictedDealSize ?? null,
+      winProbability: intelligence.winProbability ?? null
+    };
+    this.dealIntelligenceMap.set(id, dealIntel);
+    return dealIntel;
+  }
+
+  async updateDealIntelligence(id: string, updates: Partial<DealIntelligence>): Promise<DealIntelligence | undefined> {
+    const intelligence = this.dealIntelligenceMap.get(id);
+    if (!intelligence) return undefined;
+    const updated = { ...intelligence, ...cleanPartial(updates), lastUpdated: new Date() };
+    this.dealIntelligenceMap.set(id, updated);
+    return updated;
+  }
+
+  // Timing Optimization methods
+  async getTimingOptimization(id: string): Promise<TimingOptimization | undefined> {
+    return this.timingOptimizations.get(id);
+  }
+
+  async getTimingOptimizationByContact(contactId: string): Promise<TimingOptimization | undefined> {
+    return Array.from(this.timingOptimizations.values())
+      .find(to => to.contactId === contactId);
+  }
+
+  async createTimingOptimization(timing: InsertTimingOptimization): Promise<TimingOptimization> {
+    const id = randomUUID();
+    const timingOpt: TimingOptimization = {
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      contactId: timing.contactId,
+      bestCallTime: timing.bestCallTime ?? null,
+      bestEmailTime: timing.bestEmailTime ?? null,
+      bestLinkedInTime: timing.bestLinkedInTime ?? null,
+      responsePatterns: timing.responsePatterns ?? null,
+      timezone: timing.timezone ?? null
+    };
+    this.timingOptimizations.set(id, timingOpt);
+    return timingOpt;
+  }
+
+  async updateTimingOptimization(id: string, updates: Partial<TimingOptimization>): Promise<TimingOptimization | undefined> {
+    const timing = this.timingOptimizations.get(id);
+    if (!timing) return undefined;
+    const updated = { ...timing, ...cleanPartial(updates), updatedAt: new Date() };
+    this.timingOptimizations.set(id, updated);
+    return updated;
+  }
+
+  // Predictive Models methods
+  async getPredictiveModel(id: string): Promise<PredictiveModel | undefined> {
+    return this.predictiveModels.get(id);
+  }
+
+  async getPredictiveModels(modelType?: string): Promise<PredictiveModel[]> {
+    let models = Array.from(this.predictiveModels.values());
+    
+    if (modelType) {
+      models = models.filter(m => m.modelType === modelType);
+    }
+    
+    // Sort by trainedAt descending
+    models.sort((a, b) => new Date(b.trainedAt).getTime() - new Date(a.trainedAt).getTime());
+    
+    return models;
+  }
+
+  async createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel> {
+    const id = randomUUID();
+    const predictiveModel: PredictiveModel = {
+      id,
+      trainedAt: new Date(),
+      modelType: model.modelType,
+      predictions: model.predictions,
+      accuracy: model.accuracy ?? null
+    };
+    this.predictiveModels.set(id, predictiveModel);
+    return predictiveModel;
+  }
+
+  async updatePredictiveModel(id: string, updates: Partial<PredictiveModel>): Promise<PredictiveModel | undefined> {
+    const model = this.predictiveModels.get(id);
+    if (!model) return undefined;
+    const updated = { ...model, ...cleanPartial(updates) };
+    this.predictiveModels.set(id, updated);
     return updated;
   }
 }
