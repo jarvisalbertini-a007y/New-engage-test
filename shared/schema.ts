@@ -744,6 +744,60 @@ export const coachingInsights = pgTable("coaching_insights", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Multi-Channel Orchestration Tables
+export const channelConfigs = pgTable("channel_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  channel: text("channel").notNull(), // email, linkedin, sms, phone, physical_mail
+  credentials: jsonb("credentials"), // Encrypted channel-specific credentials
+  settings: jsonb("settings"), // Channel-specific settings
+  isActive: boolean("is_active").notNull().default(true),
+  dailyLimits: jsonb("daily_limits"), // Daily send limits per channel
+  currentUsage: jsonb("current_usage"), // Current usage stats
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const multiChannelCampaigns = pgTable("multi_channel_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  channels: text("channels").array().notNull(), // Array of channels to use
+  sequenceSteps: jsonb("sequence_steps").notNull(), // Steps with channel info
+  audience: jsonb("audience"), // Target audience criteria
+  status: text("status").notNull().default("draft"), // draft, active, paused, completed
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  metrics: jsonb("metrics"), // Campaign performance metrics
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const channelMessages = pgTable("channel_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => multiChannelCampaigns.id),
+  channel: text("channel").notNull(), // email, linkedin, sms, phone, physical_mail
+  recipientId: varchar("recipient_id").references(() => contacts.id),
+  content: jsonb("content").notNull(), // Channel-specific content structure
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default("pending"), // pending, sent, delivered, failed, bounced
+  response: jsonb("response"), // Channel-specific response data
+  engagement: jsonb("engagement"), // Opens, clicks, replies, etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const channelOrchestration = pgTable("channel_orchestration", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => multiChannelCampaigns.id),
+  rules: jsonb("rules").notNull(), // Orchestration rules and conditions
+  priorityOrder: text("priority_order").array().notNull(), // Channel priority order
+  switchConditions: jsonb("switch_conditions"), // Conditions for switching channels
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -1005,6 +1059,35 @@ export const insertCoachingInsightSchema = createInsertSchema(coachingInsights).
   createdAt: true,
 });
 
+// Multi-Channel Insert Schemas
+export const insertChannelConfigSchema = createInsertSchema(channelConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  currentUsage: true,
+});
+
+export const insertMultiChannelCampaignSchema = createInsertSchema(multiChannelCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  metrics: true,
+});
+
+export const insertChannelMessageSchema = createInsertSchema(channelMessages).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+  response: true,
+  engagement: true,
+});
+
+export const insertChannelOrchestrationSchema = createInsertSchema(channelOrchestration).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1143,6 +1226,19 @@ export type InsertRevenueForecast = z.infer<typeof insertRevenueForecastSchema>;
 
 export type CoachingInsight = typeof coachingInsights.$inferSelect;
 export type InsertCoachingInsight = z.infer<typeof insertCoachingInsightSchema>;
+
+// Multi-Channel Types
+export type ChannelConfig = typeof channelConfigs.$inferSelect;
+export type InsertChannelConfig = z.infer<typeof insertChannelConfigSchema>;
+
+export type MultiChannelCampaign = typeof multiChannelCampaigns.$inferSelect;
+export type InsertMultiChannelCampaign = z.infer<typeof insertMultiChannelCampaignSchema>;
+
+export type ChannelMessage = typeof channelMessages.$inferSelect;
+export type InsertChannelMessage = z.infer<typeof insertChannelMessageSchema>;
+
+export type ChannelOrchestration = typeof channelOrchestration.$inferSelect;
+export type InsertChannelOrchestration = z.infer<typeof insertChannelOrchestrationSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;

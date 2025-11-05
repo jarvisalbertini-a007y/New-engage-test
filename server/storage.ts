@@ -44,7 +44,11 @@ import {
   type DealForensics, type InsertDealForensics,
   type RevenueForecast, type InsertRevenueForecast,
   type CoachingInsight, type InsertCoachingInsight,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights
+  type ChannelConfig, type InsertChannelConfig,
+  type MultiChannelCampaign, type InsertMultiChannelCampaign,
+  type ChannelMessage, type InsertChannelMessage,
+  type ChannelOrchestration, type InsertChannelOrchestration,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -341,6 +345,34 @@ export interface IStorage {
   getCoachingInsights(filters?: { userId?: string; insightType?: string; priority?: string; status?: string }): Promise<CoachingInsight[]>;
   createCoachingInsight(insight: InsertCoachingInsight): Promise<CoachingInsight>;
   updateCoachingInsight(id: string, updates: Partial<CoachingInsight>): Promise<CoachingInsight | undefined>;
+  
+  // Multi-Channel Orchestration
+  // Channel Configs
+  getChannelConfig(id: string): Promise<ChannelConfig | undefined>;
+  getChannelConfigs(userId: string): Promise<ChannelConfig[]>;
+  getChannelConfigByUserAndChannel(userId: string, channel: string): Promise<ChannelConfig | undefined>;
+  createChannelConfig(config: InsertChannelConfig): Promise<ChannelConfig>;
+  updateChannelConfig(id: string, updates: Partial<ChannelConfig>): Promise<ChannelConfig | undefined>;
+  deleteChannelConfig(id: string): Promise<boolean>;
+  
+  // Multi-Channel Campaigns
+  getMultiChannelCampaign(id: string): Promise<MultiChannelCampaign | undefined>;
+  getMultiChannelCampaigns(filters?: { status?: string; createdBy?: string }): Promise<MultiChannelCampaign[]>;
+  createMultiChannelCampaign(campaign: InsertMultiChannelCampaign): Promise<MultiChannelCampaign>;
+  updateMultiChannelCampaign(id: string, updates: Partial<MultiChannelCampaign>): Promise<MultiChannelCampaign | undefined>;
+  deleteMultiChannelCampaign(id: string): Promise<boolean>;
+  
+  // Channel Messages
+  getChannelMessage(id: string): Promise<ChannelMessage | undefined>;
+  getChannelMessages(filters?: { campaignId?: string; channel?: string; recipientId?: string; status?: string }): Promise<ChannelMessage[]>;
+  createChannelMessage(message: InsertChannelMessage): Promise<ChannelMessage>;
+  updateChannelMessage(id: string, updates: Partial<ChannelMessage>): Promise<ChannelMessage | undefined>;
+  
+  // Channel Orchestration
+  getChannelOrchestration(id: string): Promise<ChannelOrchestration | undefined>;
+  getChannelOrchestrationByCampaign(campaignId: string): Promise<ChannelOrchestration | undefined>;
+  createChannelOrchestration(orchestration: InsertChannelOrchestration): Promise<ChannelOrchestration>;
+  updateChannelOrchestration(id: string, updates: Partial<ChannelOrchestration>): Promise<ChannelOrchestration | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -368,6 +400,10 @@ export class MemStorage implements IStorage {
   private dealForensicsRecords: Map<string, DealForensics> = new Map();
   private revenueForecasts: Map<string, RevenueForecast> = new Map();
   private coachingInsights: Map<string, CoachingInsight> = new Map();
+  private channelConfigs: Map<string, ChannelConfig> = new Map();
+  private multiChannelCampaigns: Map<string, MultiChannelCampaign> = new Map();
+  private channelMessagesMap: Map<string, ChannelMessage> = new Map();
+  private channelOrchestrations: Map<string, ChannelOrchestration> = new Map();
 
   constructor() {
     this.seedData();

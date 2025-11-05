@@ -4,7 +4,7 @@ import {
   Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, 
   Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, 
   Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut,
-  Menu, X, ChevronLeft, ChevronRight, Store, Sparkles
+  Menu, X, ChevronLeft, ChevronRight, Store, Sparkles, GitBranch, TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,6 +46,7 @@ const navigation = [
   {
     name: "Outreach",
     items: [
+      { name: "Multi-Channel", href: "/multi-channel", icon: GitBranch },
       { name: "AI Autopilot", href: "/autopilot", icon: Zap },
       { name: "Playbooks", href: "/playbooks", icon: BookOpen },
       { name: "Sequences", href: "/sequences", icon: NotebookPen },

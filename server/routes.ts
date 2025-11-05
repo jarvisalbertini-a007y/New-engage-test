@@ -2445,6 +2445,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Multi-Channel Orchestration Routes
+  app.get("/api/channels", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const channels = await storage.getChannelConfigs(userId);
+      res.json(channels);
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch channels' });
+    }
+  });
+
+  app.post("/api/channels/configure", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { channel, settings } = req.body;
+      
+      if (!channel || !settings) {
+        return res.status(400).json({ error: "Channel and settings are required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const config = await multiChannelOrchestrator.configureChannel(userId, channel, settings);
+      res.json(config);
+    } catch (error) {
+      console.error("Error configuring channel:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to configure channel' });
+    }
+  });
+
+  app.get("/api/multi-channel/campaigns", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const campaigns = await storage.getMultiChannelCampaigns({ createdBy: userId });
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Error fetching campaigns:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch campaigns' });
+    }
+  });
+
+  app.post("/api/multi-channel/campaigns", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const campaignData = {
+        ...req.body,
+        createdBy: userId,
+        status: req.body.status || 'draft'
+      };
+      
+      // Validate required fields
+      if (!campaignData.name || !campaignData.channels || !Array.isArray(campaignData.channels) || campaignData.channels.length === 0) {
+        return res.status(400).json({ error: "Name and at least one channel are required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const campaign = await multiChannelOrchestrator.createCampaign(campaignData);
+      res.json(campaign);
+    } catch (error) {
+      console.error("Error creating campaign:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create campaign' });
+    }
+  });
+
+  app.post("/api/multi-channel/send", async (req: any, res) => {
+    try {
+      const { campaignId, contactId } = req.body;
+      
+      if (!campaignId || !contactId) {
+        return res.status(400).json({ error: "Campaign ID and contact ID are required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const result = await multiChannelOrchestrator.orchestrateOutreach(campaignId, contactId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error sending multi-channel message:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to send message' });
+    }
+  });
+
+  app.get("/api/multi-channel/analytics", async (req: any, res) => {
+    try {
+      const { campaignId } = req.query;
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const analytics = await multiChannelOrchestrator.getChannelAnalytics(campaignId as string | undefined);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch analytics' });
+    }
+  });
+
+  app.post("/api/multi-channel/optimize", async (req: any, res) => {
+    try {
+      const { campaignId } = req.body;
+      
+      if (!campaignId) {
+        return res.status(400).json({ error: "Campaign ID is required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const optimization = await multiChannelOrchestrator.optimizeChannelMix(campaignId);
+      res.json(optimization);
+    } catch (error) {
+      console.error("Error optimizing channel mix:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to optimize channel mix' });
+    }
+  });
+
+  app.post("/api/multi-channel/switch-channel", async (req: any, res) => {
+    try {
+      const { contactId, campaignId, reason } = req.body;
+      
+      if (!contactId || !campaignId || !reason) {
+        return res.status(400).json({ error: "Contact ID, campaign ID, and reason are required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      const result = await multiChannelOrchestrator.switchChannel(contactId, campaignId, reason);
+      res.json(result);
+    } catch (error) {
+      console.error("Error switching channel:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to switch channel' });
+    }
+  });
+
+  app.post("/api/multi-channel/track-engagement", async (req: any, res) => {
+    try {
+      const { messageId, engagement } = req.body;
+      
+      if (!messageId || !engagement) {
+        return res.status(400).json({ error: "Message ID and engagement data are required" });
+      }
+      
+      // Import the orchestrator
+      const { multiChannelOrchestrator } = await import('./services/multiChannel');
+      await multiChannelOrchestrator.trackEngagement(messageId, engagement);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking engagement:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to track engagement' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
