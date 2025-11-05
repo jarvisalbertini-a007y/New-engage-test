@@ -25,7 +25,11 @@ import {
   type AgentType, type InsertAgentType,
   type WorkflowTemplate, type InsertWorkflowTemplate,
   type HumanApproval, type InsertHumanApproval,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals
+  type MarketplaceAgent, type InsertMarketplaceAgent,
+  type AgentRating, type InsertAgentRating,
+  type AgentDownload, type InsertAgentDownload,
+  type AgentPurchase, type InsertAgentPurchase,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -200,6 +204,35 @@ export interface IStorage {
   getHumanApprovals(filters?: { executionId?: string; status?: string }): Promise<HumanApproval[]>;
   createHumanApproval(approval: InsertHumanApproval): Promise<HumanApproval>;
   updateHumanApproval(id: string, updates: Partial<HumanApproval>): Promise<HumanApproval | undefined>;
+  
+  // Marketplace Agents
+  getMarketplaceAgent(id: string): Promise<MarketplaceAgent | undefined>;
+  getMarketplaceAgents(filters?: { category?: string; author?: string; minRating?: number; maxPrice?: number; tags?: string[] }): Promise<MarketplaceAgent[]>;
+  getMarketplaceAgentsByUser(userId: string): Promise<MarketplaceAgent[]>;
+  createMarketplaceAgent(agent: InsertMarketplaceAgent): Promise<MarketplaceAgent>;
+  updateMarketplaceAgent(id: string, updates: Partial<MarketplaceAgent>): Promise<MarketplaceAgent | undefined>;
+  deleteMarketplaceAgent(id: string): Promise<boolean>;
+  incrementAgentDownloads(id: string): Promise<void>;
+  
+  // Agent Ratings
+  getAgentRating(id: string): Promise<AgentRating | undefined>;
+  getAgentRatings(agentId: string): Promise<AgentRating[]>;
+  getUserAgentRating(agentId: string, userId: string): Promise<AgentRating | undefined>;
+  createAgentRating(rating: InsertAgentRating): Promise<AgentRating>;
+  updateAgentRating(id: string, updates: Partial<AgentRating>): Promise<AgentRating | undefined>;
+  updateAgentAverageRating(agentId: string): Promise<void>;
+  
+  // Agent Downloads
+  getAgentDownload(id: string): Promise<AgentDownload | undefined>;
+  getAgentDownloads(filters?: { agentId?: string; userId?: string }): Promise<AgentDownload[]>;
+  createAgentDownload(download: InsertAgentDownload): Promise<AgentDownload>;
+  hasUserDownloadedAgent(agentId: string, userId: string): Promise<boolean>;
+  
+  // Agent Purchases
+  getAgentPurchase(id: string): Promise<AgentPurchase | undefined>;
+  getAgentPurchases(filters?: { agentId?: string; userId?: string }): Promise<AgentPurchase[]>;
+  createAgentPurchase(purchase: InsertAgentPurchase): Promise<AgentPurchase>;
+  hasUserPurchasedAgent(agentId: string, userId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -1835,6 +1868,221 @@ export class DbStorage implements IStorage {
     if (Object.keys(cleaned).length === 0) return this.getHumanApproval(id);
     const result = await db.update(humanApprovals).set(cleaned).where(eq(humanApprovals.id, id)).returning();
     return result[0];
+  }
+
+  // Marketplace Agent methods
+  async getMarketplaceAgent(id: string): Promise<MarketplaceAgent | undefined> {
+    const result = await db.select().from(marketplaceAgents).where(eq(marketplaceAgents.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getMarketplaceAgents(filters?: { category?: string; author?: string; minRating?: number; maxPrice?: number; tags?: string[] }): Promise<MarketplaceAgent[]> {
+    let query = db.select().from(marketplaceAgents);
+    const conditions: any[] = [];
+
+    if (filters?.category) {
+      conditions.push(eq(marketplaceAgents.category, filters.category));
+    }
+    if (filters?.author) {
+      conditions.push(eq(marketplaceAgents.author, filters.author));
+    }
+    
+    // For complex filters like minRating, maxPrice, and tags, we'll handle them in code
+    let result = await (conditions.length === 1 
+      ? query.where(conditions[0])
+      : conditions.length > 1 
+        ? query.where(and(...conditions))
+        : query);
+    
+    if (filters?.minRating) {
+      result = result.filter(agent => 
+        agent.rating ? parseFloat(agent.rating) >= filters.minRating : false
+      );
+    }
+    if (filters?.maxPrice) {
+      result = result.filter(agent => 
+        parseFloat(agent.price) <= filters.maxPrice
+      );
+    }
+    if (filters?.tags && filters.tags.length > 0) {
+      result = result.filter(agent => 
+        agent.tags?.some(tag => filters.tags?.includes(tag))
+      );
+    }
+    
+    return result;
+  }
+
+  async getMarketplaceAgentsByUser(userId: string): Promise<MarketplaceAgent[]> {
+    return await db.select().from(marketplaceAgents).where(eq(marketplaceAgents.author, userId));
+  }
+
+  async createMarketplaceAgent(agent: InsertMarketplaceAgent): Promise<MarketplaceAgent> {
+    const result = await db.insert(marketplaceAgents).values(agent).returning();
+    return result[0];
+  }
+
+  async updateMarketplaceAgent(id: string, updates: Partial<MarketplaceAgent>): Promise<MarketplaceAgent | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getMarketplaceAgent(id);
+    const result = await db.update(marketplaceAgents).set({
+      ...cleaned,
+      updatedAt: new Date()
+    }).where(eq(marketplaceAgents.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteMarketplaceAgent(id: string): Promise<boolean> {
+    const result = await db.delete(marketplaceAgents).where(eq(marketplaceAgents.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async incrementAgentDownloads(id: string): Promise<void> {
+    const agent = await this.getMarketplaceAgent(id);
+    if (agent) {
+      await db.update(marketplaceAgents)
+        .set({ downloads: agent.downloads + 1 })
+        .where(eq(marketplaceAgents.id, id));
+    }
+  }
+
+  // Agent Rating methods
+  async getAgentRating(id: string): Promise<AgentRating | undefined> {
+    const result = await db.select().from(agentRatings).where(eq(agentRatings.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentRatings(agentId: string): Promise<AgentRating[]> {
+    return await db.select().from(agentRatings).where(eq(agentRatings.agentId, agentId));
+  }
+
+  async getUserAgentRating(agentId: string, userId: string): Promise<AgentRating | undefined> {
+    const result = await db.select().from(agentRatings)
+      .where(and(
+        eq(agentRatings.agentId, agentId),
+        eq(agentRatings.userId, userId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createAgentRating(rating: InsertAgentRating): Promise<AgentRating> {
+    const result = await db.insert(agentRatings).values(rating).returning();
+    
+    // Update average rating
+    await this.updateAgentAverageRating(rating.agentId);
+    
+    return result[0];
+  }
+
+  async updateAgentRating(id: string, updates: Partial<AgentRating>): Promise<AgentRating | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAgentRating(id);
+    const result = await db.update(agentRatings).set({
+      ...cleaned,
+      updatedAt: new Date()
+    }).where(eq(agentRatings.id, id)).returning();
+    
+    // Update average rating if rating was changed
+    if (result[0] && updates.rating) {
+      await this.updateAgentAverageRating(result[0].agentId);
+    }
+    
+    return result[0];
+  }
+
+  async updateAgentAverageRating(agentId: string): Promise<void> {
+    const ratings = await this.getAgentRatings(agentId);
+    if (ratings.length > 0) {
+      const average = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+      await db.update(marketplaceAgents)
+        .set({ rating: average.toFixed(1) })
+        .where(eq(marketplaceAgents.id, agentId));
+    }
+  }
+
+  // Agent Download methods
+  async getAgentDownload(id: string): Promise<AgentDownload | undefined> {
+    const result = await db.select().from(agentDownloads).where(eq(agentDownloads.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentDownloads(filters?: { agentId?: string; userId?: string }): Promise<AgentDownload[]> {
+    let query = db.select().from(agentDownloads);
+    const conditions: any[] = [];
+
+    if (filters?.agentId) {
+      conditions.push(eq(agentDownloads.agentId, filters.agentId));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(agentDownloads.userId, filters.userId));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createAgentDownload(download: InsertAgentDownload): Promise<AgentDownload> {
+    const result = await db.insert(agentDownloads).values(download).returning();
+    
+    // Increment download count
+    await this.incrementAgentDownloads(download.agentId);
+    
+    return result[0];
+  }
+
+  async hasUserDownloadedAgent(agentId: string, userId: string): Promise<boolean> {
+    const result = await db.select().from(agentDownloads)
+      .where(and(
+        eq(agentDownloads.agentId, agentId),
+        eq(agentDownloads.userId, userId)
+      ))
+      .limit(1);
+    return result.length > 0;
+  }
+
+  // Agent Purchase methods
+  async getAgentPurchase(id: string): Promise<AgentPurchase | undefined> {
+    const result = await db.select().from(agentPurchases).where(eq(agentPurchases.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentPurchases(filters?: { agentId?: string; userId?: string }): Promise<AgentPurchase[]> {
+    let query = db.select().from(agentPurchases);
+    const conditions: any[] = [];
+
+    if (filters?.agentId) {
+      conditions.push(eq(agentPurchases.agentId, filters.agentId));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(agentPurchases.userId, filters.userId));
+    }
+
+    if (conditions.length === 1) {
+      return await query.where(conditions[0]);
+    } else if (conditions.length > 1) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createAgentPurchase(purchase: InsertAgentPurchase): Promise<AgentPurchase> {
+    const result = await db.insert(agentPurchases).values(purchase).returning();
+    return result[0];
+  }
+
+  async hasUserPurchasedAgent(agentId: string, userId: string): Promise<boolean> {
+    const result = await db.select().from(agentPurchases)
+      .where(and(
+        eq(agentPurchases.agentId, agentId),
+        eq(agentPurchases.userId, userId)
+      ))
+      .limit(1);
+    return result.length > 0;
   }
 }
 

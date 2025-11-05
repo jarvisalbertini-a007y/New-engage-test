@@ -4,7 +4,7 @@ import {
   Brain, ChartLine, Users, Lightbulb, NotebookPen, Wand2, Edit, 
   Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, 
   Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut,
-  Menu, X, ChevronLeft, ChevronRight
+  Menu, X, ChevronLeft, ChevronRight, Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +58,7 @@ const navigation = [
     items: [
       { name: "Lead Database", href: "/leads", icon: Database },
       { name: "AI Agents", href: "/agents", icon: Bot },
+      { name: "Agent Marketplace", href: "/marketplace", icon: Store },
       { name: "Personas", href: "/personas", icon: UsersRound },
     ],
   },

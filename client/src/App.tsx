@@ -36,6 +36,7 @@ import { TeamCollaborationPage } from "@/pages/team-collaboration";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import CollapsibleSidebar from "@/components/collapsible-sidebar";
+import MarketplacePage from "@/pages/marketplace";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -98,6 +99,7 @@ function Router() {
           <Route path="/dialer" component={CloudDialer} />
           <Route path="/deliverability" component={Deliverability} />
           <Route path="/agents" component={AIAgents} />
+          <Route path="/marketplace" component={MarketplacePage} />
           <Route path="/magic-setup" component={MagicSetup} />
           <Route path="/workflows" component={WorkflowBuilder} />
           <Route path="/playbooks" component={PlaybooksPage} />

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -1657,6 +1657,244 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error starting autopilot run:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Marketplace API Routes
+  app.get("/api/marketplace/agents", async (req: any, res) => {
+    try {
+      const { category, minRating, maxPrice, tags } = req.query;
+      
+      const filters: any = {};
+      if (category) filters.category = category;
+      if (minRating) filters.minRating = parseFloat(minRating);
+      if (maxPrice) filters.maxPrice = parseFloat(maxPrice);
+      if (tags) filters.tags = Array.isArray(tags) ? tags : tags.split(',');
+      
+      const agents = await storage.getMarketplaceAgents(filters);
+      res.json(agents);
+    } catch (error) {
+      console.error("Error fetching marketplace agents:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch agents' });
+    }
+  });
+
+  app.get("/api/marketplace/agents/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const agent = await storage.getMarketplaceAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      // Get ratings for this agent
+      const ratings = await storage.getAgentRatings(id);
+      
+      // Check if user has downloaded/purchased this agent
+      const userId = req.user.claims.sub;
+      const hasDownloaded = await storage.hasUserDownloadedAgent(id, userId);
+      const hasPurchased = parseFloat(agent.price) > 0 
+        ? await storage.hasUserPurchasedAgent(id, userId) 
+        : true;
+      
+      res.json({ 
+        ...agent, 
+        ratings, 
+        hasDownloaded, 
+        hasPurchased,
+        canDownload: hasPurchased || parseFloat(agent.price) === 0
+      });
+    } catch (error) {
+      console.error("Error fetching agent details:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch agent' });
+    }
+  });
+
+  app.post("/api/marketplace/agents", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertMarketplaceAgentSchema.parse({
+        ...req.body,
+        author: userId
+      });
+      
+      const agent = await storage.createMarketplaceAgent(validatedData);
+      res.json(agent);
+    } catch (error) {
+      console.error("Error publishing agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to publish agent' });
+    }
+  });
+
+  app.post("/api/marketplace/agents/:id/download", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const agent = await storage.getMarketplaceAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      // Check if user can download (free or already purchased)
+      const price = parseFloat(agent.price);
+      if (price > 0) {
+        const hasPurchased = await storage.hasUserPurchasedAgent(id, userId);
+        if (!hasPurchased) {
+          return res.status(403).json({ error: "Please purchase this agent before downloading" });
+        }
+      }
+      
+      // Record download
+      const download = await storage.createAgentDownload({
+        agentId: id,
+        userId,
+        version: agent.version
+      });
+      
+      res.json({ 
+        message: "Agent downloaded successfully",
+        agent,
+        download
+      });
+    } catch (error) {
+      console.error("Error downloading agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to download agent' });
+    }
+  });
+
+  app.post("/api/marketplace/agents/:id/rate", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const { rating, review } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      // Check if user has already rated
+      const existingRating = await storage.getUserAgentRating(id, userId);
+      
+      if (existingRating) {
+        // Update existing rating
+        const updated = await storage.updateAgentRating(existingRating.id, {
+          rating,
+          review
+        });
+        res.json(updated);
+      } else {
+        // Create new rating
+        const validatedData = insertAgentRatingSchema.parse({
+          agentId: id,
+          userId,
+          rating,
+          review
+        });
+        
+        const newRating = await storage.createAgentRating(validatedData);
+        res.json(newRating);
+      }
+    } catch (error) {
+      console.error("Error rating agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to rate agent' });
+    }
+  });
+
+  app.get("/api/marketplace/my-agents", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const agents = await storage.getMarketplaceAgentsByUser(userId);
+      res.json(agents);
+    } catch (error) {
+      console.error("Error fetching user agents:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch user agents' });
+    }
+  });
+
+  app.patch("/api/marketplace/agents/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership
+      const agent = await storage.getMarketplaceAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      if (agent.author !== userId) {
+        return res.status(403).json({ error: "You can only update your own agents" });
+      }
+      
+      const updated = await storage.updateMarketplaceAgent(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update agent' });
+    }
+  });
+
+  app.delete("/api/marketplace/agents/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership
+      const agent = await storage.getMarketplaceAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      if (agent.author !== userId) {
+        return res.status(403).json({ error: "You can only delete your own agents" });
+      }
+      
+      const deleted = await storage.deleteMarketplaceAgent(id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete agent' });
+    }
+  });
+
+  app.post("/api/marketplace/agents/:id/purchase", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const { transactionId } = req.body;
+      
+      const agent = await storage.getMarketplaceAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      const price = parseFloat(agent.price);
+      if (price === 0) {
+        return res.status(400).json({ error: "This agent is free, no purchase required" });
+      }
+      
+      // Check if already purchased
+      const hasPurchased = await storage.hasUserPurchasedAgent(id, userId);
+      if (hasPurchased) {
+        return res.status(400).json({ error: "You have already purchased this agent" });
+      }
+      
+      // Record purchase (in production, this would integrate with a payment provider)
+      const purchase = await storage.createAgentPurchase({
+        agentId: id,
+        userId,
+        amount: agent.price,
+        transactionId: transactionId || `demo-${Date.now()}`
+      });
+      
+      res.json({ 
+        message: "Agent purchased successfully",
+        purchase
+      });
+    } catch (error) {
+      console.error("Error purchasing agent:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to purchase agent' });
     }
   });
 

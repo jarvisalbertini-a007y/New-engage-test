@@ -195,6 +195,58 @@ export const humanApprovals = pgTable("human_approvals", {
   timeoutAt: timestamp("timeout_at"),
 });
 
+// Marketplace Tables
+export const marketplaceAgents = pgTable("marketplace_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // same categories as agentTypes: research, writing, analysis, communication, data
+  agentTypeId: varchar("agent_type_id").references(() => agentTypes.id),
+  author: varchar("author").references(() => users.id).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0"), // 0 for free agents
+  downloads: integer("downloads").notNull().default(0),
+  rating: decimal("rating", { precision: 2, scale: 1 }), // Average rating 1.0-5.0
+  isPublic: boolean("is_public").notNull().default(true),
+  tags: text("tags").array(),
+  configTemplate: jsonb("config_template"), // Default configuration for the agent
+  systemPrompt: text("system_prompt"),
+  inputSchema: jsonb("input_schema"), // Expected input structure
+  outputSchema: jsonb("output_schema"), // Expected output structure
+  version: text("version").notNull().default("1.0.0"),
+  changeLog: jsonb("change_log"), // Array of version changes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentRatings = pgTable("agent_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => marketplaceAgents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  rating: integer("rating").notNull(), // 1-5
+  review: text("review"),
+  helpfulCount: integer("helpful_count").notNull().default(0),
+  unhelpfulCount: integer("unhelpful_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentDownloads = pgTable("agent_downloads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => marketplaceAgents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  downloadedAt: timestamp("downloaded_at").defaultNow().notNull(),
+  version: text("version").notNull(),
+});
+
+export const agentPurchases = pgTable("agent_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => marketplaceAgents.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+  transactionId: text("transaction_id").notNull(),
+});
+
 export const personas = pgTable("personas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -627,6 +679,32 @@ export const insertHumanApprovalSchema = createInsertSchema(humanApprovals).omit
   respondedAt: true,
 });
 
+export const insertMarketplaceAgentSchema = createInsertSchema(marketplaceAgents).omit({
+  id: true,
+  downloads: true,
+  rating: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgentRatingSchema = createInsertSchema(agentRatings).omit({
+  id: true,
+  helpfulCount: true,
+  unhelpfulCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgentDownloadSchema = createInsertSchema(agentDownloads).omit({
+  id: true,
+  downloadedAt: true,
+});
+
+export const insertAgentPurchaseSchema = createInsertSchema(agentPurchases).omit({
+  id: true,
+  purchasedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -705,6 +783,18 @@ export type InsertWorkflowTemplate = z.infer<typeof insertWorkflowTemplateSchema
 
 export type HumanApproval = typeof humanApprovals.$inferSelect;
 export type InsertHumanApproval = z.infer<typeof insertHumanApprovalSchema>;
+
+export type MarketplaceAgent = typeof marketplaceAgents.$inferSelect;
+export type InsertMarketplaceAgent = z.infer<typeof insertMarketplaceAgentSchema>;
+
+export type AgentRating = typeof agentRatings.$inferSelect;
+export type InsertAgentRating = z.infer<typeof insertAgentRatingSchema>;
+
+export type AgentDownload = typeof agentDownloads.$inferSelect;
+export type InsertAgentDownload = z.infer<typeof insertAgentDownloadSchema>;
+
+export type AgentPurchase = typeof agentPurchases.$inferSelect;
+export type InsertAgentPurchase = z.infer<typeof insertAgentPurchaseSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;
