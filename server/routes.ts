@@ -1898,6 +1898,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Digital Twin API Routes
+  app.get("/api/digital-twins/:contactId", async (req: any, res) => {
+    try {
+      const { contactId } = req.params;
+      const twin = await storage.getDigitalTwinByContact(contactId);
+      
+      if (!twin) {
+        return res.status(404).json({ error: "Digital twin not found for this contact" });
+      }
+      
+      res.json(twin);
+    } catch (error) {
+      console.error("Error fetching digital twin:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch digital twin' });
+    }
+  });
+
+  app.post("/api/digital-twins", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { contactId } = req.body;
+      
+      if (!contactId) {
+        return res.status(400).json({ error: "Contact ID is required" });
+      }
+      
+      const twin = await digitalTwinEngine.createTwin(contactId);
+      res.json(twin);
+    } catch (error) {
+      console.error("Error creating digital twin:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create digital twin' });
+    }
+  });
+
+  app.put("/api/digital-twins/:id/learn", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      const interaction = req.body;
+      
+      // Create interaction record
+      const twinInteraction = await storage.createTwinInteraction({
+        twinId: id,
+        ...interaction
+      });
+      
+      // Update the twin model based on the interaction
+      const updatedTwin = await digitalTwinEngine.updateTwin(id, twinInteraction);
+      res.json({ twin: updatedTwin, interaction: twinInteraction });
+    } catch (error) {
+      console.error("Error updating digital twin:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update digital twin' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/recommend", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      
+      const recommendation = await digitalTwinEngine.recommendNextAction(id);
+      res.json(recommendation);
+    } catch (error) {
+      console.error("Error getting recommendations:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get recommendations' });
+    }
+  });
+
+  app.post("/api/digital-twins/:id/personalize", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      const { template } = req.body;
+      
+      if (!template) {
+        return res.status(400).json({ error: "Template is required" });
+      }
+      
+      const personalizedContent = await digitalTwinEngine.generatePersonalizedContent(id, template);
+      res.json({ content: personalizedContent });
+    } catch (error) {
+      console.error("Error personalizing content:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to personalize content' });
+    }
+  });
+
+  app.get("/api/digital-twins/insights", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const insights = await digitalTwinEngine.getAggregateInsights();
+      res.json(insights);
+    } catch (error) {
+      console.error("Error getting insights:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get insights' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/patterns", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      
+      const patterns = await digitalTwinEngine.analyzeResponsePatterns(id);
+      res.json(patterns);
+    } catch (error) {
+      console.error("Error analyzing patterns:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to analyze patterns' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/buying-stage", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      
+      const prediction = await digitalTwinEngine.predictBuyingStage(id);
+      res.json(prediction);
+    } catch (error) {
+      console.error("Error predicting buying stage:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to predict buying stage' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/approach", async (req: any, res) => {
+    try {
+      const { digitalTwinEngine } = await import("./services/digitalTwin");
+      const { id } = req.params;
+      const { messageType = "general" } = req.query;
+      
+      const approach = await digitalTwinEngine.predictBestApproach(id, messageType as string);
+      res.json(approach);
+    } catch (error) {
+      console.error("Error predicting approach:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to predict approach' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/interactions", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { limit = 50 } = req.query;
+      
+      const interactions = await storage.getTwinInteractions(id, parseInt(limit as string));
+      res.json(interactions);
+    } catch (error) {
+      console.error("Error fetching interactions:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch interactions' });
+    }
+  });
+
+  app.get("/api/digital-twins/:id/predictions", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.query;
+      
+      const predictions = await storage.getTwinPredictions(id, type as string);
+      res.json(predictions);
+    } catch (error) {
+      console.error("Error fetching predictions:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch predictions' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

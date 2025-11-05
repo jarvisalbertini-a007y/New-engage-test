@@ -528,6 +528,68 @@ export const onboardingProfiles = pgTable("onboarding_profiles", {
   completedAt: timestamp("completed_at"),
 });
 
+// Digital Twin Prospects - AI-powered prospect modeling
+export const digitalTwins = pgTable("digital_twins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  
+  // Communication preferences
+  communicationStyle: text("communication_style"), // formal, casual, technical, friendly
+  preferredChannels: text("preferred_channels").array(), // email, linkedin, phone
+  bestEngagementTime: text("best_engagement_time"), // morning, afternoon, evening
+  
+  // Personality insights
+  personalityTraits: jsonb("personality_traits"), // decision_style, risk_tolerance, etc.
+  interests: text("interests").array(),
+  values: text("values").array(),
+  painPoints: text("pain_points").array(),
+  
+  // Content preferences
+  contentPreferences: text("content_preferences").array(), // case_studies, whitepapers, videos, demos
+  
+  // Buying journey indicators
+  buyingStageIndicators: jsonb("buying_stage_indicators"),
+  objectionsHistory: jsonb("objections_history"),
+  
+  // Model metadata
+  modelConfidence: integer("model_confidence").default(50), // 0-100
+  lastModelUpdate: timestamp("last_model_update").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Track all interactions for twin learning
+export const twinInteractions = pgTable("twin_interactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  twinId: varchar("twin_id").notNull().references(() => digitalTwins.id),
+  
+  // Interaction details
+  interactionType: text("interaction_type").notNull(), // email_open, email_click, email_reply, meeting, call
+  channel: text("channel").notNull(), // email, linkedin, phone, meeting
+  content: text("content"), // Message content or description
+  response: text("response"), // Prospect's response
+  
+  // Analysis
+  sentiment: text("sentiment"), // positive, neutral, negative
+  engagementScore: integer("engagement_score"), // 0-100
+  outcome: text("outcome"), // interested, not_interested, deferred, meeting_booked
+  
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+// AI predictions about prospects
+export const twinPredictions = pgTable("twin_predictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  twinId: varchar("twin_id").notNull().references(() => digitalTwins.id),
+  
+  predictionType: text("prediction_type").notNull(), // next_action, buying_stage, conversion_probability
+  prediction: text("prediction").notNull(),
+  confidence: integer("confidence").notNull(), // 0-100
+  
+  validatedAt: timestamp("validated_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -600,6 +662,22 @@ export const insertOnboardingProfileSchema = createInsertSchema(onboardingProfil
   id: true,
   createdAt: true,
   completedAt: true,
+});
+
+export const insertDigitalTwinSchema = createInsertSchema(digitalTwins).omit({
+  id: true,
+  createdAt: true,
+  lastModelUpdate: true,
+});
+
+export const insertTwinInteractionSchema = createInsertSchema(twinInteractions).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertTwinPredictionSchema = createInsertSchema(twinPredictions).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertPlatformConfigSchema = createInsertSchema(platformConfigs).omit({
@@ -747,6 +825,15 @@ export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 
 export type OnboardingProfile = typeof onboardingProfiles.$inferSelect;
 export type InsertOnboardingProfile = z.infer<typeof insertOnboardingProfileSchema>;
+
+export type DigitalTwin = typeof digitalTwins.$inferSelect;
+export type InsertDigitalTwin = z.infer<typeof insertDigitalTwinSchema>;
+
+export type TwinInteraction = typeof twinInteractions.$inferSelect;
+export type InsertTwinInteraction = z.infer<typeof insertTwinInteractionSchema>;
+
+export type TwinPrediction = typeof twinPredictions.$inferSelect;
+export type InsertTwinPrediction = z.infer<typeof insertTwinPredictionSchema>;
 
 export type PlatformConfig = typeof platformConfigs.$inferSelect;
 export type InsertPlatformConfig = z.infer<typeof insertPlatformConfigSchema>;

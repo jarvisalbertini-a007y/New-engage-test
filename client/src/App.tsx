@@ -37,6 +37,7 @@ import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import CollapsibleSidebar from "@/components/collapsible-sidebar";
 import MarketplacePage from "@/pages/marketplace";
+import DigitalTwins from "@/pages/digital-twins";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -110,6 +111,7 @@ function Router() {
           <Route path="/setup-assistant" component={SetupAssistantPage} />
           <Route path="/performance-coaching" component={PerformanceCoachingPage} />
           <Route path="/team-collaboration" component={TeamCollaborationPage} />
+          <Route path="/digital-twins" component={DigitalTwins} />
           <Route component={NotFound} />
         </Switch>
       </div>

@@ -29,7 +29,10 @@ import {
   type AgentRating, type InsertAgentRating,
   type AgentDownload, type InsertAgentDownload,
   type AgentPurchase, type InsertAgentPurchase,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases
+  type DigitalTwin, type InsertDigitalTwin,
+  type TwinInteraction, type InsertTwinInteraction,
+  type TwinPrediction, type InsertTwinPrediction,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -233,6 +236,24 @@ export interface IStorage {
   getAgentPurchases(filters?: { agentId?: string; userId?: string }): Promise<AgentPurchase[]>;
   createAgentPurchase(purchase: InsertAgentPurchase): Promise<AgentPurchase>;
   hasUserPurchasedAgent(agentId: string, userId: string): Promise<boolean>;
+
+  // Digital Twins
+  getDigitalTwin(id: string): Promise<DigitalTwin | undefined>;
+  getDigitalTwinByContact(contactId: string): Promise<DigitalTwin | undefined>;
+  getDigitalTwins(filters?: { companyId?: string; limit?: number }): Promise<DigitalTwin[]>;
+  createDigitalTwin(twin: InsertDigitalTwin): Promise<DigitalTwin>;
+  updateDigitalTwin(id: string, updates: Partial<DigitalTwin>): Promise<DigitalTwin | undefined>;
+  
+  // Twin Interactions
+  getTwinInteraction(id: string): Promise<TwinInteraction | undefined>;
+  getTwinInteractions(twinId: string, limit?: number): Promise<TwinInteraction[]>;
+  createTwinInteraction(interaction: InsertTwinInteraction): Promise<TwinInteraction>;
+  
+  // Twin Predictions
+  getTwinPrediction(id: string): Promise<TwinPrediction | undefined>;
+  getTwinPredictions(twinId: string, type?: string): Promise<TwinPrediction[]>;
+  createTwinPrediction(prediction: InsertTwinPrediction): Promise<TwinPrediction>;
+  updateTwinPrediction(id: string, updates: Partial<TwinPrediction>): Promise<TwinPrediction | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -245,6 +266,9 @@ export class MemStorage implements IStorage {
   private insights: Map<string, Insight> = new Map();
   private personas: Map<string, Persona> = new Map();
   private tasks: Map<string, Task> = new Map();
+  private digitalTwins: Map<string, DigitalTwin> = new Map();
+  private twinInteractions: Map<string, TwinInteraction> = new Map();
+  private twinPredictions: Map<string, TwinPrediction> = new Map();
 
   constructor() {
     this.seedData();
@@ -1037,6 +1061,136 @@ export class MemStorage implements IStorage {
 
   async updateHumanApproval(id: string, updates: Partial<HumanApproval>): Promise<HumanApproval | undefined> {
     return { id, ...updates, requestedAt: new Date() } as HumanApproval;
+  }
+
+  // Digital Twin methods
+  async getDigitalTwin(id: string): Promise<DigitalTwin | undefined> {
+    return this.digitalTwins.get(id);
+  }
+
+  async getDigitalTwinByContact(contactId: string): Promise<DigitalTwin | undefined> {
+    return Array.from(this.digitalTwins.values()).find(twin => twin.contactId === contactId);
+  }
+
+  async getDigitalTwins(filters?: { companyId?: string; limit?: number }): Promise<DigitalTwin[]> {
+    let twins = Array.from(this.digitalTwins.values());
+    
+    if (filters?.companyId) {
+      twins = twins.filter(t => t.companyId === filters.companyId);
+    }
+    
+    if (filters?.limit) {
+      twins = twins.slice(0, filters.limit);
+    }
+    
+    return twins;
+  }
+
+  async createDigitalTwin(twin: InsertDigitalTwin): Promise<DigitalTwin> {
+    const id = randomUUID();
+    const newTwin: DigitalTwin = {
+      id,
+      contactId: twin.contactId,
+      companyId: twin.companyId || null,
+      communicationStyle: twin.communicationStyle || "professional",
+      personalityTraits: twin.personalityTraits || {},
+      interests: twin.interests || [],
+      values: twin.values || [],
+      painPoints: twin.painPoints || [],
+      preferredChannels: twin.preferredChannels || [],
+      bestEngagementTime: twin.bestEngagementTime || null,
+      contentPreferences: twin.contentPreferences || [],
+      buyingStageIndicators: twin.buyingStageIndicators || {},
+      objectionsHistory: twin.objectionsHistory || {},
+      lastModelUpdate: new Date(),
+      modelConfidence: twin.modelConfidence || 50
+    };
+    this.digitalTwins.set(id, newTwin);
+    return newTwin;
+  }
+
+  async updateDigitalTwin(id: string, updates: Partial<DigitalTwin>): Promise<DigitalTwin | undefined> {
+    const twin = this.digitalTwins.get(id);
+    if (!twin) return undefined;
+    
+    const updated = { ...twin, ...cleanPartial(updates), lastModelUpdate: new Date() };
+    this.digitalTwins.set(id, updated);
+    return updated;
+  }
+
+  // Twin Interaction methods
+  async getTwinInteraction(id: string): Promise<TwinInteraction | undefined> {
+    return this.twinInteractions.get(id);
+  }
+
+  async getTwinInteractions(twinId: string, limit?: number): Promise<TwinInteraction[]> {
+    let interactions = Array.from(this.twinInteractions.values())
+      .filter(i => i.twinId === twinId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    if (limit) {
+      interactions = interactions.slice(0, limit);
+    }
+    
+    return interactions;
+  }
+
+  async createTwinInteraction(interaction: InsertTwinInteraction): Promise<TwinInteraction> {
+    const id = randomUUID();
+    const newInteraction: TwinInteraction = {
+      id,
+      twinId: interaction.twinId,
+      interactionType: interaction.interactionType,
+      channel: interaction.channel,
+      content: interaction.content || null,
+      response: interaction.response || null,
+      sentiment: interaction.sentiment || null,
+      engagementScore: interaction.engagementScore || null,
+      outcome: interaction.outcome || null,
+      timestamp: new Date()
+    };
+    this.twinInteractions.set(id, newInteraction);
+    return newInteraction;
+  }
+
+  // Twin Prediction methods
+  async getTwinPrediction(id: string): Promise<TwinPrediction | undefined> {
+    return this.twinPredictions.get(id);
+  }
+
+  async getTwinPredictions(twinId: string, type?: string): Promise<TwinPrediction[]> {
+    let predictions = Array.from(this.twinPredictions.values())
+      .filter(p => p.twinId === twinId);
+    
+    if (type) {
+      predictions = predictions.filter(p => p.predictionType === type);
+    }
+    
+    return predictions;
+  }
+
+  async createTwinPrediction(prediction: InsertTwinPrediction): Promise<TwinPrediction> {
+    const id = randomUUID();
+    const newPrediction: TwinPrediction = {
+      id,
+      twinId: prediction.twinId,
+      predictionType: prediction.predictionType,
+      prediction: prediction.prediction,
+      confidence: prediction.confidence,
+      validatedAt: prediction.validatedAt || null,
+      createdAt: new Date()
+    };
+    this.twinPredictions.set(id, newPrediction);
+    return newPrediction;
+  }
+
+  async updateTwinPrediction(id: string, updates: Partial<TwinPrediction>): Promise<TwinPrediction | undefined> {
+    const prediction = this.twinPredictions.get(id);
+    if (!prediction) return undefined;
+    
+    const updated = { ...prediction, ...cleanPartial(updates) };
+    this.twinPredictions.set(id, updated);
+    return updated;
   }
 }
 
@@ -2083,6 +2237,101 @@ export class DbStorage implements IStorage {
       ))
       .limit(1);
     return result.length > 0;
+  }
+
+  // Digital Twin methods
+  async getDigitalTwin(id: string): Promise<DigitalTwin | undefined> {
+    const result = await db.select().from(digitalTwins).where(eq(digitalTwins.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDigitalTwinByContact(contactId: string): Promise<DigitalTwin | undefined> {
+    const result = await db.select().from(digitalTwins)
+      .where(eq(digitalTwins.contactId, contactId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getDigitalTwins(filters?: { companyId?: string; limit?: number }): Promise<DigitalTwin[]> {
+    let query = db.select().from(digitalTwins);
+    
+    if (filters?.companyId) {
+      query = query.where(eq(digitalTwins.companyId, filters.companyId));
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    return await query;
+  }
+
+  async createDigitalTwin(twin: InsertDigitalTwin): Promise<DigitalTwin> {
+    const result = await db.insert(digitalTwins).values(twin).returning();
+    return result[0];
+  }
+
+  async updateDigitalTwin(id: string, updates: Partial<DigitalTwin>): Promise<DigitalTwin | undefined> {
+    const result = await db
+      .update(digitalTwins)
+      .set({ ...cleanPartial(updates), lastModelUpdate: new Date() })
+      .where(eq(digitalTwins.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Twin Interaction methods
+  async getTwinInteraction(id: string): Promise<TwinInteraction | undefined> {
+    const result = await db.select().from(twinInteractions).where(eq(twinInteractions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTwinInteractions(twinId: string, limit?: number): Promise<TwinInteraction[]> {
+    let query = db.select().from(twinInteractions)
+      .where(eq(twinInteractions.twinId, twinId))
+      .orderBy(twinInteractions.timestamp);
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+
+  async createTwinInteraction(interaction: InsertTwinInteraction): Promise<TwinInteraction> {
+    const result = await db.insert(twinInteractions).values(interaction).returning();
+    return result[0];
+  }
+
+  // Twin Prediction methods
+  async getTwinPrediction(id: string): Promise<TwinPrediction | undefined> {
+    const result = await db.select().from(twinPredictions).where(eq(twinPredictions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTwinPredictions(twinId: string, type?: string): Promise<TwinPrediction[]> {
+    let query = db.select().from(twinPredictions)
+      .where(eq(twinPredictions.twinId, twinId));
+    
+    if (type) {
+      query = query.where(eq(twinPredictions.predictionType, type));
+    }
+    
+    return await query;
+  }
+
+  async createTwinPrediction(prediction: InsertTwinPrediction): Promise<TwinPrediction> {
+    const result = await db.insert(twinPredictions).values(prediction).returning();
+    return result[0];
+  }
+
+  async updateTwinPrediction(id: string, updates: Partial<TwinPrediction>): Promise<TwinPrediction | undefined> {
+    const result = await db
+      .update(twinPredictions)
+      .set(cleanPartial(updates))
+      .where(eq(twinPredictions.id, id))
+      .returning();
+    return result[0];
   }
 }
 
