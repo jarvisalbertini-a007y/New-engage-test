@@ -37,6 +37,7 @@ const navigation = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: ChartLine },
       { name: "Deal Intelligence", href: "/deal-intelligence", icon: Brain },
+      { name: "Revenue Operations", href: "/revenue-ops", icon: TrendingUp },
       { name: "Role Views", href: "/role-views", icon: Users },
       { name: "Visitor Intelligence", href: "/visitors", icon: Users },
       { name: "Insights Engine", href: "/insights", icon: Lightbulb },

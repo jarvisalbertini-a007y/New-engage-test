@@ -15,6 +15,7 @@ import { parseNLPToWorkflow, executeWorkflow, resumeWorkflow } from "./services/
 import { sdrTeamManager } from "./services/sdrTeams";
 import { insertSdrTeamSchema } from "@shared/schema";
 import { dealIntelligenceEngine } from "./services/dealIntelligence";
+import { revenueOpsCenter } from "./services/revenueOps";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
@@ -2020,6 +2021,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching insights:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch insights' });
+    }
+  });
+
+  // Revenue Operations API Routes
+  app.get("/api/revenue-ops/health", async (req: any, res) => {
+    try {
+      const health = await revenueOpsCenter.analyzePipelineHealth();
+      res.json(health);
+    } catch (error) {
+      console.error("Error fetching pipeline health:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch pipeline health' });
+    }
+  });
+
+  app.post("/api/revenue-ops/forensics", async (req: any, res) => {
+    try {
+      const { dealId, analysisType } = req.body;
+      
+      if (!dealId || !analysisType) {
+        return res.status(400).json({ error: "Deal ID and analysis type are required" });
+      }
+      
+      if (!['won', 'lost', 'stuck'].includes(analysisType)) {
+        return res.status(400).json({ error: "Analysis type must be won, lost, or stuck" });
+      }
+      
+      const forensics = await revenueOpsCenter.performDealForensics(dealId, analysisType);
+      res.json(forensics);
+    } catch (error) {
+      console.error("Error performing deal forensics:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to perform deal forensics' });
+    }
+  });
+
+  app.get("/api/revenue-ops/forecast", async (req: any, res) => {
+    try {
+      const period = req.query.period as string || 'Q1 2025';
+      const forecast = await revenueOpsCenter.generateForecast(period);
+      res.json(forecast);
+    } catch (error) {
+      console.error("Error generating revenue forecast:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate forecast' });
+    }
+  });
+
+  app.get("/api/revenue-ops/risks", async (req: any, res) => {
+    try {
+      const risks = await revenueOpsCenter.identifyRisks();
+      const recommendations = await revenueOpsCenter.recommendActions();
+      
+      res.json({
+        risks,
+        recommendations,
+        totalAtRisk: risks.reduce((sum, r) => sum + r.dealCount, 0),
+        totalValueAtRisk: risks.reduce((sum, r) => sum + r.totalValue, 0)
+      });
+    } catch (error) {
+      console.error("Error identifying pipeline risks:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to identify risks' });
+    }
+  });
+
+  app.get("/api/revenue-ops/coaching", async (req: any, res) => {
+    try {
+      const userId = req.query.userId as string || req.user?.claims?.sub;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      const insights = await revenueOpsCenter.generateCoachingInsights(userId);
+      res.json(insights);
+    } catch (error) {
+      console.error("Error generating coaching insights:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate coaching insights' });
+    }
+  });
+
+  app.post("/api/revenue-ops/intervene", async (req: any, res) => {
+    try {
+      const { type, dealId, action } = req.body;
+      
+      if (!type || !action) {
+        return res.status(400).json({ error: "Intervention type and action are required" });
+      }
+      
+      // Simulate intervention (in production, this would trigger actual workflows)
+      const intervention = {
+        id: `int-${Date.now()}`,
+        type,
+        dealId,
+        action,
+        triggeredBy: req.user?.claims?.sub,
+        triggeredAt: new Date(),
+        status: 'initiated',
+        expectedImpact: 'medium'
+      };
+      
+      res.json({
+        message: "Intervention triggered successfully",
+        intervention
+      });
+    } catch (error) {
+      console.error("Error triggering intervention:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to trigger intervention' });
+    }
+  });
+
+  app.get("/api/revenue-ops/velocity", async (req: any, res) => {
+    try {
+      const velocity = await revenueOpsCenter.trackVelocity();
+      res.json(velocity);
+    } catch (error) {
+      console.error("Error tracking deal velocity:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to track velocity' });
+    }
+  });
+
+  app.get("/api/revenue-ops/win-loss", async (req: any, res) => {
+    try {
+      const analysis = await revenueOpsCenter.analyzeWinLoss();
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error analyzing win/loss patterns:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to analyze win/loss' });
     }
   });
 

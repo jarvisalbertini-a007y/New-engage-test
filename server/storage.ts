@@ -40,7 +40,11 @@ import {
   type DealIntelligence, type InsertDealIntelligence,
   type TimingOptimization, type InsertTimingOptimization,
   type PredictiveModel, type InsertPredictiveModel,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels
+  type PipelineHealth, type InsertPipelineHealth,
+  type DealForensics, type InsertDealForensics,
+  type RevenueForecast, type InsertRevenueForecast,
+  type CoachingInsight, type InsertCoachingInsight,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -313,6 +317,30 @@ export interface IStorage {
   getPredictiveModels(modelType?: string): Promise<PredictiveModel[]>;
   createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel>;
   updatePredictiveModel(id: string, updates: Partial<PredictiveModel>): Promise<PredictiveModel | undefined>;
+  
+  // Revenue Operations - Pipeline Health
+  getPipelineHealth(id: string): Promise<PipelineHealth | undefined>;
+  getLatestPipelineHealth(): Promise<PipelineHealth | undefined>;
+  getPipelineHealthHistory(limit?: number): Promise<PipelineHealth[]>;
+  createPipelineHealth(health: InsertPipelineHealth): Promise<PipelineHealth>;
+  
+  // Deal Forensics
+  getDealForensics(id: string): Promise<DealForensics | undefined>;
+  getDealForensicsByDealId(dealId: string): Promise<DealForensics[]>;
+  getDealForensicsByType(analysisType: string): Promise<DealForensics[]>;
+  createDealForensics(forensics: InsertDealForensics): Promise<DealForensics>;
+  
+  // Revenue Forecasts
+  getRevenueForecast(id: string): Promise<RevenueForecast | undefined>;
+  getRevenueForecasts(period?: string): Promise<RevenueForecast[]>;
+  getLatestForecast(): Promise<RevenueForecast | undefined>;
+  createRevenueForecast(forecast: InsertRevenueForecast): Promise<RevenueForecast>;
+  
+  // Coaching Insights
+  getCoachingInsight(id: string): Promise<CoachingInsight | undefined>;
+  getCoachingInsights(filters?: { userId?: string; insightType?: string; priority?: string; status?: string }): Promise<CoachingInsight[]>;
+  createCoachingInsight(insight: InsertCoachingInsight): Promise<CoachingInsight>;
+  updateCoachingInsight(id: string, updates: Partial<CoachingInsight>): Promise<CoachingInsight | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -336,6 +364,10 @@ export class MemStorage implements IStorage {
   private dealIntelligenceMap: Map<string, DealIntelligence> = new Map();
   private timingOptimizations: Map<string, TimingOptimization> = new Map();
   private predictiveModels: Map<string, PredictiveModel> = new Map();
+  private pipelineHealthSnapshots: Map<string, PipelineHealth> = new Map();
+  private dealForensicsRecords: Map<string, DealForensics> = new Map();
+  private revenueForecasts: Map<string, RevenueForecast> = new Map();
+  private coachingInsights: Map<string, CoachingInsight> = new Map();
 
   constructor() {
     this.seedData();
@@ -1623,6 +1655,182 @@ export class MemStorage implements IStorage {
     if (!model) return undefined;
     const updated = { ...model, ...cleanPartial(updates) };
     this.predictiveModels.set(id, updated);
+    return updated;
+  }
+
+  // Revenue Operations - Pipeline Health methods
+  async getPipelineHealth(id: string): Promise<PipelineHealth | undefined> {
+    return this.pipelineHealthSnapshots.get(id);
+  }
+
+  async getLatestPipelineHealth(): Promise<PipelineHealth | undefined> {
+    const snapshots = Array.from(this.pipelineHealthSnapshots.values());
+    if (snapshots.length === 0) return undefined;
+    
+    // Sort by createdAt descending and return the latest
+    snapshots.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return snapshots[0];
+  }
+
+  async getPipelineHealthHistory(limit: number = 10): Promise<PipelineHealth[]> {
+    const snapshots = Array.from(this.pipelineHealthSnapshots.values());
+    
+    // Sort by createdAt descending
+    snapshots.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    return snapshots.slice(0, limit);
+  }
+
+  async createPipelineHealth(health: InsertPipelineHealth): Promise<PipelineHealth> {
+    const id = randomUUID();
+    const pipelineHealth: PipelineHealth = {
+      id,
+      snapshotDate: new Date(),
+      totalDeals: health.totalDeals,
+      totalValue: health.totalValue.toString(),
+      byStage: health.byStage,
+      velocity: health.velocity,
+      conversion: health.conversion,
+      riskIndicators: health.riskIndicators,
+      healthScore: health.healthScore,
+      createdAt: new Date()
+    };
+    this.pipelineHealthSnapshots.set(id, pipelineHealth);
+    return pipelineHealth;
+  }
+
+  // Deal Forensics methods
+  async getDealForensics(id: string): Promise<DealForensics | undefined> {
+    return this.dealForensicsRecords.get(id);
+  }
+
+  async getDealForensicsByDealId(dealId: string): Promise<DealForensics[]> {
+    return Array.from(this.dealForensicsRecords.values())
+      .filter(f => f.dealId === dealId)
+      .sort((a, b) => new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime());
+  }
+
+  async getDealForensicsByType(analysisType: string): Promise<DealForensics[]> {
+    return Array.from(this.dealForensicsRecords.values())
+      .filter(f => f.analysisType === analysisType)
+      .sort((a, b) => new Date(b.analyzedAt).getTime() - new Date(a.analyzedAt).getTime());
+  }
+
+  async createDealForensics(forensics: InsertDealForensics): Promise<DealForensics> {
+    const id = randomUUID();
+    const dealForensics: DealForensics = {
+      id,
+      dealId: forensics.dealId,
+      analysisType: forensics.analysisType,
+      rootCauses: forensics.rootCauses,
+      criticalMoments: forensics.criticalMoments,
+      missedOpportunities: forensics.missedOpportunities || null,
+      recommendations: forensics.recommendations,
+      competitorFactors: forensics.competitorFactors || null,
+      analyzedAt: new Date(),
+      createdAt: new Date()
+    };
+    this.dealForensicsRecords.set(id, dealForensics);
+    return dealForensics;
+  }
+
+  // Revenue Forecasts methods
+  async getRevenueForecast(id: string): Promise<RevenueForecast | undefined> {
+    return this.revenueForecasts.get(id);
+  }
+
+  async getRevenueForecasts(period?: string): Promise<RevenueForecast[]> {
+    let forecasts = Array.from(this.revenueForecasts.values());
+    
+    if (period) {
+      forecasts = forecasts.filter(f => f.forecastPeriod === period);
+    }
+    
+    // Sort by createdAt descending
+    forecasts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    return forecasts;
+  }
+
+  async getLatestForecast(): Promise<RevenueForecast | undefined> {
+    const forecasts = Array.from(this.revenueForecasts.values());
+    if (forecasts.length === 0) return undefined;
+    
+    // Sort by createdAt descending and return the latest
+    forecasts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return forecasts[0];
+  }
+
+  async createRevenueForecast(forecast: InsertRevenueForecast): Promise<RevenueForecast> {
+    const id = randomUUID();
+    const revenueForecast: RevenueForecast = {
+      id,
+      forecastPeriod: forecast.forecastPeriod,
+      predictedRevenue: forecast.predictedRevenue.toString(),
+      confidenceLevel: forecast.confidenceLevel.toString(),
+      assumptions: forecast.assumptions,
+      scenarios: forecast.scenarios,
+      createdAt: new Date()
+    };
+    this.revenueForecasts.set(id, revenueForecast);
+    return revenueForecast;
+  }
+
+  // Coaching Insights methods
+  async getCoachingInsight(id: string): Promise<CoachingInsight | undefined> {
+    return this.coachingInsights.get(id);
+  }
+
+  async getCoachingInsights(filters?: { userId?: string; insightType?: string; priority?: string; status?: string }): Promise<CoachingInsight[]> {
+    let insights = Array.from(this.coachingInsights.values());
+    
+    if (filters?.userId) {
+      insights = insights.filter(i => i.userId === filters.userId);
+    }
+    if (filters?.insightType) {
+      insights = insights.filter(i => i.insightType === filters.insightType);
+    }
+    if (filters?.priority) {
+      insights = insights.filter(i => i.priority === filters.priority);
+    }
+    if (filters?.status) {
+      insights = insights.filter(i => i.status === filters.status);
+    }
+    
+    // Sort by priority (high first) and then by createdAt descending
+    insights.sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const priorityCompare = (priorityOrder[a.priority as keyof typeof priorityOrder] || 1) - 
+                              (priorityOrder[b.priority as keyof typeof priorityOrder] || 1);
+      if (priorityCompare !== 0) return priorityCompare;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    return insights;
+  }
+
+  async createCoachingInsight(insight: InsertCoachingInsight): Promise<CoachingInsight> {
+    const id = randomUUID();
+    const coachingInsight: CoachingInsight = {
+      id,
+      userId: insight.userId || null,
+      insightType: insight.insightType,
+      insight: insight.insight,
+      actionItems: insight.actionItems,
+      priority: insight.priority || 'medium',
+      status: insight.status || 'pending',
+      createdAt: new Date()
+    };
+    this.coachingInsights.set(id, coachingInsight);
+    return coachingInsight;
+  }
+
+  async updateCoachingInsight(id: string, updates: Partial<CoachingInsight>): Promise<CoachingInsight | undefined> {
+    const insight = this.coachingInsights.get(id);
+    if (!insight) return undefined;
+    
+    const updated = { ...insight, ...cleanPartial(updates) };
+    this.coachingInsights.set(id, updated);
     return updated;
   }
 }

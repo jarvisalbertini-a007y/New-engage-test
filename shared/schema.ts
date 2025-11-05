@@ -696,6 +696,54 @@ export const predictiveModels = pgTable("predictive_models", {
   trainedAt: timestamp("trained_at").defaultNow().notNull(),
 });
 
+// Revenue Operations Tables
+export const pipelineHealth = pgTable("pipeline_health", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  snapshotDate: timestamp("snapshot_date").defaultNow().notNull(),
+  totalDeals: integer("total_deals").notNull().default(0),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull().default(0),
+  byStage: jsonb("by_stage").notNull(), // Stage-wise breakdown of deals
+  velocity: jsonb("velocity").notNull(), // Deal velocity metrics
+  conversion: jsonb("conversion").notNull(), // Conversion rates between stages
+  riskIndicators: jsonb("risk_indicators").notNull(), // Array of risk indicators
+  healthScore: integer("health_score").notNull().default(50), // 0-100 health score
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dealForensics = pgTable("deal_forensics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull(), // Reference to specific deal
+  analysisType: text("analysis_type").notNull(), // won, lost, stuck
+  rootCauses: jsonb("root_causes").notNull(), // Array of root causes
+  criticalMoments: jsonb("critical_moments").notNull(), // Array of critical moments in the deal
+  missedOpportunities: jsonb("missed_opportunities"), // What could have been done better
+  recommendations: jsonb("recommendations").notNull(), // AI-generated recommendations
+  competitorFactors: jsonb("competitor_factors"), // Competitor involvement and impact
+  analyzedAt: timestamp("analyzed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const revenueForecasts = pgTable("revenue_forecasts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  forecastPeriod: text("forecast_period").notNull(), // e.g., "Q1 2025", "2025"
+  predictedRevenue: decimal("predicted_revenue", { precision: 12, scale: 2 }).notNull(),
+  confidenceLevel: decimal("confidence_level", { precision: 5, scale: 2 }).notNull(), // 0.00 to 1.00
+  assumptions: jsonb("assumptions").notNull(), // Array of assumptions made
+  scenarios: jsonb("scenarios").notNull(), // Best case, worst case, most likely scenarios
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const coachingInsights = pgTable("coaching_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  insightType: text("insight_type").notNull(), // performance, behavior, skills, opportunity
+  insight: text("insight").notNull(), // The actual insight text
+  actionItems: jsonb("action_items").notNull(), // Array of specific actions to take
+  priority: text("priority").notNull().default("medium"), // high, medium, low
+  status: text("status").notNull().default("pending"), // pending, acknowledged, completed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -934,6 +982,29 @@ export const insertPredictiveModelSchema = createInsertSchema(predictiveModels).
   trainedAt: true,
 });
 
+// Revenue Operations Insert Schemas
+export const insertPipelineHealthSchema = createInsertSchema(pipelineHealth).omit({
+  id: true,
+  snapshotDate: true,
+  createdAt: true,
+});
+
+export const insertDealForensicsSchema = createInsertSchema(dealForensics).omit({
+  id: true,
+  analyzedAt: true,
+  createdAt: true,
+});
+
+export const insertRevenueForecastSchema = createInsertSchema(revenueForecasts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCoachingInsightSchema = createInsertSchema(coachingInsights).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1059,6 +1130,19 @@ export type InsertTimingOptimization = z.infer<typeof insertTimingOptimizationSc
 
 export type PredictiveModel = typeof predictiveModels.$inferSelect;
 export type InsertPredictiveModel = z.infer<typeof insertPredictiveModelSchema>;
+
+// Revenue Operations Types
+export type PipelineHealth = typeof pipelineHealth.$inferSelect;
+export type InsertPipelineHealth = z.infer<typeof insertPipelineHealthSchema>;
+
+export type DealForensics = typeof dealForensics.$inferSelect;
+export type InsertDealForensics = z.infer<typeof insertDealForensicsSchema>;
+
+export type RevenueForecast = typeof revenueForecasts.$inferSelect;
+export type InsertRevenueForecast = z.infer<typeof insertRevenueForecastSchema>;
+
+export type CoachingInsight = typeof coachingInsights.$inferSelect;
+export type InsertCoachingInsight = z.infer<typeof insertCoachingInsightSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;
