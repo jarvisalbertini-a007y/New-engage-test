@@ -1,5 +1,11 @@
 import { storage } from "../storage";
-import { openai } from "./openai";
+import OpenAI from "openai";
+
+const hasOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+const openai = hasOpenAIKey ? new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR
+}) : null;
+
 import type { 
   PipelineHealth, InsertPipelineHealth,
   DealForensics, InsertDealForensics,

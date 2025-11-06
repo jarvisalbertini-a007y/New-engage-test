@@ -1,5 +1,11 @@
 import { storage } from "../storage";
-import { openaiClient } from "./openai";
+import OpenAI from "openai";
+
+const hasOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+const openaiClient = hasOpenAIKey ? new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR
+}) : null;
+
 import { 
   type Contact, 
   type ChannelConfig, 
