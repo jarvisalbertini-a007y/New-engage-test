@@ -20,6 +20,22 @@ export interface GeneratedContent {
   confidence: number;
 }
 
+// Helper function to format value propositions as readable text
+function formatValuePropositions(props: any): string {
+  if (!props) return 'our AI-powered sales platform';
+  
+  if (Array.isArray(props)) {
+    return props.length > 0 ? props.join(', ') : 'our solutions';
+  } else if (typeof props === 'object') {
+    const values = Object.values(props).filter(v => v);
+    return values.length > 0 ? values.join(', ') : 'our solutions';
+  } else if (typeof props === 'string') {
+    return props;
+  }
+  
+  return 'our AI-powered sales platform';
+}
+
 export async function generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
   // Get context data
   const persona = request.personaId ? (await storage.getPersona(request.personaId)) ?? null : null;
@@ -52,7 +68,7 @@ async function generateEmailContent(
     title: contact?.title || undefined,
     insight: insight?.description,
     valueProposition: persona?.valuePropositions ? 
-      JSON.stringify(persona.valuePropositions) : 
+      formatValuePropositions(persona.valuePropositions) : 
       'our AI-powered sales platform that increases reply rates by 40%',
     tone: request.tone || 'professional'
   };
@@ -90,7 +106,7 @@ async function generateLinkedInContent(
     title: contact?.title || undefined,
     insight: insight?.description,
     valueProposition: persona?.valuePropositions ? 
-      JSON.stringify(persona.valuePropositions) : 
+      formatValuePropositions(persona.valuePropositions) : 
       'AI-powered sales automation',
     tone: 'friendly' // LinkedIn is generally more casual
   };
@@ -240,16 +256,6 @@ async function generateStepTemplate(
 ): Promise<string> {
   const isFirstStep = stepNumber === 1;
   const isLastStep = stepNumber === totalSteps;
-  
-  // Format value propositions as a readable string
-  const formatValuePropositions = (props: any): string => {
-    if (Array.isArray(props)) {
-      return props.join(', ');
-    } else if (props && typeof props === 'object') {
-      return Object.values(props).join(', ');
-    }
-    return 'our solutions';
-  };
   
   const valueProps = formatValuePropositions(persona.valuePropositions);
   
