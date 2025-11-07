@@ -154,14 +154,23 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
   };
 
   const onSubmit = (data: any) => {
+    // Transform steps to match API schema - convert template to body, remove UI-only fields
+    const apiSteps = steps.map(({ template, stepNumber, isActive, ...rest }) => ({
+      ...rest,
+      body: template || "", // API expects 'body' not 'template'
+    }));
+    
     const sequenceData = {
       ...data,
-      steps: steps,
+      status: "draft", // Required field - sequences start as draft
+      steps: apiSteps,
       targets: {
         sequenceType,
         stepCount: steps.length,
       }
     };
+    
+    console.log("Sending sequence data:", JSON.stringify(sequenceData, null, 2));
     onSequenceCreated(sequenceData);
   };
 

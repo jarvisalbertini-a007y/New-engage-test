@@ -53,10 +53,12 @@ export default function Sequences() {
         description: "Your new sequence has been created successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Sequence creation failed:", error);
+      const errorMessage = error?.message || error?.response?.data?.error || "Failed to create sequence. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to create sequence. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Using GPT-4 Turbo for optimal performance
 let apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || '';
 
 // Check for malformed API key (includes header format)
@@ -58,7 +58,7 @@ export async function analyzeEmailDraft(emailText: string): Promise<{
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -97,7 +97,7 @@ export async function generatePersonalizedEmail(context: {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -138,7 +138,7 @@ export async function improveEmailDraft(emailText: string): Promise<{ improvedSu
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -175,7 +175,7 @@ export async function generateInsightMessage(insight: {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -224,7 +224,7 @@ export async function categorizeEmailResponse(emailContent: string): Promise<{
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",

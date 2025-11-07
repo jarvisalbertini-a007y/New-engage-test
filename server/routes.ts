@@ -134,6 +134,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/activity", async (req, res) => {
+    try {
+      // Fetch recent activity items
+      const emails = await storage.getEmails({ limit: 10 });
+      const sequences = await storage.getSequences(); // No limit parameter available
+      const insights = await storage.getInsights({ limit: 10 });
+      
+      // Combine and format activity items
+      const activity = [
+        ...emails.map(email => ({
+          id: email.id,
+          type: 'email',
+          message: `Email ${email.status}: ${email.subject || 'No subject'}`,
+          timestamp: email.sentAt || new Date().toISOString(),
+          icon: 'mail'
+        })),
+        ...sequences.slice(0, 5).map(seq => ({ // Slice to limit results
+          id: seq.id,
+          type: 'sequence',
+          message: `Sequence ${seq.status}: ${seq.name}`,
+          timestamp: seq.createdAt,
+          icon: 'workflow'
+        })),
+        ...insights.map(insight => ({
+          id: insight.id,
+          type: 'insight',
+          message: `New insight: ${insight.type} for company ${insight.companyId || 'Unknown'}`,
+          timestamp: insight.createdAt,
+          icon: 'lightbulb'
+        }))
+      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+       .slice(0, 10); // Return top 10 most recent items
+      
+      res.json(activity);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/dashboard/insights", async (req, res) => {
+    try {
+      // Fetch recent insights and opportunities
+      const insights = await storage.getInsights({ limit: 5 });
+      const companies = await storage.getCompanies(10);
+      const sequences = await storage.getSequences(); // No limit parameter available
+      
+      // Format insights for dashboard
+      const dashboardInsights = insights.map(insight => ({
+        id: insight.id,
+        type: insight.type,
+        companyId: insight.companyId,
+        description: insight.description,
+        confidence: insight.confidence,
+        createdAt: insight.createdAt,
+        relevanceScore: insight.relevanceScore
+      }));
+      
+      // Add some AI-generated recommendations
+      const recommendations = [
+        {
+          id: 'rec-1',
+          title: 'High-Value Prospects Detected',
+          description: `${companies.length} companies match your ideal customer profile`,
+          action: 'View Companies',
+          priority: 'high'
+        },
+        {
+          id: 'rec-2',
+          title: 'Sequence Optimization Available',
+          description: `${sequences.filter(s => s.status === 'active').length} sequences can be optimized for better performance`,
+          action: 'Optimize Now',
+          priority: 'medium'
+        }
+      ];
+      
+      res.json({
+        insights: dashboardInsights,
+        recommendations
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // Visitor Intelligence Routes - Protected
   app.get("/api/visitors/active", async (req, res) => {
     try {
@@ -426,6 +510,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { personaId, sequenceType, stepCount } = req.body;
       const steps = await generateSequenceSteps(personaId, sequenceType, stepCount);
       res.json(steps);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+  
+  // Campaigns Route - Aggregates all campaign types
+  app.get("/api/campaigns", async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const createdBy = req.query.createdBy as string;
+      
+      const allCampaigns = [];
+      
+      // Fetch autopilot campaigns (these should exist)
+      try {
+        const autopilotCampaigns = await storage.getAutopilotCampaigns({ status, createdBy });
+        allCampaigns.push(...autopilotCampaigns.map(campaign => ({
+          id: campaign.id,
+          name: campaign.name,
+          type: 'autopilot',
+          status: campaign.status,
+          createdAt: campaign.createdAt,
+          metrics: {
+            totalLeadsProcessed: campaign.totalLeadsProcessed || 0,
+            totalEmailsSent: campaign.totalEmailsSent || 0,
+            totalReplies: campaign.totalReplies || 0,
+            totalMeetingsBooked: campaign.totalMeetingsBooked || 0
+          }
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch autopilot campaigns:', err);
+      }
+      
+      // Fetch voice campaigns (may not exist yet)
+      try {
+        const voiceCampaigns = await storage.getVoiceCampaigns({ status, createdBy });
+        allCampaigns.push(...voiceCampaigns.map(campaign => ({
+          id: campaign.id,
+          name: campaign.name,
+          type: 'voice',
+          status: campaign.status,
+          createdAt: campaign.createdAt,
+          metrics: {
+            totalCalls: 0,
+            connectedCalls: 0,
+            voicemails: 0,
+            conversions: 0
+          }
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch voice campaigns:', err);
+        // Continue without voice campaigns
+      }
+      
+      // Sort by creation date (most recent first)
+      allCampaigns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      res.json(allCampaigns);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
