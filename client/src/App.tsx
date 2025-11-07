@@ -51,15 +51,18 @@ function Router() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   
+  // TEMPORARY: Testing mode flag
+  const TESTING_MODE = true; // Must match the flag in useAuth
+  
   // Check onboarding status (only for authenticated users)
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["/api/onboarding/profile"],
     queryFn: api.getOnboardingProfile,
-    enabled: isAuthenticated, // Only check if authenticated
+    enabled: isAuthenticated && !TESTING_MODE, // Skip in testing mode
   });
   
   useEffect(() => {
-    if (isAuthenticated && !profileLoading) {
+    if (!TESTING_MODE && isAuthenticated && !profileLoading) {
       // Redirect to onboarding if profile doesn't exist or not completed
       if ((!profile || !profile.isComplete) && location !== "/onboarding") {
         setLocation("/onboarding");
@@ -67,6 +70,57 @@ function Router() {
     }
   }, [profile, profileLoading, location, setLocation, isAuthenticated]);
 
+  // In testing mode, skip authentication and onboarding checks
+  if (TESTING_MODE) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <CollapsibleSidebar />
+        <div className="flex-1 flex flex-col overflow-hidden ml-0 md:ml-0 transition-all-soft">
+          <Switch>
+            <Route path="/" component={DashboardAi} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/dashboard-ai" component={DashboardAi} />
+            <Route path="/outreach" component={OutreachReview} />
+            <Route path="/visitors" component={VisitorIntelligence} />
+            <Route path="/email-coach" component={EmailCoach} />
+            <Route path="/sequences" component={Sequences} />
+            <Route path="/leads" component={LeadDatabase} />
+            <Route path="/insights" component={Insights} />
+            <Route path="/content-studio" component={ContentStudio} />
+            <Route path="/inbox" component={UnifiedInbox} />
+            <Route path="/personas" component={Personas} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/dialer" component={CloudDialer} />
+            <Route path="/deliverability" component={Deliverability} />
+            <Route path="/agents" component={AIAgents} />
+            <Route path="/marketplace" component={MarketplacePage} />
+            <Route path="/magic-setup" component={MagicSetup} />
+            <Route path="/workflows" component={WorkflowBuilder} />
+            <Route path="/playbooks" component={PlaybooksPage} />
+            <Route path="/autopilot" component={AutopilotPage} />
+            <Route path="/workflow-triggers" component={WorkflowTriggersPage} />
+            <Route path="/lead-scoring" component={LeadScoringPage} />
+            <Route path="/role-views" component={RoleViewsPage} />
+            <Route path="/setup-assistant" component={SetupAssistantPage} />
+            <Route path="/performance-coaching" component={PerformanceCoachingPage} />
+            <Route path="/team-collaboration" component={TeamCollaborationPage} />
+            <Route path="/digital-twins" component={DigitalTwins} />
+            <Route path="/sdr-teams" component={SDRTeamsPage} />
+            <Route path="/deal-intelligence" component={DealIntelligence} />
+            <Route path="/revenue-ops" component={RevenueOpsPage} />
+            <Route path="/multi-channel" component={MultiChannelPage} />
+            <Route path="/voice-ai" component={VoiceAIPage} />
+            <Route path="/browser-extension" component={BrowserExtension} />
+            <Route path="/crowd-intel" component={CrowdIntelPage} />
+            <Route path="/enterprise" component={EnterprisePage} />
+            <Route component={NotFound} />
+          </Switch>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal authentication flow (non-testing mode)
   // Show landing page for non-authenticated users
   if (authLoading || !isAuthenticated) {
     return (

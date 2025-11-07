@@ -6,14 +6,19 @@ export const api = {
   
   // Visitor Intelligence
   getActiveVisitors: () => fetch("/api/visitors/active").then(res => res.json()),
-  trackVisitor: (data: { ipAddress: string; userAgent: string; page: string }) =>
-    apiRequest("POST", "/api/visitors/track", data),
+  trackVisitor: async (data: { ipAddress: string; userAgent: string; page: string }) => {
+    const response = await apiRequest("POST", "/api/visitors/track", data);
+    return response.json();
+  },
   
   // Companies
   getCompanies: (limit?: number) => 
     fetch(`/api/companies${limit ? `?limit=${limit}` : ""}`).then(res => res.json()),
   getCompany: (id: string) => fetch(`/api/companies/${id}`).then(res => res.json()),
-  createCompany: (data: any) => apiRequest("POST", "/api/companies", data),
+  createCompany: async (data: any) => {
+    const response = await apiRequest("POST", "/api/companies", data);
+    return response.json();
+  },
   
   // Contacts
   getContacts: (filters?: { companyId?: string; limit?: number }) => {
@@ -22,25 +27,42 @@ export const api = {
     if (filters?.limit) params.append("limit", filters.limit.toString());
     return fetch(`/api/contacts?${params}`).then(res => res.json());
   },
-  createContact: (data: any) => apiRequest("POST", "/api/contacts", data),
+  createContact: async (data: any) => {
+    const response = await apiRequest("POST", "/api/contacts", data);
+    return response.json();
+  },
   
   // Email Analysis
-  analyzeEmail: (emailContent: string) =>
-    apiRequest("POST", "/api/emails/analyze", { emailContent }),
-  improveEmail: (emailContent: string) =>
-    apiRequest("POST", "/api/emails/improve", { emailContent }),
-  checkSpam: (emailContent: string) =>
-    apiRequest("POST", "/api/emails/spam-check", { emailContent }),
-  optimizeSubject: (subject: string) =>
-    apiRequest("POST", "/api/emails/optimize-subject", { subject }),
-  categorizeEmail: (emailContent: string) =>
-    apiRequest("POST", "/api/emails/categorize", { emailContent }),
+  analyzeEmail: async (emailContent: string) => {
+    const response = await apiRequest("POST", "/api/emails/analyze", { emailContent });
+    return response.json();
+  },
+  improveEmail: async (emailContent: string) => {
+    const response = await apiRequest("POST", "/api/emails/improve", { emailContent });
+    return response.json();
+  },
+  checkSpam: async (emailContent: string) => {
+    const response = await apiRequest("POST", "/api/emails/spam-check", { emailContent });
+    return response.json();
+  },
+  optimizeSubject: async (subject: string) => {
+    const response = await apiRequest("POST", "/api/emails/optimize-subject", { subject });
+    return response.json();
+  },
+  categorizeEmail: async (emailContent: string) => {
+    const response = await apiRequest("POST", "/api/emails/categorize", { emailContent });
+    return response.json();
+  },
   
   // Content Generation
-  generateContent: (request: any) =>
-    apiRequest("POST", "/api/content/generate", request),
-  generatePersonalizedEmail: (context: any) =>
-    apiRequest("POST", "/api/content/personalized-email", context),
+  generateContent: async (request: any) => {
+    const response = await apiRequest("POST", "/api/content/generate", request);
+    return response.json();
+  },
+  generatePersonalizedEmail: async (context: any) => {
+    const response = await apiRequest("POST", "/api/content/personalized-email", context);
+    return response.json();
+  },
   
   // Sequences
   getSequences: (filters?: { createdBy?: string; status?: string }) => {
@@ -49,9 +71,14 @@ export const api = {
     if (filters?.status) params.append("status", filters.status);
     return fetch(`/api/sequences?${params}`).then(res => res.json());
   },
-  createSequence: (data: any) => apiRequest("POST", "/api/sequences", data),
-  generateSequenceSteps: (data: { personaId: string; sequenceType: string; stepCount?: number }) =>
-    apiRequest("POST", "/api/sequences/generate-steps", data),
+  createSequence: async (data: any) => {
+    const response = await apiRequest("POST", "/api/sequences", data);
+    return response.json();
+  },
+  generateSequenceSteps: async (data: { personaId: string; sequenceType: string; stepCount?: number }) => {
+    const response = await apiRequest("POST", "/api/sequences/generate-steps", data);
+    return response.json();
+  },
   
   // Insights
   getInsights: (filters?: { companyId?: string; type?: string; limit?: number }) => {
@@ -61,7 +88,10 @@ export const api = {
     if (filters?.limit) params.append("limit", filters.limit.toString());
     return fetch(`/api/insights?${params}`).then(res => res.json());
   },
-  discoverInsights: () => apiRequest("POST", "/api/insights/discover", {}),
+  discoverInsights: async () => {
+    const response = await apiRequest("POST", "/api/insights/discover", {});
+    return response.json();
+  },
   getInsightRecommendations: (insightId: string) =>
     fetch(`/api/insights/${insightId}/recommendations`).then(res => res.json()),
   
@@ -70,7 +100,10 @@ export const api = {
     const params = createdBy ? `?createdBy=${createdBy}` : "";
     return fetch(`/api/personas${params}`).then(res => res.json());
   },
-  createPersona: (data: any) => apiRequest("POST", "/api/personas", data),
+  createPersona: async (data: any) => {
+    const response = await apiRequest("POST", "/api/personas", data);
+    return response.json();
+  },
   
   // Tasks
   getTasks: (filters?: { assignedTo?: string; status?: string; priority?: string }) => {
@@ -80,14 +113,24 @@ export const api = {
     if (filters?.priority) params.append("priority", filters.priority);
     return fetch(`/api/tasks?${params}`).then(res => res.json());
   },
-  createTask: (data: any) => apiRequest("POST", "/api/tasks", data),
-  updateTask: (id: string, data: any) => apiRequest("PATCH", `/api/tasks/${id}`, data),
+  createTask: async (data: any) => {
+    const response = await apiRequest("POST", "/api/tasks", data);
+    return response.json();
+  },
+  updateTask: async (id: string, data: any) => {
+    const response = await apiRequest("PATCH", `/api/tasks/${id}`, data);
+    return response.json();
+  },
   
   // Phone Calls
-  initiateCall: (data: { contactId: string; userId: string; scriptType: string }) =>
-    apiRequest("POST", "/api/calls/initiate", data),
-  startCallCampaign: (data: { contactIds: string[]; userId: string; scriptType: string }) =>
-    apiRequest("POST", "/api/calls/campaign", data),
+  initiateCall: async (data: { contactId: string; userId: string; scriptType: string }) => {
+    const response = await apiRequest("POST", "/api/calls/initiate", data);
+    return response.json();
+  },
+  startCallCampaign: async (data: { contactIds: string[]; userId: string; scriptType: string }) => {
+    const response = await apiRequest("POST", "/api/calls/campaign", data);
+    return response.json();
+  },
   getCallAnalytics: (userId?: string) => {
     const params = userId ? `?userId=${userId}` : "";
     return fetch(`/api/calls/analytics${params}`).then(res => res.json());
@@ -106,8 +149,10 @@ export const api = {
     if (filters?.personaId) params.append("personaId", filters.personaId);
     return fetch(`/api/call-scripts?${params}`).then(res => res.json());
   },
-  generateCallScript: (data: { type: string; contactId?: string }) =>
-    apiRequest("POST", "/api/call-scripts/generate", data),
+  generateCallScript: async (data: { type: string; contactId?: string }) => {
+    const response = await apiRequest("POST", "/api/call-scripts/generate", data);
+    return response.json();
+  },
   getVoicemails: (filters?: { contactId?: string; isListened?: boolean }) => {
     const params = new URLSearchParams();
     if (filters?.contactId) params.append("contactId", filters.contactId);
@@ -122,32 +167,50 @@ export const api = {
     fetch(`/api/deliverability/warming-status/${domain}`).then(res => res.json()),
   getInboxPlacement: () =>
     fetch("/api/deliverability/inbox-placement").then(res => res.json()),
-  updateWarmingSettings: (settings: { enabled: boolean; speed: string }) =>
-    apiRequest("POST", "/api/deliverability/warming-settings", settings),
-  verifyDomain: (domain: string) =>
-    apiRequest("POST", "/api/deliverability/verify-domain", { domain }),
+  updateWarmingSettings: async (settings: { enabled: boolean; speed: string }) => {
+    const response = await apiRequest("POST", "/api/deliverability/warming-settings", settings);
+    return response.json();
+  },
+  verifyDomain: async (domain: string) => {
+    const response = await apiRequest("POST", "/api/deliverability/verify-domain", { domain });
+    return response.json();
+  },
   
   // AI Agents APIs
   getAgentMetrics: () =>
     fetch("/api/agents/metrics").then(res => res.json()),
   getAgents: () =>
     fetch("/api/agents").then(res => res.json()),
-  createAgent: (data: any) =>
-    apiRequest("POST", "/api/agents", data),
-  updateAgent: (id: string, data: any) =>
-    apiRequest("PATCH", `/api/agents/${id}`, data),
-  deleteAgent: (id: string) =>
-    apiRequest("DELETE", `/api/agents/${id}`, {}),
+  createAgent: async (data: any) => {
+    const response = await apiRequest("POST", "/api/agents", data);
+    return response.json();
+  },
+  updateAgent: async (id: string, data: any) => {
+    const response = await apiRequest("PATCH", `/api/agents/${id}`, data);
+    return response.json();
+  },
+  deleteAgent: async (id: string) => {
+    const response = await apiRequest("DELETE", `/api/agents/${id}`, {});
+    return response.json();
+  },
     
   // Onboarding APIs
   getOnboardingProfile: () =>
     fetch("/api/onboarding/profile").then(res => res.json()),
-  createOnboardingProfile: (data: any) =>
-    apiRequest("POST", "/api/onboarding/profile", data),
-  updateOnboardingProfile: (data: any) =>
-    apiRequest("PATCH", "/api/onboarding/profile", data),
-  autoConfigureOnboarding: (data: any) =>
-    apiRequest("POST", "/api/onboarding/auto-configure", data),
-  applyOnboardingConfig: (data: any) =>
-    apiRequest("POST", "/api/onboarding/apply-config", data),
+  createOnboardingProfile: async (data: any) => {
+    const response = await apiRequest("POST", "/api/onboarding/profile", data);
+    return response.json();
+  },
+  updateOnboardingProfile: async (data: any) => {
+    const response = await apiRequest("PATCH", "/api/onboarding/profile", data);
+    return response.json();
+  },
+  autoConfigureOnboarding: async (data: any) => {
+    const response = await apiRequest("POST", "/api/onboarding/auto-configure", data);
+    return response.json();
+  },
+  applyOnboardingConfig: async (data: any) => {
+    const response = await apiRequest("POST", "/api/onboarding/apply-config", data);
+    return response.json();
+  },
 };

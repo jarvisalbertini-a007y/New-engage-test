@@ -43,6 +43,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Global authentication middleware for all /api routes
   app.use('/api/*', (req: any, res, next) => {
+    // TEMPORARY: Bypass authentication for testing
+    const TESTING_MODE = true; // Set to false to re-enable authentication
+    
+    if (TESTING_MODE) {
+      // Create mock user for testing
+      if (!req.user) {
+        req.user = {
+          claims: {
+            sub: 'test-user-123',
+            email: 'test@example.com',
+            name: 'Test User',
+            first_name: 'Test',
+            last_name: 'User'
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+        };
+      }
+      console.log('[AUTH] Testing mode enabled - bypassing authentication');
+      return next();
+    }
+    
     // Skip authentication for public endpoints
     const path = req.baseUrl + req.path;
     if (publicEndpoints.some(endpoint => path.startsWith(endpoint))) {
@@ -676,6 +697,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Onboarding routes
   app.get("/api/onboarding/profile", async (req, res) => {
     try {
+      // TEMPORARY: In testing mode, return completed profile
+      const TESTING_MODE = true; // Must match the flag in auth middleware
+      if (TESTING_MODE) {
+        res.json({ 
+          userId: 'test-user-123',
+          company: 'Test Company',
+          industry: 'Technology',
+          role: 'Sales Manager',
+          onboardingStep: 5,
+          isComplete: true 
+        });
+        return;
+      }
+      
       const userId = (req as any).session?.userId || "demo-user";
       const profile = await storage.getOnboardingProfile(userId);
       res.json(profile || { onboardingStep: 1, isComplete: false });
