@@ -39,6 +39,11 @@ export default function Dashboard() {
     console.log("Generate message for insight:", insightId);
   };
 
+  const handleAIGenerate = () => {
+    // Navigate to content studio for AI generation
+    window.location.href = "/content-studio";
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -59,11 +64,20 @@ export default function Dashboard() {
               <p className="text-sm md:text-base text-muted-foreground">Welcome back, Alex. Here's what's happening with your sales today.</p>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="secondary" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-new-sequence">
+              <Button 
+                variant="secondary" 
+                className="rounded-lg hover:soft-shadow-hover transition-all-soft" 
+                data-testid="button-new-sequence"
+                onClick={() => window.location.href = "/sequences"}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">New Sequence</span>
               </Button>
-              <Button className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-ai-generate">
+              <Button 
+                className="rounded-lg hover:soft-shadow-hover transition-all-soft" 
+                data-testid="button-ai-generate"
+                onClick={handleAIGenerate}
+              >
                 <Wand2 className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">AI Generate</span>
               </Button>
