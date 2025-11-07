@@ -833,6 +833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/onboarding/apply-config", async (req, res) => {
     try {
+      const userId = (req as any).session?.userId || "demo-user";
       const { personas, sequences, agents } = req.body;
       const results: { personas: any[]; sequences: any[]; agents: any[] } = { 
         personas: [], 
@@ -840,27 +841,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agents: [] 
       };
 
-      // Create personas
+      // Create personas with required fields
       if (personas?.length) {
         for (const persona of personas) {
-          const created = await storage.createPersona(persona);
-          results.personas.push(created);
+          try {
+            const created = await storage.createPersona({
+              ...persona,
+              createdBy: userId,
+              valuePropositions: persona.valuePropositions || [],
+              painPoints: persona.painPoints || [],
+              // Ensure required fields have defaults
+              targetTitles: persona.targetTitles || [],
+              industries: persona.industries || [],
+              companySizes: persona.companySizes || []
+            });
+            results.personas.push(created);
+          } catch (error) {
+            console.error('Error creating persona:', error);
+          }
         }
       }
 
-      // Create sequences
+      // Create sequences with required fields
       if (sequences?.length) {
         for (const sequence of sequences) {
-          const created = await storage.createSequence(sequence);
-          results.sequences.push(created);
+          try {
+            const created = await storage.createSequence({
+              ...sequence,
+              createdBy: userId,
+              status: 'active',
+              // Ensure steps are properly formatted
+              steps: sequence.steps || []
+            });
+            results.sequences.push(created);
+          } catch (error) {
+            console.error('Error creating sequence:', error);
+          }
         }
       }
 
-      // Create AI agents
+      // Create AI agents with required fields
       if (agents?.length) {
         for (const agent of agents) {
-          const created = await storage.createAiAgent(agent);
-          results.agents.push(created);
+          try {
+            const created = await storage.createAiAgent({
+              ...agent,
+              createdBy: userId,
+              status: agent.status || 'active',
+              targetsPerDay: agent.targetsPerDay || 50,
+              type: agent.type || 'prospecting',
+              configuration: agent.configuration || {},
+              conversationCount: 0,
+              meetingsBooked: 0,
+              positiveReplies: 0,
+              performance: {}
+            });
+            results.agents.push(created);
+          } catch (error) {
+            console.error('Error creating agent:', error);
+          }
         }
       }
 

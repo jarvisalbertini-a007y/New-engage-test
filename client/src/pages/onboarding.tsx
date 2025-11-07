@@ -104,6 +104,17 @@ export default function Onboarding() {
         description: `Created ${data.personas?.length || 0} personas, ${data.sequences?.length || 0} sequences, and ${data.agents?.length || 0} AI agents.`,
       });
     },
+    onError: (error: any) => {
+      setIsConfiguring(false);
+      toast({
+        title: "Configuration Failed",
+        description: error.message || "Failed to generate configuration. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Auto-configure error:", error);
+      // Allow moving to next step even if configuration fails
+      setCurrentStep(4);
+    },
   });
 
   const applyConfigMutation = useMutation({
@@ -113,6 +124,14 @@ export default function Onboarding() {
         onboardingStep: 5,
         isComplete: true,
       });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Configuration Error",
+        description: error.message || "Failed to apply configuration. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Apply config error:", error);
     },
   });
 
@@ -157,10 +176,25 @@ export default function Onboarding() {
   };
 
   const handleSkip = () => {
+    // Stop any ongoing configuration
+    setIsConfiguring(false);
+    
+    // Directly navigate to dashboard, marking onboarding as complete
     updateProfileMutation.mutate({
       onboardingStep: 5,
       isComplete: true,
     });
+    
+    // If the mutation doesn't work for some reason, force navigation
+    setTimeout(() => {
+      if (currentStep < 5) {
+        toast({
+          title: "Skipping setup",
+          description: "Taking you to the dashboard...",
+        });
+        setLocation("/dashboard");
+      }
+    }, 500);
   };
 
   return (
