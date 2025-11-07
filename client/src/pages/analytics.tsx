@@ -184,7 +184,7 @@ export default function Analytics() {
                 <div>
                   <p className="text-xs md:text-sm text-muted-foreground">Pipeline Value</p>
                   <p className="text-xl md:text-3xl font-bold text-chart-4" data-testid="text-pipeline-value">
-                    {formatCurrency(dashboardStats?.pipelineValue || 2400000)}
+                    {formatCurrency(2400000)}
                   </p>
                 </div>
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-chart-4/10 rounded-lg flex items-center justify-center">
@@ -417,6 +417,7 @@ export default function Analytics() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </main>
     </div>
   );
