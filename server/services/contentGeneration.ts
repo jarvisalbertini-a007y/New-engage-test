@@ -241,13 +241,25 @@ async function generateStepTemplate(
   const isFirstStep = stepNumber === 1;
   const isLastStep = stepNumber === totalSteps;
   
+  // Format value propositions as a readable string
+  const formatValuePropositions = (props: any): string => {
+    if (Array.isArray(props)) {
+      return props.join(', ');
+    } else if (props && typeof props === 'object') {
+      return Object.values(props).join(', ');
+    }
+    return 'our solutions';
+  };
+  
+  const valueProps = formatValuePropositions(persona.valuePropositions);
+  
   if (type === 'email') {
     if (isFirstStep) {
       return `Hi {{firstName}},
 
 I noticed {{company}} has been {{insight}} and thought you might be interested in how we've helped similar {{industry}} companies.
 
-${JSON.stringify(persona.valuePropositions)}
+Our focus areas include: ${valueProps}
 
 Would you be open to a quick 15-minute conversation this week?
 
@@ -256,7 +268,7 @@ Best regards,
     } else if (isLastStep) {
       return `Hi {{firstName}},
 
-I've reached out a few times about how we can help {{company}} with ${JSON.stringify(persona.valuePropositions)}.
+I've reached out a few times about how we can help {{company}} with ${valueProps}.
 
 If this isn't a priority right now, no worries! I'll check back in a few months.
 
@@ -277,9 +289,9 @@ Best regards,
 {{senderName}}`;
     }
   } else if (type === 'linkedin') {
-    return `Hi {{firstName}}, I noticed we're both in the {{industry}} space. I've been helping companies like {{company}} with ${JSON.stringify(persona.valuePropositions)}. Would love to connect and share some insights that might be relevant to your work at {{company}}.`;
+    return `Hi {{firstName}}, I noticed we're both in the {{industry}} space. I've been helping companies like {{company}} with ${valueProps}. Would love to connect and share some insights that might be relevant to your work at {{company}}.`;
   } else if (type === 'phone') {
-    return `Cold call script for {{firstName}} at {{company}}. Reference previous emails and {{insight}}. Offer brief demo of how we help {{industry}} companies with ${JSON.stringify(persona.valuePropositions)}.`;
+    return `Cold call script for {{firstName}} at {{company}}. Reference previous emails and {{insight}}. Offer brief demo of how we help {{industry}} companies with ${valueProps}.`;
   }
   
   return 'Wait step - no action required';
