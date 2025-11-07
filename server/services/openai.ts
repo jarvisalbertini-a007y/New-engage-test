@@ -1,10 +1,37 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const hasOpenAIKey = !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+let apiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || '';
+
+// Check for malformed API key (includes header format)
+if (apiKey === 'Authorization: Bearer OPENAI_API_KEY' || 
+    apiKey.includes('Authorization:') || 
+    apiKey.includes('Bearer ') ||
+    apiKey === 'OPENAI_API_KEY') {
+  console.warn('⚠️ Invalid OpenAI API key detected. Please provide your actual API key without the "Authorization: Bearer" prefix.');
+  apiKey = ''; // Clear invalid key
+}
+
+// Validate API key format (OpenAI keys start with 'sk-' and are typically 51 characters)
+const isValidKey = apiKey && apiKey.startsWith('sk-') && apiKey.length > 40;
+const hasOpenAIKey = isValidKey;
+
 const openai = hasOpenAIKey ? new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR
+  apiKey: apiKey
 }) : null;
+
+// Log initialization status (without exposing the key)
+if (!hasOpenAIKey) {
+  console.log('⚠️ OpenAI client not initialized. Please add a valid OpenAI API key to enable AI features.');
+  if (apiKey) {
+    console.log('   Current key format appears invalid. OpenAI keys should start with "sk-"');
+  }
+} else {
+  console.log('✅ OpenAI client initialized successfully');
+}
+
+// Export whether OpenAI is available for other services to check
+export const isOpenAIAvailable = hasOpenAIKey;
 
 export async function analyzeEmailDraft(emailText: string): Promise<{
   score: number;
