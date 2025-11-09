@@ -54,7 +54,7 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
       status: "draft",
       steps: [],
       targets: {},
-      createdBy: "current-user", // In a real app, this would come from auth context
+      // Don't set createdBy - let the backend handle it or set to null
     },
   });
 
