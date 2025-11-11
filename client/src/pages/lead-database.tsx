@@ -9,13 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import type { Company, Contact } from "@shared/schema";
 import { 
   Building2, User, Search, Plus, Mail, Phone, Briefcase, 
-  MapPin, DollarSign, Users, ExternalLink, Sparkles, Filter 
+  MapPin, DollarSign, Users, ExternalLink, Sparkles, Filter,
+  Edit, Trash2, CheckCircle
 } from "lucide-react";
 
 const companyFormSchema = z.object({
@@ -47,15 +50,18 @@ export default function Leads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [filterIndustry, setFilterIndustry] = useState<string>("all");
   const [filterSize, setFilterSize] = useState<string>("all");
 
-  // Queries
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+  // Queries with proper typing
+  const { data: companies = [], isLoading: companiesLoading } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
   });
 
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery({
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ["/api/contacts"],
   });
 
@@ -130,6 +136,82 @@ export default function Leads() {
     },
   });
 
+  const updateCompanyMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: CompanyFormData }) => {
+      const response = await fetch(`/api/companies/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update company");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Company Updated",
+        description: "Successfully updated company information",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      setEditingCompany(null);
+      companyForm.reset();
+    },
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/companies/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete company");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Company Deleted",
+        description: "Successfully removed company from database",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+    },
+  });
+
+  const updateContactMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ContactFormData }) => {
+      const response = await fetch(`/api/contacts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update contact");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contact Updated",
+        description: "Successfully updated contact information",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setEditingContact(null);
+      contactForm.reset();
+    },
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/contacts/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete contact");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contact Deleted",
+        description: "Successfully removed contact from database",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+    },
+  });
+
   const enrichCompanyMutation = useMutation({
     mutationFn: async (companyId: string) => {
       const response = await fetch(`/api/companies/${companyId}/enrich`, {
@@ -144,6 +226,26 @@ export default function Leads() {
         description: "Company data is being enriched with external sources",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+    },
+  });
+
+  const bulkEnrichContactsMutation = useMutation({
+    mutationFn: async (contactIds: string[]) => {
+      const response = await fetch("/api/contacts/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds }),
+      });
+      if (!response.ok) throw new Error("Failed to enrich contacts");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Bulk Enrichment Started",
+        description: `Enriching ${selectedContactIds.length} contacts`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setSelectedContactIds([]);
     },
   });
 
@@ -178,7 +280,13 @@ export default function Leads() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Dialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen}>
+            <Dialog open={companyDialogOpen} onOpenChange={(open) => {
+              setCompanyDialogOpen(open);
+              if (!open) {
+                setEditingCompany(null);
+                companyForm.reset();
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-add-company">
                   <Plus className="h-4 w-4 mr-2" />
@@ -187,10 +295,16 @@ export default function Leads() {
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Add New Company</DialogTitle>
+                  <DialogTitle>{editingCompany ? 'Edit Company' : 'Add New Company'}</DialogTitle>
                 </DialogHeader>
                 <Form {...companyForm}>
-                  <form onSubmit={companyForm.handleSubmit((data) => createCompanyMutation.mutate(data))} className="space-y-4">
+                  <form onSubmit={companyForm.handleSubmit((data) => {
+                    if (editingCompany) {
+                      updateCompanyMutation.mutate({ id: editingCompany.id, data });
+                    } else {
+                      createCompanyMutation.mutate(data);
+                    }
+                  })} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={companyForm.control}
@@ -322,7 +436,13 @@ export default function Leads() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+            <Dialog open={contactDialogOpen} onOpenChange={(open) => {
+              setContactDialogOpen(open);
+              if (!open) {
+                setEditingContact(null);
+                contactForm.reset();
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="rounded-lg hover:soft-shadow-hover transition-all-soft" data-testid="button-add-contact">
                   <Plus className="h-4 w-4 mr-2" />
@@ -331,10 +451,16 @@ export default function Leads() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add New Contact</DialogTitle>
+                  <DialogTitle>{editingContact ? 'Edit Contact' : 'Add New Contact'}</DialogTitle>
                 </DialogHeader>
                 <Form {...contactForm}>
-                  <form onSubmit={contactForm.handleSubmit((data) => createContactMutation.mutate(data))} className="space-y-4">
+                  <form onSubmit={contactForm.handleSubmit((data) => {
+                    if (editingContact) {
+                      updateContactMutation.mutate({ id: editingContact.id, data });
+                    } else {
+                      createContactMutation.mutate(data);
+                    }
+                  })} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={contactForm.control}
@@ -617,16 +743,52 @@ export default function Leads() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => enrichCompanyMutation.mutate(company.id)}
-                        disabled={enrichCompanyMutation.isPending}
-                        data-testid={`button-enrich-${company.id}`}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Enrich
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCompany(company);
+                            companyForm.reset({
+                              name: company.name,
+                              domain: company.domain || "",
+                              industry: company.industry || "",
+                              size: company.size || "",
+                              location: company.location || "",
+                              revenue: company.revenue || "",
+                              description: company.description || "",
+                              linkedinUrl: company.linkedinUrl || "",
+                            });
+                            setCompanyDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-company-${company.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${company.name}?`)) {
+                              deleteCompanyMutation.mutate(company.id);
+                            }
+                          }}
+                          disabled={deleteCompanyMutation.isPending}
+                          data-testid={`button-delete-company-${company.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => enrichCompanyMutation.mutate(company.id)}
+                          disabled={enrichCompanyMutation.isPending}
+                          data-testid={`button-enrich-${company.id}`}
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Enrich
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -697,13 +859,38 @@ export default function Leads() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" data-testid={`button-email-${contact.id}`}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Email
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingContact(contact);
+                              contactForm.reset({
+                                firstName: contact.firstName,
+                                lastName: contact.lastName,
+                                email: contact.email,
+                                companyId: contact.companyId || "",
+                                title: contact.title || "",
+                                phoneNumber: contact.phoneNumber || "",
+                                linkedinUrl: contact.linkedinUrl || "",
+                              });
+                              setContactDialogOpen(true);
+                            }}
+                            data-testid={`button-edit-contact-${contact.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" data-testid={`button-call-${contact.id}`}>
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName}?`)) {
+                                deleteContactMutation.mutate(contact.id);
+                              }
+                            }}
+                            disabled={deleteContactMutation.isPending}
+                            data-testid={`button-delete-contact-${contact.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>

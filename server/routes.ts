@@ -281,6 +281,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update company endpoint
+  app.put("/api/companies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // Remove id from updates if present
+      delete updates.id;
+      
+      const company = await storage.updateCompany(id, updates);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json(company);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update company' });
+    }
+  });
+  
+  // Delete company endpoint
+  app.delete("/api/companies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteCompany(id);
+      if (!success) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete company' });
+    }
+  });
+  
   // Company Enrichment Routes
   app.post("/api/companies/:id/enrich", async (req, res) => {
     try {
@@ -324,6 +357,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(contact);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Update contact endpoint
+  app.put("/api/contacts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // Remove id from updates if present
+      delete updates.id;
+      
+      const contact = await storage.updateContact(id, updates);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update contact' });
+    }
+  });
+  
+  // Delete contact endpoint
+  app.delete("/api/contacts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteContact(id);
+      if (!success) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete contact' });
+    }
+  });
+  
+  // Bulk enrich contacts endpoint
+  app.post("/api/contacts/enrich", async (req, res) => {
+    try {
+      const { contactIds } = req.body;
+      if (!Array.isArray(contactIds) || contactIds.length === 0) {
+        return res.status(400).json({ error: "Contact IDs array is required" });
+      }
+      
+      // Simulate enrichment for each contact
+      const enrichmentResults = await Promise.all(
+        contactIds.map(async (id: string) => {
+          const contact = await storage.getContact(id);
+          if (!contact) return { id, error: "Contact not found" };
+          
+          // Simulate enrichment data
+          const enrichedData = {
+            verificationStatus: Math.random() > 0.2 ? "verified" : "unverified",
+            enrichedAt: new Date().toISOString(),
+            additionalInfo: {
+              linkedinUrl: contact.email ? `https://linkedin.com/in/${contact.email.split('@')[0]}` : null,
+              phoneVerified: Math.random() > 0.5,
+              jobFunction: ["Sales", "Marketing", "Engineering", "Product", "Operations"][Math.floor(Math.random() * 5)]
+            }
+          };
+          
+          // Update contact with enriched data
+          await storage.updateContact(id, {
+            verificationStatus: enrichedData.verificationStatus as any,
+            linkedinUrl: enrichedData.additionalInfo.linkedinUrl
+          });
+          
+          return { id, ...enrichedData };
+        })
+      );
+      
+      res.json({ enriched: enrichmentResults });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to enrich contacts' });
     }
   });
 
