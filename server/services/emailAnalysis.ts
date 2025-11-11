@@ -1,5 +1,14 @@
-import { analyzeEmailDraft, improveEmailDraft } from "./openai";
+import { openAIClient } from './openaiClient';
+import type { 
+  EmailRubric, 
+  MEDDICScore, 
+  CommandOfMessageScore, 
+  NeverSplitDifferenceScore,
+  EmailSuggestion,
+  EmailAnalysisResult 
+} from '@shared/ai';
 
+// Legacy interface for backwards compatibility
 export interface EmailAnalysis {
   score: number;
   suggestions: string[];
@@ -15,53 +24,481 @@ export interface SpamAnalysis {
   suggestions: string[];
 }
 
+// Helper to count words
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+}
+
+// Helper to calculate reading level (Flesch-Kincaid Grade Level)
+function calculateReadingLevel(text: string): number {
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+  const syllables = words.reduce((count, word) => {
+    // Simplified syllable counting
+    const vowelGroups = word.toLowerCase().match(/[aeiouy]+/g);
+    return count + (vowelGroups ? vowelGroups.length : 1);
+  }, 0);
+
+  if (sentences.length === 0 || words.length === 0) return 8;
+
+  const avgWordsPerSentence = words.length / sentences.length;
+  const avgSyllablesPerWord = syllables / words.length;
+  
+  // Flesch-Kincaid Grade Level formula
+  const gradeLevel = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
+  return Math.max(1, Math.min(20, Math.round(gradeLevel)));
+}
+
+// Helper to count "you" vs "I" usage
+function calculateYouToIRatio(text: string): number {
+  const youCount = (text.match(/\b(you|your|yours)\b/gi) || []).length;
+  const iCount = (text.match(/\b(i|me|my|mine|we|our|ours|us)\b/gi) || []).length;
+  
+  if (iCount === 0) return youCount > 0 ? 10 : 0;
+  return Math.round((youCount / iCount) * 10) / 10;
+}
+
+// MEDDIC Analysis
+function analyzeMEDDIC(emailContent: string): MEDDICScore {
+  const content = emailContent.toLowerCase();
+  
+  const metrics = {
+    present: /(\d+%|roi|revenue|cost|savings|increase|decrease|improve|reduce)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+  
+  const economicBuyer = {
+    present: /(decision maker|budget|approval|executive|director|vp|ceo|cfo|cto)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+  
+  const decisionCriteria = {
+    present: /(requirement|criteria|need|must have|priority|important|critical)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+  
+  const decisionProcess = {
+    present: /(process|timeline|steps|evaluation|review|approval)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+  
+  const identifyPain = {
+    present: /(challenge|problem|issue|pain|struggle|difficulty|frustrat)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+  
+  const champion = {
+    present: /(champion|advocate|supporter|sponsor|help us|work with us)/i.test(emailContent),
+    score: 0,
+    details: ''
+  };
+
+  // Calculate scores
+  if (metrics.present) {
+    const matches = emailContent.match(/\d+%|\$[\d,]+|[\d,]+\s*(hours|days|weeks)/gi) || [];
+    metrics.score = Math.min(100, matches.length * 25);
+    metrics.details = matches.length > 0 ? 'Specific metrics mentioned' : 'Vague metrics';
+  }
+
+  if (economicBuyer.present) {
+    economicBuyer.score = 75;
+    economicBuyer.details = 'Economic buyer referenced';
+  }
+
+  if (decisionCriteria.present) {
+    decisionCriteria.score = 75;
+    decisionCriteria.details = 'Decision criteria mentioned';
+  }
+
+  if (decisionProcess.present) {
+    decisionProcess.score = 75;
+    decisionProcess.details = 'Process steps outlined';
+  }
+
+  if (identifyPain.present) {
+    const painPoints = emailContent.match(/(challenge|problem|issue|pain|struggle)/gi) || [];
+    identifyPain.score = Math.min(100, painPoints.length * 30);
+    identifyPain.details = `${painPoints.length} pain point(s) identified`;
+  }
+
+  if (champion.present) {
+    champion.score = 75;
+    champion.details = 'Champion identification attempted';
+  }
+
+  const totalScore = Math.round(
+    (metrics.score + economicBuyer.score + decisionCriteria.score + 
+     decisionProcess.score + identifyPain.score + champion.score) / 6
+  );
+
+  return {
+    metrics,
+    economicBuyer,
+    decisionCriteria,
+    decisionProcess,
+    identifyPain,
+    champion,
+    totalScore
+  };
+}
+
+// Command of the Message Analysis
+function analyzeCommandOfMessage(emailContent: string): CommandOfMessageScore {
+  const wordCount = countWords(emailContent);
+  const readingLevel = calculateReadingLevel(emailContent);
+  const youToIRatio = calculateYouToIRatio(emailContent);
+  
+  const paragraphs = emailContent.split('\n\n').filter(p => p.trim().length > 0);
+  const avgWordsPerParagraph = paragraphs.length > 0 ? 
+    Math.round(wordCount / paragraphs.length) : wordCount;
+
+  const conciseness = {
+    wordCount,
+    score: wordCount <= 200 ? 100 : wordCount <= 300 ? 75 : wordCount <= 400 ? 50 : 25,
+    target: 200
+  };
+
+  const readingLevelScore = {
+    level: readingLevel,
+    score: readingLevel <= 8 ? 100 : readingLevel <= 10 ? 75 : readingLevel <= 12 ? 50 : 25,
+    target: 8
+  };
+
+  const youToIScore = {
+    ratio: youToIRatio,
+    score: youToIRatio >= 2 ? 100 : youToIRatio >= 1.5 ? 75 : youToIRatio >= 1 ? 50 : 25,
+    target: 2
+  };
+
+  const paragraphScore = {
+    avgWords: avgWordsPerParagraph,
+    score: avgWordsPerParagraph <= 30 ? 100 : avgWordsPerParagraph <= 50 ? 75 : 
+           avgWordsPerParagraph <= 70 ? 50 : 25,
+    target: 30
+  };
+
+  const totalScore = Math.round(
+    (conciseness.score + readingLevelScore.score + youToIScore.score + paragraphScore.score) / 4
+  );
+
+  return {
+    conciseness,
+    readingLevel: readingLevelScore,
+    youToIRatio: youToIScore,
+    paragraphLength: paragraphScore,
+    totalScore
+  };
+}
+
+// Never Split the Difference Analysis
+function analyzeNeverSplitDifference(emailContent: string): NeverSplitDifferenceScore {
+  const content = emailContent.toLowerCase();
+  
+  // Mirroring detection
+  const mirroringPhrases = [
+    'sounds like',
+    'it seems like',
+    'it feels like',
+    'what I\'m hearing is',
+    'correct me if I\'m wrong'
+  ];
+  const mirroringExamples = mirroringPhrases.filter(phrase => content.includes(phrase));
+  
+  // Labeling detection
+  const labelingPhrases = [
+    'it sounds like',
+    'it seems like you',
+    'it looks like',
+    'it appears that'
+  ];
+  const labelingExamples = labelingPhrases.filter(phrase => content.includes(phrase));
+  
+  // Calibrated questions detection
+  const calibratedPatterns = [
+    /how\s+would\s+you/i,
+    /what\s+would\s+it\s+take/i,
+    /what\s+makes\s+this/i,
+    /how\s+am\s+i\s+supposed/i,
+    /what\s+about\s+this/i
+  ];
+  const calibratedExamples = calibratedPatterns
+    .filter(pattern => pattern.test(emailContent))
+    .map(pattern => {
+      const match = emailContent.match(pattern);
+      return match ? match[0] : '';
+    })
+    .filter(Boolean);
+
+  // Empathy detection
+  const empathyPhrases = [
+    'I understand',
+    'I appreciate',
+    'I recognize',
+    'must be',
+    'that sounds'
+  ];
+  const empathyExamples = empathyPhrases.filter(phrase => content.includes(phrase.toLowerCase()));
+
+  const mirroring = {
+    present: mirroringExamples.length > 0,
+    score: Math.min(100, mirroringExamples.length * 40),
+    examples: mirroringExamples
+  };
+
+  const labeling = {
+    present: labelingExamples.length > 0,
+    score: Math.min(100, labelingExamples.length * 40),
+    examples: labelingExamples
+  };
+
+  const calibratedQuestions = {
+    present: calibratedExamples.length > 0,
+    score: Math.min(100, calibratedExamples.length * 35),
+    examples: calibratedExamples
+  };
+
+  const empathy = {
+    present: empathyExamples.length > 0,
+    score: Math.min(100, empathyExamples.length * 30),
+    examples: empathyExamples
+  };
+
+  const totalScore = Math.round(
+    (mirroring.score + labeling.score + calibratedQuestions.score + empathy.score) / 4
+  );
+
+  return {
+    mirroring,
+    labeling,
+    calibratedQuestions,
+    empathy,
+    totalScore
+  };
+}
+
+// Generate suggestions based on rubric scores
+function generateSuggestions(rubric: EmailRubric, emailContent: string): EmailSuggestion[] {
+  const suggestions: EmailSuggestion[] = [];
+
+  // MEDDIC suggestions
+  if (rubric.meddic.totalScore < 70) {
+    if (!rubric.meddic.metrics.present) {
+      suggestions.push({
+        type: 'critical',
+        category: 'meddic',
+        issue: 'No specific metrics mentioned',
+        suggestion: 'Include quantifiable metrics like "reduce costs by 30%" or "save 10 hours per week"',
+        example: 'Our solution has helped similar companies reduce operational costs by 35% within 6 months'
+      });
+    }
+    
+    if (!rubric.meddic.identifyPain.present) {
+      suggestions.push({
+        type: 'critical',
+        category: 'meddic',
+        issue: 'No pain points identified',
+        suggestion: 'Ask about or acknowledge specific challenges they face',
+        example: 'I noticed many companies in your industry struggle with [specific challenge]. Is this something your team faces?'
+      });
+    }
+  }
+
+  // Command of Message suggestions
+  if (rubric.commandOfMessage.totalScore < 70) {
+    if (rubric.commandOfMessage.conciseness.wordCount > 200) {
+      suggestions.push({
+        type: 'improvement',
+        category: 'command',
+        issue: `Email is ${rubric.commandOfMessage.conciseness.wordCount} words (target: 200)`,
+        suggestion: 'Shorten your email by removing unnecessary words and focusing on one clear message',
+        example: 'Remove filler phrases and get straight to the point'
+      });
+    }
+    
+    if (rubric.commandOfMessage.youToIRatio.ratio < 2) {
+      suggestions.push({
+        type: 'improvement',
+        category: 'command',
+        issue: `You-to-I ratio is ${rubric.commandOfMessage.youToIRatio.ratio}:1 (target: 2:1)`,
+        suggestion: 'Focus more on the prospect and less on yourself/your company',
+        example: 'Instead of "We help companies..." try "You can achieve..."'
+      });
+    }
+  }
+
+  // Never Split the Difference suggestions
+  if (rubric.neverSplitDifference.totalScore < 70) {
+    if (!rubric.neverSplitDifference.calibratedQuestions.present) {
+      suggestions.push({
+        type: 'enhancement',
+        category: 'negotiation',
+        issue: 'No calibrated questions used',
+        suggestion: 'Add open-ended "how" or "what" questions to engage the prospect',
+        example: 'What would need to happen for this to become a priority for you?'
+      });
+    }
+  }
+
+  return suggestions;
+}
+
+// New comprehensive email analysis with rubrics
+export async function analyzeEmailWithRubrics(emailContent: string): Promise<EmailAnalysisResult> {
+  const startTime = Date.now();
+  
+  // Step 1: Calculate deterministic rubric scores
+  const meddic = analyzeMEDDIC(emailContent);
+  const commandOfMessage = analyzeCommandOfMessage(emailContent);
+  const neverSplitDifference = analyzeNeverSplitDifference(emailContent);
+  
+  const overallScore = Math.round(
+    (meddic.totalScore + commandOfMessage.totalScore + neverSplitDifference.totalScore) / 3
+  );
+  
+  const rubric: EmailRubric = {
+    meddic,
+    commandOfMessage,
+    neverSplitDifference,
+    overallScore
+  };
+  
+  // Step 2: Generate suggestions based on rubric
+  const suggestions = generateSuggestions(rubric, emailContent);
+  
+  // Step 3: Use OpenAI for qualitative feedback and improved version
+  let qualitativeFeedback = 'Unable to generate AI feedback';
+  let improvedVersion: string | undefined = undefined;
+  let aiGenerated = false;
+  
+  // Prepare context for OpenAI
+  const lowScoreAreas = [];
+  if (meddic.totalScore < 70) lowScoreAreas.push('MEDDIC framework');
+  if (commandOfMessage.totalScore < 70) lowScoreAreas.push('Command of the Message');
+  if (neverSplitDifference.totalScore < 70) lowScoreAreas.push('Never Split the Difference techniques');
+  
+  if (openAIClient.isAvailable() && overallScore < 80) {
+    const systemPrompt = `You are an expert sales email coach. Analyze the email based on:
+- MEDDIC (Metrics, Economic Buyer, Decision Criteria, Decision Process, Identify Pain, Champion)
+- Command of the Message (conciseness, clarity, you-focused)
+- Never Split the Difference (tactical empathy, calibrated questions)
+
+Provide specific, actionable feedback focusing on the weakest areas.`;
+
+    const userPrompt = `Email to analyze:
+${emailContent}
+
+Rubric Scores:
+- MEDDIC: ${meddic.totalScore}/100
+- Command of Message: ${commandOfMessage.totalScore}/100  
+- Negotiation Techniques: ${neverSplitDifference.totalScore}/100
+
+Low-scoring areas: ${lowScoreAreas.length > 0 ? lowScoreAreas.join(', ') : 'None'}
+
+Provide:
+1. Brief qualitative feedback (2-3 sentences) on the biggest improvement opportunity
+2. A rewritten version that addresses the main issues while maintaining the original intent`;
+
+    const aiResponse = await openAIClient.generateJSON<{
+      feedback: string;
+      improvedVersion: string;
+    }>(userPrompt, systemPrompt, {
+      feature: 'email-coach-analysis',
+      fallback: null
+    });
+
+    if (aiResponse.success && aiResponse.data) {
+      qualitativeFeedback = aiResponse.data.feedback;
+      improvedVersion = aiResponse.data.improvedVersion;
+      aiGenerated = true;
+    }
+  } else if (overallScore >= 80) {
+    qualitativeFeedback = 'Excellent email! Your message effectively uses proven sales frameworks and maintains strong engagement techniques.';
+  }
+  
+  const processingTime = Date.now() - startTime;
+  
+  return {
+    result: {
+      rubric,
+      suggestions,
+      improvedVersion,
+      qualitativeFeedback
+    },
+    aiGenerated,
+    confidence: overallScore,
+    metadata: {
+      model: aiGenerated ? 'gpt-3.5-turbo' : undefined,
+      processingTime,
+      fallbackUsed: !aiGenerated
+    }
+  };
+}
+
+// Legacy function for backwards compatibility
 export async function analyzeEmail(emailContent: string): Promise<EmailAnalysis> {
-  // Get AI analysis
-  const aiAnalysis = await analyzeEmailDraft(emailContent);
+  const result = await analyzeEmailWithRubrics(emailContent);
+  const { rubric, suggestions, qualitativeFeedback } = result.result;
   
-  // Calculate readability score
+  // Map new format to legacy format
+  const legacySuggestions = suggestions.map(s => s.suggestion);
+  const improvements = suggestions.map(s => ({
+    type: s.type,
+    message: s.suggestion
+  }));
+  
+  // Calculate readability score using Flesch Reading Ease
   const readabilityScore = calculateReadabilityScore(emailContent);
-  
-  // Calculate spam score
   const spamAnalysis = analyzeSpamRisk(emailContent);
-  
-  // Identify personalized elements
   const personalizedElements = identifyPersonalizedElements(emailContent);
   
   return {
-    score: aiAnalysis.score,
-    suggestions: aiAnalysis.suggestions,
-    improvements: aiAnalysis.improvements,
+    score: rubric.overallScore,
+    suggestions: legacySuggestions,
+    improvements,
     readabilityScore,
     spamScore: spamAnalysis.score,
     personalizedElements
   };
 }
 
+// Legacy improve email function
 export async function improveEmail(emailContent: string): Promise<{
   improved: { subject: string; body: string; };
   improvements: string[];
 }> {
-  const result = await improveEmailDraft(emailContent);
+  const result = await analyzeEmailWithRubrics(emailContent);
+  const { improvedVersion, suggestions } = result.result;
   
-  // Generate list of improvements made
-  const improvements = [
-    "Enhanced personalization",
-    "Improved call-to-action clarity",
-    "Optimized subject line length",
-    "Reduced spam risk",
-    "Better value proposition positioning"
-  ];
+  // Extract subject from improved version if available
+  let improvedSubject = 'Re: Follow-up';
+  let improvedBody = improvedVersion || emailContent;
+  
+  if (improvedVersion && improvedVersion.includes('Subject:')) {
+    const lines = improvedVersion.split('\n');
+    const subjectLine = lines.find(l => l.startsWith('Subject:'));
+    if (subjectLine) {
+      improvedSubject = subjectLine.replace('Subject:', '').trim();
+      improvedBody = lines.filter(l => !l.startsWith('Subject:')).join('\n').trim();
+    }
+  }
+  
+  const improvements = suggestions.map(s => s.suggestion);
   
   return {
     improved: {
-      subject: result.improvedSubject,
-      body: result.improvedBody
+      subject: improvedSubject,
+      body: improvedBody
     },
     improvements
   };
 }
 
+// Legacy helper functions
 function calculateReadabilityScore(text: string): number {
   // Simplified Flesch Reading Ease calculation
   const sentences = text.split(/[.!?]+/).length;
