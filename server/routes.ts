@@ -43,11 +43,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Global authentication middleware for all /api routes
   app.use('/api/*', (req: any, res, next) => {
-    // TEMPORARY: Bypass authentication for testing
-    const TESTING_MODE = true; // Set to false to re-enable authentication
+    // Authentication is now properly enforced
+    const TESTING_MODE = false; // Authentication is enabled for production
     
     if (TESTING_MODE) {
-      // Create mock user for testing
+      // This code path is now disabled - proper authentication required
       if (!req.user) {
         req.user = {
           claims: {
@@ -1002,8 +1002,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Onboarding routes
   app.get("/api/onboarding/profile", async (req, res) => {
     try {
-      // TEMPORARY: In testing mode, return completed profile
-      const TESTING_MODE = true; // Must match the flag in auth middleware
+      // Authentication is now properly enforced
+      const TESTING_MODE = false; // Must match the flag in auth middleware
       if (TESTING_MODE) {
         res.json({ 
           userId: 'test-user-123',
