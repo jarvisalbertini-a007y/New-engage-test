@@ -36,6 +36,112 @@ function formatValuePropositions(props: any): string {
   return 'our AI-powered sales platform';
 }
 
+// Generate personalized email with AI or fallback to templates
+async function generatePersonalizedEmail(context: {
+  firstName: string;
+  company: string;
+  industry?: string;
+  title?: string;
+  insight?: string;
+  valueProposition: string;
+  tone: string;
+}): Promise<{ subject: string; body: string }> {
+  // Try AI generation first if available
+  if (openAIClient.isAvailable()) {
+    const prompt = `Generate a personalized sales email with the following context:
+- Recipient: ${context.firstName} at ${context.company}
+- Industry: ${context.industry || 'Unknown'}
+- Title: ${context.title || 'Unknown'}
+- Recent Insight: ${context.insight || 'No specific insight'}
+- Value Proposition: ${context.valueProposition}
+- Tone: ${context.tone}
+
+Generate a JSON response with:
+- subject: Compelling email subject line (max 60 characters)
+- body: Complete email body (3-4 paragraphs, personalized, value-focused)
+
+Focus on value over features. Be concise and action-oriented.`;
+
+    const systemPrompt = `You are an expert B2B sales copywriter. Generate personalized, high-converting sales emails.
+Return valid JSON with 'subject' and 'body' fields only.`;
+
+    const response = await openAIClient.generateJSON<{ subject: string; body: string }>(
+      prompt,
+      systemPrompt,
+      {
+        feature: 'email-generation',
+        model: 'gpt-3.5-turbo',
+        temperature: 0.7,
+        maxTokens: 800,
+        fallback: null
+      }
+    );
+    
+    if (response.success && response.data) {
+      return response.data;
+    }
+  }
+  
+  // Fallback to template-based generation
+  const templates = {
+    professional: {
+      subject: `Quick question about ${context.company}'s growth strategy`,
+      body: `Hi ${context.firstName},
+
+I noticed ${context.company} ${context.insight || 'has been making impressive progress'} and thought you might be interested in how we're helping similar ${context.industry || 'companies'} achieve even better results.
+
+Our ${context.valueProposition} has helped companies in your space increase reply rates by 40% and book 3x more qualified meetings.
+
+Would you be open to a quick 15-minute call this week to explore if we could help ${context.company} achieve similar results?
+
+Best regards,
+{{senderName}}`
+    },
+    casual: {
+      subject: `${context.firstName}, quick thought about ${context.company}`,
+      body: `Hey ${context.firstName},
+
+Just came across ${context.company} and ${context.insight || "love what you're doing"}!
+
+We've been working with a lot of ${context.industry || 'companies like yours'} on ${context.valueProposition}, and the results have been pretty amazing - talking 40% better engagement rates.
+
+Worth a quick chat to see if we could help you too?
+
+Cheers,
+{{senderName}}`
+    },
+    friendly: {
+      subject: `Idea for ${context.company}'s sales team`,
+      body: `Hi ${context.firstName}!
+
+Hope this finds you well! I've been following ${context.company}'s journey and ${context.insight || "I'm really impressed by your growth"}.
+
+I'd love to share how we're helping ${context.industry || 'teams like yours'} with ${context.valueProposition}. Our clients typically see 40% improvement in their outreach effectiveness.
+
+Do you have 15 minutes this week for a friendly chat about how we might be able to help ${context.company}?
+
+Looking forward to connecting!
+{{senderName}}`
+    },
+    urgent: {
+      subject: `Time-sensitive opportunity for ${context.company}`,
+      body: `${context.firstName},
+
+I'll keep this brief - ${context.company} ${context.insight || 'is at a critical growth stage'} and I believe we can help you capitalize on this momentum.
+
+Our ${context.valueProposition} is designed specifically for ${context.industry || 'fast-growing companies'} like yours. We've helped similar companies increase their pipeline by 3x in just 60 days.
+
+Can we schedule a 15-minute call tomorrow or Thursday to discuss?
+
+Best,
+{{senderName}}`
+    }
+  };
+  
+  const selectedTemplate = templates[context.tone as keyof typeof templates] || templates.professional;
+  return selectedTemplate;
+}
+
 export async function generateContent(request: ContentGenerationRequest): Promise<GeneratedContent> {
   // Get context data
   const persona = request.personaId ? (await storage.getPersona(request.personaId)) ?? null : null;
@@ -98,7 +204,6 @@ async function generateLinkedInContent(
   company: Company | null,
   insight: Insight | null
 ): Promise<GeneratedContent> {
-  // LinkedIn messages are typically shorter and more casual
   const context = {
     firstName: contact?.firstName || 'there',
     company: company?.name || 'your company',
@@ -107,19 +212,44 @@ async function generateLinkedInContent(
     insight: insight?.description,
     valueProposition: persona?.valuePropositions ? 
       formatValuePropositions(persona.valuePropositions) : 
-      'AI-powered sales automation',
-    tone: 'friendly' // LinkedIn is generally more casual
+      'AI-powered sales automation'
   };
   
-  const generated = await generatePersonalizedEmail(context);
+  // Generate LinkedIn-specific content with AI if available
+  let linkedInBody: string;
   
-  // Make LinkedIn message shorter and more conversational
-  const linkedInBody = generated.body
-    .split('\n')
-    .slice(0, 3) // Keep first 3 paragraphs
-    .join('\n')
-    .replace(/Best regards,.*$/i, 'Would love to connect!')
-    .replace(/Sincerely,.*$/i, 'Looking forward to hearing from you!');
+  if (openAIClient.isAvailable()) {
+    const prompt = `Generate a brief LinkedIn message for sales outreach:
+- Recipient: ${context.firstName} at ${context.company}
+- Title: ${context.title || 'Unknown'}
+- Industry: ${context.industry || 'Unknown'}
+- Insight: ${context.insight || 'No specific insight'}
+- Value: ${context.valueProposition}
+
+Create a natural, conversational LinkedIn message (2-3 sentences max). Be casual and focus on connection, not selling.`;
+
+    const response = await openAIClient.generateText(
+      prompt,
+      'You are a B2B sales professional writing casual LinkedIn messages. Keep it brief and conversational.',
+      {
+        feature: 'linkedin-generation',
+        model: 'gpt-3.5-turbo',
+        temperature: 0.7,
+        maxTokens: 200,
+        fallback: null
+      }
+    );
+    
+    if (response.success && response.data) {
+      linkedInBody = response.data;
+    } else {
+      // Fallback to template
+      linkedInBody = `Hi ${context.firstName}, noticed ${context.company} ${context.insight || 'is doing great things'}. We're helping ${context.industry || 'companies like yours'} with ${context.valueProposition}. Would love to connect and share some insights!`;
+    }
+  } else {
+    // No AI available, use template
+    linkedInBody = `Hi ${context.firstName}, noticed ${context.company} ${context.insight || 'is doing great things'}. We're helping ${context.industry || 'companies like yours'} with ${context.valueProposition}. Would love to connect and share some insights!`;
+  }
   
   const personalizationElements = [];
   if (contact?.firstName) personalizationElements.push('First name');
@@ -216,11 +346,12 @@ export async function generateSequenceSteps(
   const persona = await storage.getPersona(personaId);
   if (!persona) throw new Error('Persona not found');
   
-  const steps = [];
+  // Generate base deterministic steps
+  const baseSteps = [];
   
   for (let i = 1; i <= stepCount; i++) {
     if (sequenceType === 'email_only') {
-      steps.push({
+      baseSteps.push({
         stepNumber: i,
         type: 'email' as const,
         delay: i === 1 ? 0 : i * 3, // 0, 3, 6, 9, 12 days
@@ -230,7 +361,7 @@ export async function generateSequenceSteps(
     } else {
       // Multi-channel sequence
       const stepType = getMultiChannelStepType(i);
-      steps.push({
+      baseSteps.push({
         stepNumber: i,
         type: stepType,
         delay: i === 1 ? 0 : i * 2, // 0, 2, 4, 6, 8 days
@@ -240,7 +371,10 @@ export async function generateSequenceSteps(
     }
   }
   
-  return steps;
+  // Apply AI personalization to enhance steps
+  const enhancedSteps = await personalizeSequenceSteps(baseSteps, persona);
+  
+  return enhancedSteps;
 }
 
 function getMultiChannelStepType(stepNumber: number): 'email' | 'linkedin' | 'phone' | 'wait' {
@@ -301,4 +435,238 @@ Best regards,
   }
   
   return 'Wait step - no action required';
+}
+
+// AI enhancement cache with TTL to reduce repeated API calls
+// Singleton cache instance persists across requests
+interface CachedEnhancement {
+  data: StepEnhancement;
+  expiry: number;
+}
+
+class EnhancementCache {
+  private cache = new Map<string, CachedEnhancement>();
+  private readonly TTL = 3600000; // 1 hour in milliseconds
+  
+  get(key: string): StepEnhancement | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    // Check if expired
+    if (Date.now() > cached.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return cached.data;
+  }
+  
+  set(key: string, data: StepEnhancement): void {
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + this.TTL
+    });
+  }
+  
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// Singleton cache instance
+const enhancementCache = new EnhancementCache();
+
+interface StepEnhancement {
+  subject?: string;
+  opening: string;
+  cta: string;
+  personalizationNotes: string[];
+}
+
+async function personalizeSequenceSteps(
+  baseSteps: Array<{
+    stepNumber: number;
+    type: 'email' | 'linkedin' | 'phone' | 'wait';
+    delay: number;
+    subject?: string;
+    template: string;
+  }>,
+  persona: Persona
+): Promise<typeof baseSteps> {
+  // Only personalize email and linkedin steps
+  const stepsToPersonalize = baseSteps.filter(
+    step => step.type === 'email' || step.type === 'linkedin'
+  );
+  
+  // If no OpenAI API key or no steps to personalize, return base steps
+  if (!openAIClient.isAvailable() || stepsToPersonalize.length === 0) {
+    return baseSteps;
+  }
+  
+  const enhancedSteps = [...baseSteps];
+  
+  // Process each step that needs personalization
+  for (const step of stepsToPersonalize) {
+    // Create a cache key based on persona + step type + step position
+    // We cache the AI enhancement data, not the enhanced step itself
+    const cacheKey = `${persona.id}_${step.type}_${step.stepNumber}_${isFirstStep(step.stepNumber)}_${isLastStep(step.stepNumber, baseSteps.length)}`;
+    
+    // Check cache for enhancement data only
+    let enhancement = enhancementCache.get(cacheKey);
+    
+    if (!enhancement) {
+      // Generate AI enhancement
+      enhancement = await generateStepEnhancement(step, persona);
+      
+      // Cache the enhancement data only, not the full step
+      if (enhancement) {
+        enhancementCache.set(cacheKey, enhancement);
+      }
+    }
+    
+    // Always apply enhancement to the base step (cached or fresh)
+    if (enhancement) {
+      const stepIndex = baseSteps.indexOf(step);
+      // Apply enhancement creates a new enhanced step each time
+      enhancedSteps[stepIndex] = applyEnhancement(step, enhancement);
+    }
+  }
+  
+  function isFirstStep(stepNumber: number): boolean {
+    return stepNumber === 1;
+  }
+  
+  function isLastStep(stepNumber: number, totalSteps: number): boolean {
+    return stepNumber === totalSteps;
+  }
+  
+  return enhancedSteps;
+}
+
+async function generateStepEnhancement(
+  step: {
+    stepNumber: number;
+    type: 'email' | 'linkedin' | 'phone' | 'wait';
+    subject?: string;
+    template: string;
+  },
+  persona: Persona
+): Promise<StepEnhancement | null> {
+  const valueProps = formatValuePropositions(persona.valuePropositions);
+  const isFirstStep = step.stepNumber === 1;
+  
+  // Create channel-specific prompt for AI enhancement
+  const isLinkedIn = step.type === 'linkedin';
+  const prompt = isLinkedIn ? 
+    `Generate a personalized LinkedIn message for sales outreach.
+
+Persona: ${persona.name}
+Industry: ${persona.industry || 'B2B'}
+Value Propositions: ${valueProps}
+Step Number: ${step.stepNumber} (${isFirstStep ? 'First connection' : 'Follow-up'})
+
+Generate a JSON response with:
+- opening: Brief, conversational opening that feels natural on LinkedIn (max 80 chars)
+- cta: Soft call-to-action appropriate for LinkedIn (max 60 chars)
+- personalizationNotes: Array of 2-3 LinkedIn-specific personalization tips
+
+Keep it short, casual, and focused on connection rather than selling. LinkedIn messages should be 2-3 sentences max.` :
+    `Generate personalized email components for a sales sequence.
+
+Persona: ${persona.name}
+Industry: ${persona.industry || 'B2B'}
+Value Propositions: ${valueProps}
+Step Number: ${step.stepNumber} (${isFirstStep ? 'First touch' : 'Follow-up'})
+
+Generate a JSON response with:
+- subject: Compelling subject line (max 60 chars)
+- opening: Engaging first sentence that hooks the reader (max 100 chars)
+- cta: Clear call-to-action that drives action (max 80 chars)
+- personalizationNotes: Array of 2-3 personalization tips for the SDR
+
+The tone should be professional but conversational. Focus on value, not features.`;
+
+  const systemPrompt = `You are an expert sales copywriter specializing in B2B outreach. 
+Generate compelling, personalized sales messaging that converts.
+Keep subject lines under 60 characters, openings under 100 characters, and CTAs under 80 characters.
+Return valid JSON only.`;
+
+  // Use the new OpenAI client with proper token management
+  const response = await openAIClient.generateJSON<StepEnhancement>(
+    prompt,
+    systemPrompt,
+    {
+      feature: 'sequence-personalization',
+      model: 'gpt-3.5-turbo',
+      temperature: 0.7,
+      maxTokens: 500,
+      fallback: null
+    }
+  );
+  
+  if (response.success && response.data) {
+    return response.data;
+  }
+  
+  // Return null on failure (will use base template)
+  return null;
+}
+
+function applyEnhancement(
+  step: {
+    stepNumber: number;
+    type: 'email' | 'linkedin' | 'phone' | 'wait';
+    delay: number;
+    subject?: string;
+    template: string;
+  },
+  enhancement: StepEnhancement
+): typeof step {
+  const enhanced = { ...step };
+  
+  // Apply subject for email steps
+  if (step.type === 'email' && enhancement.subject) {
+    enhanced.subject = enhancement.subject;
+  }
+  
+  // Enhance template with AI-generated opening and CTA
+  let enhancedTemplate = step.template;
+  
+  // Replace generic opening with AI-generated one
+  if (enhancement.opening) {
+    // For emails, replace the first line after greeting
+    if (step.type === 'email') {
+      enhancedTemplate = enhancedTemplate.replace(
+        /Hi {{firstName}},\n\n.*/,
+        (match) => {
+          const lines = match.split('\n');
+          lines[2] = enhancement.opening; // Replace first content line
+          return lines.join('\n');
+        }
+      );
+    } else if (step.type === 'linkedin') {
+      // For LinkedIn, replace opening after greeting
+      enhancedTemplate = enhancedTemplate.replace(
+        /Hi {{firstName}}, .*/,
+        `Hi {{firstName}}, ${enhancement.opening}`
+      );
+    }
+  }
+  
+  // Replace generic CTA with AI-generated one
+  if (enhancement.cta) {
+    // Look for question marks or common CTA patterns
+    enhancedTemplate = enhancedTemplate.replace(
+      /(Would you be .*\?|Are you available.*\?|Would love to .*)/i,
+      enhancement.cta
+    );
+  }
+  
+  // Add personalization notes as comments at the end
+  if (enhancement.personalizationNotes && enhancement.personalizationNotes.length > 0) {
+    enhancedTemplate += `\n\n<!-- Personalization Tips:\n${enhancement.personalizationNotes.map(note => `• ${note}`).join('\n')}\n-->`;
+  }
+  
+  enhanced.template = enhancedTemplate;
+  return enhanced;
 }
