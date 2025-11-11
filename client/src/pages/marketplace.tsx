@@ -96,7 +96,7 @@ const categoryIcons = {
 export default function MarketplacePage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceFilter, setPriceFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<number>(0);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
@@ -110,7 +110,7 @@ export default function MarketplacePage() {
     queryKey: ["/api/marketplace/agents", selectedCategory, priceFilter, ratingFilter],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (selectedCategory) params.set("category", selectedCategory);
+      if (selectedCategory && selectedCategory !== "all") params.set("category", selectedCategory);
       if (priceFilter === "free") params.set("maxPrice", "0");
       if (priceFilter === "paid") params.set("minPrice", "0.01");
       if (ratingFilter > 0) params.set("minRating", ratingFilter.toString());
@@ -302,7 +302,7 @@ export default function MarketplacePage() {
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="research">Research</SelectItem>
               <SelectItem value="writing">Writing</SelectItem>
               <SelectItem value="analysis">Analysis</SelectItem>
