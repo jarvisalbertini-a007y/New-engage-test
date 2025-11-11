@@ -2262,7 +2262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signals = await storage.getIntentSignals({ limit: 100 });
       
       // Group by signal type
-      const signalTypes = {};
+      const signalTypes: Record<string, number> = {};
       signals.forEach(signal => {
         signalTypes[signal.signalType] = (signalTypes[signal.signalType] || 0) + 1;
       });
@@ -3105,28 +3105,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { campaignId, period } = req.query;
       
       let analytics;
+      let avgDuration = 0;
+      
       if (campaignId) {
         analytics = await getCampaignAnalytics(campaignId as string);
       } else {
         // Get all recent analytics
         const calls = await storage.getVoiceCalls({});
-        const analyticsPromises = calls
-          .slice(0, 100) // Limit to recent 100 calls
-          .map(call => getCallAnalytics(call.id));
+        const limitedCalls = calls.slice(0, 100); // Limit to recent 100 calls
+        const analyticsPromises = limitedCalls.map(call => getCallAnalytics(call.id));
         
         const results = await Promise.all(analyticsPromises);
         analytics = results.filter(Boolean);
+        
+        // Create a map of callId to VoiceCall for duration lookup
+        const callMap = new Map(limitedCalls.map(call => [call.id, call]));
+        
+        // Calculate average duration from VoiceCall records
+        const totalDuration = analytics.reduce((acc: number, a: any) => {
+          const call = callMap.get(a.callId);
+          return acc + (call?.duration || 0);
+        }, 0);
+        
+        avgDuration = analytics.length > 0 ? totalDuration / analytics.length : 0;
       }
       
       // Calculate aggregate metrics
       const aggregateMetrics = {
         totalCalls: analytics.length,
-        avgDuration: analytics.reduce((acc: number, a: any) => {
-          const call = analytics.find((c: any) => c.callId === a.callId);
-          return acc + (call?.duration || 0);
-        }, 0) / analytics.length || 0,
+        avgDuration,
         avgSpeakingRatio: analytics.reduce((acc: number, a: any) => 
-          acc + parseFloat(a.speakingRatio || 0), 0) / analytics.length || 0,
+          acc + parseFloat(a.speakingRatio || '0'), 0) / analytics.length || 0,
         totalObjections: analytics.reduce((acc: number, a: any) => 
           acc + (a.objectionCount || 0), 0),
         positiveSignals: analytics.reduce((acc: number, a: any) => 
