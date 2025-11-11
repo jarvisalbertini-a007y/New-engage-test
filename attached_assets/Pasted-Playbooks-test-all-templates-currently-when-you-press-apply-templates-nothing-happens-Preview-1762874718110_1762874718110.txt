@@ -1,0 +1,132 @@
+Playbooks
+- test all templates
+- currently when you press apply templates, nothing happens
+- Preview template button or button next to apply playbook doesn’t work
+- create custom button doesn’t work
+- custon filter doesn’t work
+- 
+
+
+Insights
+- does nothing
+- No insights populated
+- What is supposed to happen here?
+
+Voice Campaign
+- error message (failed to create voice campaign. Please try again)
+- Need more detailed error messaging
+
+AI Autopilot
+- Can’t create campaign
+- Target persons doesn’t work
+- Sequence selection doesn’t work
+- Create campaign button doesn’t work
+- Setting window doesn’t auto adjust to mobile rendering on iPad. Check rendering configuration in UI
+
+Sequence
+- AI generate doesn’t work (error: failed to generate steps)
+- Create sequence doesn’t work
+- Save as draft doesn’t work
+
+AI email coach
+- AI improve doesn’t generate new emails
+- Nothing pops up for email analysis
+- Nothing pops up in detailed analysis
+    - Should follow these guidelines. 
+        - concise and mobile-friendly follow-up email based on this conversation transcript. 
+        - Guidelines:
+        - - Apply "Command of the Message," MEDDIC, and "Never Split the Difference" frameworks.  
+        - - Use short paragraphs focused on one idea.  
+        - - Keep emails under 200 words and sentences below 20 syllables.  
+        - - Avoid hedge words, clichés, and complex language (8th-grade reading level).  
+        - - Maintain a confident, professional, and positive tone.  
+        - - Optimize the *you-to-I ratio* (reference their company twice as often as yours).  
+        - - Integrate relevant resources (e.g., webinars, case studies, articles).  
+        - *Example*  
+            - “Hi [FIRST NAME],  
+            - I enjoyed our discussion today! Here’s how we can help:  
+            - 1. [BENEFIT 1]: Improve [PAIN POINT] by [SOLUTION].  
+            - 2. [BENEFIT 2]: Streamline [PROCESS] with [SOLUTION].  
+            - 3. [BENEFIT 3]: Scale [OUTCOME] using [SOLUTION].  
+            - Next steps: I’ll [NEXT STEP] to help meet [SHARED GOAL]. Do you have updates on [ITEM] before that?”
+    - Create an optimized interface to show how they can improve based on these guidelines and score the email based on the guidelines.
+
+Cloud Dialer
+- Doesn’t work
+- Generate ai script button doesn’t work
+- Start campaign button doesn’t work
+
+Content Studio
+- Generate content goes to blank screen
+- Target persona doesn’t work
+- Target company doesn’t work
+- Target contact doesn’t work
+- Recent insights doesn’t work
+- Recent templates doesn’t work
+- Personalization score doesn’t work
+
+Unified inbox doesn’t work
+
+Lead database
+- Company creation works but can’t be edited
+- Enrich doesn’t work.
+    - Should auto present enriched data and allow user to select which or automate in settings
+- No way to edit contacts
+    - Should follow similar enrichment as company
+
+Digital Twin
+- Create twin - error: failed to create digital twin
+- Training and testing doesn’t work
+
+AI Agents
+- don’t actually run
+- No actual performance or activity
+- Active doesn’t activate them
+
+Agent marketplace is blank
+
+Personas
+- create personas - error: failed to create persona
+
+Crowd intel
+- has no information
+- Where does it gather the intel?
+
+Setup Assistant
+- UI doesn’t work on iPad, can’t scroll
+- Sequences doesn’t work
+- None of the selections fully work
+- Before asking certain questions, ai should present research I.e based on my research your ideal buyers are….. and allow user to confirm and add input
+
+AI coaching
+- doesn’t work
+- Start doesn’t actually start a program
+- UI not mobile friendly 
+- Learning hub doesn’t work
+Lead scoring doesn’t work
+
+Workflow builder
+- doesn’t work
+- Nlp mode doesn’t create a workflow
+- Templates don’t create ac actual workflow
+- No agents to connect
+- UI doesn’t work for drag and drop
+- No connections or actions working
+
+Workflow triggers
+- doesn’t work
+- Templates don’t create anything
+
+Deliverability is fake
+
+Analytics are fake
+
+Enterprise doesn’t work
+
+Extensive errors across the platform
+Extensive deep testing needs to be completed once errors are investigated and fixed.
+
+
+All areas should have default AI suggestions rather than asking the user to provide. The user should provide as little information as needed while using the ai to research and consult/confirm.
+
+
