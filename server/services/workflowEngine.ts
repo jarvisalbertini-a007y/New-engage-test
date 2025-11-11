@@ -308,12 +308,12 @@ async function executeAgentNode(
   }
 
   const systemPrompt = agentType?.systemPrompt || getDefaultAgentPrompt(node.agentType);
-  const temperature = agentType?.temperature || 0.7;
-  const maxTokens = agentType?.maxTokens || 2000;
+  const temperature = agentType?.temperature ? parseFloat(agentType.temperature) : 0.7;
+  const maxTokens = agentType?.maxTokens ? Number(agentType.maxTokens) : 2000;
 
   try {
     const response = await openaiClient.chat.completions.create({
-      model: agentType?.model || "gpt-4o-mini",
+      model: agentType?.modelPreference || "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: JSON.stringify(context) }
@@ -420,6 +420,7 @@ async function executeActionNode(
       // Create task in the database
       try {
         const task = await storage.createTask({
+          type: node.config.type || "follow_up",
           title: node.config.title || "Follow-up task",
           description: node.config.description || "Created by workflow",
           priority: node.config.priority || "medium",
@@ -509,17 +510,17 @@ async function executeConditionNode(
       try {
         // Simple condition evaluation (in production, use a safe evaluator)
         if (condition.includes('>')) {
-          const [left, right] = condition.split('>').map(s => s.trim());
+          const [left, right] = condition.split('>').map((s: string) => s.trim());
           const leftValue = context[left] || parseInt(left);
           const rightValue = context[right] || parseInt(right);
           result = leftValue > rightValue;
         } else if (condition.includes('<')) {
-          const [left, right] = condition.split('<').map(s => s.trim());
+          const [left, right] = condition.split('<').map((s: string) => s.trim());
           const leftValue = context[left] || parseInt(left);
           const rightValue = context[right] || parseInt(right);
           result = leftValue < rightValue;
         } else if (condition.includes('==')) {
-          const [left, right] = condition.split('==').map(s => s.trim());
+          const [left, right] = condition.split('==').map((s: string) => s.trim());
           const leftValue = context[left] || left;
           const rightValue = context[right] || right;
           result = leftValue == rightValue;
@@ -623,7 +624,7 @@ export async function executeWorkflow(
         await storage.createHumanApproval({
           executionId: execution.id,
           nodeId: currentNode.id,
-          requestContext: context,
+          requestData: context,
           status: 'pending'
         });
 
@@ -697,8 +698,8 @@ export async function resumeWorkflow(
   await storage.updateHumanApproval(approvalId, {
     status: approved ? 'approved' : 'rejected',
     approvedBy: 'user', // In production, get from auth context
-    approvedAt: new Date(),
-    feedback
+    respondedAt: new Date(),
+    approverNotes: feedback
   });
 
   if (!approved) {

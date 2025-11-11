@@ -16,7 +16,7 @@ import { sdrTeamManager } from "./services/sdrTeams";
 import { insertSdrTeamSchema } from "@shared/schema";
 import { dealIntelligenceEngine } from "./services/dealIntelligence";
 import { revenueOpsCenter } from "./services/revenueOps";
-import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScript, getVoiceScripts, getCallAnalytics, getCampaignAnalytics } from "./services/voiceAI";
+import { voiceAIManager, createVoiceCampaign, getVoiceCampaigns, createVoiceScript, getVoiceScripts, getCallAnalytics as getVoiceCallAnalytics, getCampaignAnalytics } from "./services/voiceAI";
 import { browserExtensionService } from "./services/browserExtension";
 import { crowdIntelNetwork } from "./services/crowdIntel";
 import { insertSharedIntelSchema, insertIntelRatingSchema } from "@shared/schema";
