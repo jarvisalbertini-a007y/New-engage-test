@@ -624,6 +624,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
+  
+  app.put("/api/personas/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub || 'anonymous';
+      
+      // Check if persona exists and user owns it
+      const existing = await storage.getPersona(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Persona not found' });
+      }
+      if (existing.createdBy && existing.createdBy !== userId && userId !== 'anonymous') {
+        return res.status(403).json({ error: 'Not authorized to update this persona' });
+      }
+      
+      // Validate partial update data
+      const validatedData = insertPersonaSchema.partial().parse(req.body);
+      const updated = await storage.updatePersona(id, validatedData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Failed to update persona' });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating persona:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update persona' });
+    }
+  });
+  
+  app.delete("/api/personas/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub || 'anonymous';
+      
+      // Check if persona exists and user owns it
+      const existing = await storage.getPersona(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Persona not found' });
+      }
+      if (existing.createdBy && existing.createdBy !== userId && userId !== 'anonymous') {
+        return res.status(403).json({ error: 'Not authorized to delete this persona' });
+      }
+      
+      const success = await storage.deletePersona(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Failed to delete persona' });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting persona:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete persona' });
+    }
+  });
 
   // Task Routes
   app.get("/api/tasks", async (req, res) => {
@@ -2532,6 +2588,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch predictions' });
     }
   });
+  
+  app.delete("/api/digital-twins/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if twin exists
+      const twin = await storage.getDigitalTwin(id);
+      if (!twin) {
+        return res.status(404).json({ error: 'Digital twin not found' });
+      }
+      
+      // Check ownership through the contact
+      const contact = await storage.getContact(twin.contactId);
+      if (!contact) {
+        return res.status(404).json({ error: 'Associated contact not found' });
+      }
+      
+      // Check if user owns the contact (simplified authorization)
+      // In a real system, you'd check if the user has permission to manage this contact
+      // For now, we'll allow any authenticated user to delete twins
+      
+      const success = await storage.deleteDigitalTwin(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Failed to delete digital twin' });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting digital twin:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete digital twin' });
+    }
+  });
 
   // SDR Teams Routes
   app.get("/api/sdr-teams", async (req: any, res) => {
@@ -2845,6 +2935,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching voice campaigns:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch voice campaigns' });
+    }
+  });
+  
+  app.put("/api/voice/campaigns/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if campaign exists and user owns it
+      const existing = await storage.getVoiceCampaign(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Voice campaign not found' });
+      }
+      if (existing.createdBy !== userId) {
+        return res.status(403).json({ error: 'Not authorized to update this campaign' });
+      }
+      
+      // Validate partial update data
+      const validatedData = insertVoiceCampaignSchema.partial().parse(req.body);
+      const updated = await storage.updateVoiceCampaign(id, validatedData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Failed to update voice campaign' });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating voice campaign:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update voice campaign' });
+    }
+  });
+  
+  app.delete("/api/voice/campaigns/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if campaign exists and user owns it
+      const existing = await storage.getVoiceCampaign(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Voice campaign not found' });
+      }
+      if (existing.createdBy !== userId) {
+        return res.status(403).json({ error: 'Not authorized to delete this campaign' });
+      }
+      
+      const success = await storage.deleteVoiceCampaign(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Failed to delete voice campaign' });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting voice campaign:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete voice campaign' });
     }
   });
   

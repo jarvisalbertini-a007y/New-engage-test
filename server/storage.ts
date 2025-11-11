@@ -128,6 +128,7 @@ export interface IStorage {
   getPersonas(createdBy?: string): Promise<Persona[]>;
   createPersona(persona: InsertPersona): Promise<Persona>;
   updatePersona(id: string, updates: Partial<Persona>): Promise<Persona | undefined>;
+  deletePersona(id: string): Promise<boolean>;
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
@@ -275,6 +276,7 @@ export interface IStorage {
   getDigitalTwins(filters?: { companyId?: string; limit?: number }): Promise<DigitalTwin[]>;
   createDigitalTwin(twin: InsertDigitalTwin): Promise<DigitalTwin>;
   updateDigitalTwin(id: string, updates: Partial<DigitalTwin>): Promise<DigitalTwin | undefined>;
+  deleteDigitalTwin(id: string): Promise<boolean>;
   
   // Twin Interactions
   getTwinInteraction(id: string): Promise<TwinInteraction | undefined>;
@@ -956,6 +958,10 @@ export class MemStorage implements IStorage {
     this.personas.set(id, updated);
     return updated;
   }
+  
+  async deletePersona(id: string): Promise<boolean> {
+    return this.personas.delete(id);
+  }
 
   // Task methods
   async getTask(id: string): Promise<Task | undefined> {
@@ -1386,6 +1392,10 @@ export class MemStorage implements IStorage {
     const updated = { ...twin, ...cleanPartial(updates), lastModelUpdate: new Date() };
     this.digitalTwins.set(id, updated);
     return updated;
+  }
+  
+  async deleteDigitalTwin(id: string): Promise<boolean> {
+    return this.digitalTwins.delete(id);
   }
 
   // Twin Interaction methods
@@ -2387,6 +2397,11 @@ export class DbStorage implements IStorage {
     const result = await db.update(personas).set(cleaned).where(eq(personas.id, id)).returning();
     return result[0];
   }
+  
+  async deletePersona(id: string): Promise<boolean> {
+    const result = await db.delete(personas).where(eq(personas.id, id)).returning();
+    return result.length > 0;
+  }
 
   // Task methods
   async getTask(id: string): Promise<Task | undefined> {
@@ -3239,6 +3254,11 @@ export class DbStorage implements IStorage {
       .returning();
     return result[0];
   }
+  
+  async deleteDigitalTwin(id: string): Promise<boolean> {
+    const result = await db.delete(digitalTwins).where(eq(digitalTwins.id, id)).returning();
+    return result.length > 0;
+  }
 
   // Twin Interaction methods
   async getTwinInteraction(id: string): Promise<TwinInteraction | undefined> {
@@ -3335,8 +3355,8 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoiceCampaign(id: string): Promise<boolean> {
-    const result = await db.delete(voiceCampaigns).where(eq(voiceCampaigns.id, id));
-    return !!result.count && result.count > 0;
+    const result = await db.delete(voiceCampaigns).where(eq(voiceCampaigns.id, id)).returning();
+    return result.length > 0;
   }
 
   // Voice Call methods
@@ -3424,8 +3444,8 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoiceScript(id: string): Promise<boolean> {
-    const result = await db.delete(voiceScripts).where(eq(voiceScripts.id, id));
-    return !!result.count && result.count > 0;
+    const result = await db.delete(voiceScripts).where(eq(voiceScripts.id, id)).returning();
+    return result.length > 0;
   }
 
   // Call Analytics methods
