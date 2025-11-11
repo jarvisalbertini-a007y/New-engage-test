@@ -1,4 +1,4 @@
-import { generatePersonalizedEmail, generateInsightMessage } from "./openai";
+import { openAIClient } from "./openaiClient";
 import { storage } from "../storage";
 import { type Persona, type Contact, type Company, type Insight } from "@shared/schema";
 
