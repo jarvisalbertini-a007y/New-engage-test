@@ -392,6 +392,15 @@ export interface IStorage {
   createChannelOrchestration(orchestration: InsertChannelOrchestration): Promise<ChannelOrchestration>;
   updateChannelOrchestration(id: string, updates: Partial<ChannelOrchestration>): Promise<ChannelOrchestration | undefined>;
   
+  // Inbox Messages
+  getInboxMessage(id: string): Promise<InboxMessage | undefined>;
+  getInboxMessages(filters?: { userId?: string; channel?: string; category?: string; isRead?: boolean; isArchived?: boolean }): Promise<InboxMessage[]>;
+  createInboxMessage(message: InsertInboxMessage): Promise<InboxMessage>;
+  updateInboxMessage(id: string, updates: Partial<InboxMessage>): Promise<InboxMessage | undefined>;
+  markInboxMessageAsRead(id: string): Promise<InboxMessage | undefined>;
+  toggleInboxMessageStar(id: string): Promise<InboxMessage | undefined>;
+  archiveInboxMessage(id: string): Promise<InboxMessage | undefined>;
+  
   // Voice AI
   // Voice Campaigns
   getVoiceCampaign(id: string): Promise<VoiceCampaign | undefined>;

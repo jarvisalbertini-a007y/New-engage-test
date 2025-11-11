@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Inbox, Search, Filter, Reply, Archive, Star, MoreHorizontal, CheckCircle, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,77 +13,100 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
-// Mock email data for demonstration
-const mockEmails = [
-  {
-    id: "1",
-    from: "sarah.chen@dataflow.com",
-    fromName: "Sarah Chen",
-    subject: "Re: Partnership Opportunity",
-    preview: "Thanks for reaching out! I'm definitely interested in learning more about your platform...",
-    content: "Thanks for reaching out! I'm definitely interested in learning more about your platform. Would you be available for a call next week to discuss how we could integrate this with our current workflow?",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    category: "interested",
-    isRead: false,
-    isStarred: false,
-    company: "DataFlow Inc",
-    avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face",
-  },
-  {
-    id: "2",
-    from: "mike.johnson@techcorp.com",
-    fromName: "Mike Johnson",
-    subject: "Re: Sales Automation Demo",
-    preview: "Hi Alex, I appreciate you reaching out, but we're not currently in the market for...",
-    content: "Hi Alex, I appreciate you reaching out, but we're not currently in the market for new sales tools. We just implemented a new system last quarter. Perhaps you could check back with us in 6 months?",
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    category: "follow_up",
-    isRead: true,
-    isStarred: true,
-    company: "TechCorp Solutions",
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face",
-  },
-  {
-    id: "3",
-    from: "lisa.rodriguez@nextgen.com",
-    fromName: "Lisa Rodriguez",
-    subject: "Unsubscribe Request",
-    preview: "Please remove me from your mailing list...",
-    content: "Please remove me from your mailing list. I'm not interested in receiving further communications.",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    category: "unsubscribe",
-    isRead: true,
-    isStarred: false,
-    company: "NextGen Analytics",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=32&h=32&fit=crop&crop=face",
-  },
-];
+// InboxMessage type definition
+interface InboxMessage {
+  id: string;
+  from: string;
+  fromName: string;
+  subject: string;
+  preview: string;
+  content: string;
+  timestamp: Date;
+  category: string;
+  isRead: boolean;
+  isStarred: boolean;
+  company: string;
+  avatar?: string;
+}
 
 export default function UnifiedInbox() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [selectedEmail, setSelectedEmail] = useState<InboxMessage | null>(null);
   const [replyText, setReplyText] = useState("");
-  const [emails, setEmails] = useState(mockEmails);
   const { toast } = useToast();
+  
+  // Fetch inbox messages from API
+  const { data: emails = [], isLoading } = useQuery<InboxMessage[]>({
+    queryKey: ["/api/inbox"],
+  });
 
-  const categorizeEmailMutation = useMutation({
-    mutationFn: api.categorizeEmail,
-    onSuccess: (data, variables) => {
-      // Update email category based on AI analysis
-      setEmails(prev => prev.map(email => 
-        email.id === variables.emailId 
-          ? { ...email, category: data.category }
-          : email
-      ));
-      toast({
-        title: "Email Categorized",
-        description: `Email categorized as ${data.category}`,
+  // Mutations for message actions
+  const markAsReadMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await fetch(`/api/inbox/${messageId}/read`, {
+        method: "PATCH",
       });
+      if (!response.ok) throw new Error("Failed to mark as read");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inbox"] });
     },
   });
 
-  const filteredEmails = emails.filter(email => {
+  const toggleStarMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await fetch(`/api/inbox/${messageId}/star`, {
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error("Failed to toggle star");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inbox"] });
+    },
+  });
+
+  const archiveMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await fetch(`/api/inbox/${messageId}/archive`, {
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error("Failed to archive message");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Message Archived",
+        description: "Message has been moved to archive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inbox"] });
+    },
+  });
+
+  const sendReplyMutation = useMutation({
+    mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+      const response = await fetch(`/api/inbox/${messageId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!response.ok) throw new Error("Failed to send reply");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reply Sent",
+        description: "Your reply has been sent successfully",
+      });
+      setReplyText("");
+      setSelectedEmail(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/inbox"] });
+    },
+  });
+
+  const filteredEmails = emails.filter((email: InboxMessage) => {
     const matchesSearch = email.fromName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          email.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          email.company.toLowerCase().includes(searchTerm.toLowerCase());
@@ -121,26 +144,12 @@ export default function UnifiedInbox() {
     }
   };
 
-  const markAsRead = (emailId: string) => {
-    setEmails(prev => prev.map(email => 
-      email.id === emailId ? { ...email, isRead: true } : email
-    ));
-  };
-
-  const toggleStar = (emailId: string) => {
-    setEmails(prev => prev.map(email => 
-      email.id === emailId ? { ...email, isStarred: !email.isStarred } : email
-    ));
-  };
-
   const handleReply = () => {
     if (replyText.trim() && selectedEmail) {
-      toast({
-        title: "Reply Sent",
-        description: `Reply sent to ${selectedEmail.fromName}`,
+      sendReplyMutation.mutate({ 
+        messageId: selectedEmail.id, 
+        content: replyText 
       });
-      setReplyText("");
-      setSelectedEmail(null);
     }
   };
 

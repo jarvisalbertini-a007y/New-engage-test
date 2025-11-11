@@ -788,6 +788,33 @@ export const channelMessages = pgTable("channel_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Unified Inbox Messages
+export const inboxMessages = pgTable("inbox_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  contactId: varchar("contact_id").references(() => contacts.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  channel: text("channel").notNull().default("email"), // email, linkedin, sms, phone
+  direction: text("direction").notNull().default("inbound"), // inbound, outbound
+  fromEmail: text("from_email"),
+  fromName: text("from_name"),
+  toEmail: text("to_email"),
+  subject: text("subject"),
+  content: text("content").notNull(),
+  preview: text("preview"),
+  category: text("category"), // interested, follow_up, objection, unsubscribe, out_of_office
+  aiScore: integer("ai_score"), // AI confidence score for categorization (0-100)
+  sentiment: text("sentiment"), // positive, neutral, negative
+  urgency: text("urgency"), // high, medium, low
+  isRead: boolean("is_read").notNull().default(false),
+  isStarred: boolean("is_starred").notNull().default(false),
+  isArchived: boolean("is_archived").notNull().default(false),
+  threadId: varchar("thread_id"), // For conversation threading
+  metadata: jsonb("metadata"), // Additional channel-specific metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const channelOrchestration = pgTable("channel_orchestration", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").notNull().references(() => multiChannelCampaigns.id),
@@ -1237,6 +1264,12 @@ export const insertChannelMessageSchema = createInsertSchema(channelMessages).om
   engagement: true,
 });
 
+export const insertInboxMessageSchema = createInsertSchema(inboxMessages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertChannelOrchestrationSchema = createInsertSchema(channelOrchestration).omit({
   id: true,
   createdAt: true,
@@ -1555,6 +1588,9 @@ export type InsertMultiChannelCampaign = z.infer<typeof insertMultiChannelCampai
 
 export type ChannelMessage = typeof channelMessages.$inferSelect;
 export type InsertChannelMessage = z.infer<typeof insertChannelMessageSchema>;
+
+export type InboxMessage = typeof inboxMessages.$inferSelect;
+export type InsertInboxMessage = z.infer<typeof insertInboxMessageSchema>;
 
 export type ChannelOrchestration = typeof channelOrchestration.$inferSelect;
 export type InsertChannelOrchestration = z.infer<typeof insertChannelOrchestrationSchema>;
