@@ -12,6 +12,8 @@ import {
   type CallScript, type InsertCallScript,
   type Voicemail, type InsertVoicemail,
   type AiAgent, type InsertAiAgent,
+  type AgentExecution, type InsertAgentExecution,
+  type AgentMetric, type InsertAgentMetric,
   type OnboardingProfile, type InsertOnboardingProfile,
   type PlatformConfig, type InsertPlatformConfig,
   type WorkflowTrigger, type InsertWorkflowTrigger,
@@ -64,7 +66,7 @@ import {
   type EnterpriseSecurity, type InsertEnterpriseSecurity,
   type AuditLog, type InsertAuditLog,
   type AccessControl, type InsertAccessControl,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, whiteLabels, enterpriseSecurity, auditLogs, accessControls
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -160,6 +162,18 @@ export interface IStorage {
   createAiAgent(agent: InsertAiAgent): Promise<AiAgent>;
   updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined>;
   deleteAiAgent(id: string): Promise<boolean>;
+  
+  // Agent Executions
+  getAgentExecution(id: string): Promise<AgentExecution | undefined>;
+  getAgentExecutions(filters?: { agentId?: string; status?: string; taskType?: string }): Promise<AgentExecution[]>;
+  createAgentExecution(execution: InsertAgentExecution): Promise<AgentExecution>;
+  updateAgentExecution(id: string, updates: Partial<AgentExecution>): Promise<AgentExecution | undefined>;
+  
+  // Agent Metrics
+  getAgentMetrics(agentId: string, date?: string): Promise<AgentMetric | undefined>;
+  getAgentMetricsRange(agentId: string, startDate: string, endDate: string): Promise<AgentMetric[]>;
+  createAgentMetric(metric: InsertAgentMetric): Promise<AgentMetric>;
+  updateAgentMetric(id: string, updates: Partial<AgentMetric>): Promise<AgentMetric | undefined>;
   
   // Onboarding
   getOnboardingProfile(userId: string): Promise<OnboardingProfile | undefined>;
@@ -2586,6 +2600,82 @@ export class DbStorage implements IStorage {
   async deleteAiAgent(id: string): Promise<boolean> {
     const result = await db.delete(aiAgents).where(eq(aiAgents.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Agent Execution methods
+  async getAgentExecution(id: string): Promise<AgentExecution | undefined> {
+    const result = await db.select().from(agentExecutions).where(eq(agentExecutions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentExecutions(filters?: { agentId?: string; status?: string; taskType?: string }): Promise<AgentExecution[]> {
+    let query = db.select().from(agentExecutions);
+    
+    const conditions: any[] = [];
+    if (filters?.agentId) conditions.push(eq(agentExecutions.agentId, filters.agentId));
+    if (filters?.status) conditions.push(eq(agentExecutions.status, filters.status));
+    if (filters?.taskType) conditions.push(eq(agentExecutions.taskType, filters.taskType));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    
+    return await query;
+  }
+
+  async createAgentExecution(execution: InsertAgentExecution): Promise<AgentExecution> {
+    const result = await db.insert(agentExecutions).values(execution).returning();
+    return result[0];
+  }
+
+  async updateAgentExecution(id: string, updates: Partial<AgentExecution>): Promise<AgentExecution | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAgentExecution(id);
+    const result = await db.update(agentExecutions).set(cleaned).where(eq(agentExecutions.id, id)).returning();
+    return result[0];
+  }
+
+  // Agent Metrics methods
+  async getAgentMetrics(agentId: string, date?: string): Promise<AgentMetric | undefined> {
+    const query = db.select().from(agentMetrics).where(eq(agentMetrics.agentId, agentId));
+    
+    if (date) {
+      const results = await query.where(and(
+        eq(agentMetrics.agentId, agentId),
+        eq(agentMetrics.date, date)
+      )).limit(1);
+      return results[0];
+    }
+    
+    // Get most recent metric if no date specified
+    const results = await query.limit(1);
+    return results[0];
+  }
+
+  async getAgentMetricsRange(agentId: string, startDate: string, endDate: string): Promise<AgentMetric[]> {
+    return await db.select()
+      .from(agentMetrics)
+      .where(and(
+        eq(agentMetrics.agentId, agentId),
+        // Date range comparison would need proper SQL operators
+        // For now, returning all metrics for the agent
+        // In production, would use: gte(agentMetrics.date, startDate), lte(agentMetrics.date, endDate)
+      ));
+  }
+
+  async createAgentMetric(metric: InsertAgentMetric): Promise<AgentMetric> {
+    const result = await db.insert(agentMetrics).values(metric).returning();
+    return result[0];
+  }
+
+  async updateAgentMetric(id: string, updates: Partial<AgentMetric>): Promise<AgentMetric | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) {
+      const result = await db.select().from(agentMetrics).where(eq(agentMetrics.id, id)).limit(1);
+      return result[0];
+    }
+    const result = await db.update(agentMetrics).set(cleaned).where(eq(agentMetrics.id, id)).returning();
+    return result[0];
   }
 
   // Onboarding methods

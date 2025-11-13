@@ -1,5 +1,5 @@
 import { OpenAI } from "openai";
-import { AiAgent, Task, InsertTask, Company, Contact } from "@shared/schema";
+import { AiAgent, Task, InsertTask, Company, Contact, AgentExecution, InsertAgentExecution, AgentMetric } from "@shared/schema";
 import { storage } from "../storage";
 import { emailDeliveryService } from "./emailDelivery";
 import { contentGenerationService } from "./contentGeneration";
@@ -31,8 +31,40 @@ class AgentJobQueue {
   private jobs: Map<string, AgentJob> = new Map();
   private processingInterval: NodeJS.Timeout | null = null;
   
-  start() {
+  async start() {
     if (this.processingInterval) return;
+    
+    // Load incomplete jobs from database on startup
+    try {
+      const incompleteJobs = await storage.getAgentExecutions({
+        status: 'pending'
+      });
+      
+      for (const execution of incompleteJobs) {
+        // Mark old stuck jobs as failed
+        const ageMs = Date.now() - new Date(execution.createdAt).getTime();
+        if (ageMs > 3600000) { // 1 hour
+          await storage.updateAgentExecution(execution.id, {
+            status: 'failed',
+            error: 'Job timed out',
+            completedAt: new Date().toISOString()
+          });
+        } else {
+          // Re-add to in-memory queue
+          this.jobs.set(execution.id, {
+            id: execution.id,
+            agentId: execution.agentId,
+            taskType: execution.taskType,
+            targetId: execution.targetId || undefined,
+            context: execution.context as Record<string, any>,
+            status: 'pending',
+            createdAt: new Date(execution.createdAt)
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[AgentExecutor] Failed to load incomplete jobs:", error);
+    }
     
     // Process jobs every 5 seconds
     this.processingInterval = setInterval(() => {
@@ -50,21 +82,33 @@ class AgentJobQueue {
     console.log("[AgentExecutor] Job queue stopped");
   }
   
-  addJob(agentId: string, taskType: string, context: Record<string, any>, targetId?: string): string {
-    const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const job: AgentJob = {
-      id: jobId,
+  async addJob(agentId: string, taskType: string, context: Record<string, any>, targetId?: string, createdBy: string = 'system'): Promise<string> {
+    // Create database record first
+    const execution: InsertAgentExecution = {
       agentId,
       taskType,
       targetId,
       context,
       status: 'pending',
-      createdAt: new Date()
+      createdBy
     };
     
-    this.jobs.set(jobId, job);
-    console.log(`[AgentExecutor] Job ${jobId} added for agent ${agentId}`);
-    return jobId;
+    const created = await storage.createAgentExecution(execution);
+    
+    // Add to in-memory queue
+    const job: AgentJob = {
+      id: created.id,
+      agentId,
+      taskType,
+      targetId,
+      context,
+      status: 'pending',
+      createdAt: new Date(created.createdAt)
+    };
+    
+    this.jobs.set(created.id, job);
+    console.log(`[AgentExecutor] Job ${created.id} added for agent ${agentId}`);
+    return created.id;
   }
   
   getJob(jobId: string): AgentJob | undefined {
@@ -78,14 +122,33 @@ class AgentJobQueue {
     pendingJob.status = 'processing';
     pendingJob.startedAt = new Date();
     
+    // Update database to mark as processing
+    try {
+      await storage.updateAgentExecution(pendingJob.id, {
+        status: 'processing',
+        startedAt: pendingJob.startedAt.toISOString()
+      });
+    } catch (error) {
+      console.error(`[AgentExecutor] Failed to update job ${pendingJob.id} to processing:`, error);
+    }
+    
     try {
       const result = await executeAgentTask(pendingJob);
       pendingJob.status = 'completed';
       pendingJob.result = result;
       pendingJob.completedAt = new Date();
+      const executionTimeMs = pendingJob.completedAt.getTime() - pendingJob.startedAt.getTime();
+      
+      // Update database with completion
+      await storage.updateAgentExecution(pendingJob.id, {
+        status: 'completed',
+        result,
+        completedAt: pendingJob.completedAt.toISOString(),
+        executionTimeMs
+      });
       
       // Update agent metrics
-      await updateAgentMetrics(pendingJob.agentId, true, pendingJob.completedAt.getTime() - pendingJob.startedAt.getTime());
+      await updateAgentMetrics(pendingJob.agentId, true, executionTimeMs, pendingJob.taskType);
       
       console.log(`[AgentExecutor] Job ${pendingJob.id} completed successfully`);
     } catch (error) {
@@ -93,8 +156,15 @@ class AgentJobQueue {
       pendingJob.error = error instanceof Error ? error.message : 'Unknown error';
       pendingJob.completedAt = new Date();
       
+      // Update database with failure
+      await storage.updateAgentExecution(pendingJob.id, {
+        status: 'failed',
+        error: pendingJob.error,
+        completedAt: pendingJob.completedAt.toISOString()
+      });
+      
       // Update agent metrics
-      await updateAgentMetrics(pendingJob.agentId, false);
+      await updateAgentMetrics(pendingJob.agentId, false, undefined, pendingJob.taskType);
       
       console.error(`[AgentExecutor] Job ${pendingJob.id} failed:`, error);
     }
@@ -538,45 +608,75 @@ function average(numbers: number[]): number {
 }
 
 // Update agent metrics after task execution
-async function updateAgentMetrics(agentId: string, success: boolean, executionTime?: number) {
+async function updateAgentMetrics(agentId: string, success: boolean, executionTime?: number, taskType?: string) {
   try {
+    // Get or create today's metrics
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    let metric = await storage.getAgentMetrics(agentId, today);
+    
+    if (!metric) {
+      // Create new metric for today
+      const newMetric = await storage.createAgentMetric({
+        agentId,
+        date: today,
+        tasksCompleted: success ? 1 : 0,
+        tasksFailed: success ? 0 : 1,
+        avgExecutionTime: executionTime || 0,
+        successRate: success ? 1 : 0,
+        leadsGenerated: taskType === 'find_leads' && success ? 1 : 0,
+        emailsComposed: taskType === 'compose_email' && success ? 1 : 0,
+        dataEnriched: taskType === 'enrich_data' && success ? 1 : 0
+      });
+      metric = newMetric;
+    } else {
+      // Update existing metric for today
+      const updates: Partial<AgentMetric> = {
+        tasksCompleted: (metric.tasksCompleted || 0) + (success ? 1 : 0),
+        tasksFailed: (metric.tasksFailed || 0) + (success ? 0 : 1),
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update success rate
+      const totalTasks = updates.tasksCompleted! + (metric.tasksFailed || 0) + (success ? 0 : 1);
+      updates.successRate = totalTasks > 0 ? (updates.tasksCompleted! / totalTasks) : 0;
+      
+      // Update average execution time
+      if (executionTime && success) {
+        const currentAvg = metric.avgExecutionTime || 0;
+        const currentTotal = metric.tasksCompleted || 0;
+        const newTotal = currentTotal + 1;
+        updates.avgExecutionTime = Math.round((currentAvg * currentTotal + executionTime) / newTotal);
+      }
+      
+      // Update task-specific counters
+      if (success) {
+        if (taskType === 'find_leads') {
+          updates.leadsGenerated = (metric.leadsGenerated || 0) + 1;
+        } else if (taskType === 'compose_email') {
+          updates.emailsComposed = (metric.emailsComposed || 0) + 1;
+        } else if (taskType === 'enrich_data') {
+          updates.dataEnriched = (metric.dataEnriched || 0) + 1;
+        }
+      }
+      
+      await storage.updateAgentMetric(metric.id, updates);
+    }
+    
+    // Also update agent's last execution time and in-memory metrics
     const agent = await storage.getAiAgent(agentId);
-    if (!agent) return;
-    
-    const metrics = agent.metrics || {
-      tasksCompleted: 0,
-      tasksToday: 0,
-      successRate: 0.85,
-      avgExecutionTime: 2500,
-      totalExecutions: 0,
-      successfulExecutions: 0
-    };
-    
-    // Update metrics
-    metrics.totalExecutions = (metrics.totalExecutions || 0) + 1;
-    if (success) {
-      metrics.successfulExecutions = (metrics.successfulExecutions || 0) + 1;
-      metrics.tasksCompleted = (metrics.tasksCompleted || 0) + 1;
-      metrics.tasksToday = (metrics.tasksToday || 0) + 1;
+    if (agent) {
+      // Update in-memory metrics for quick access
+      const metrics = agent.metrics || {};
+      metrics.tasksCompleted = (metric.tasksCompleted || 0) + (success ? 1 : 0);
+      metrics.tasksToday = metrics.tasksCompleted; // Today's count
+      metrics.successRate = (metric.successRate || 0);
+      metrics.avgExecutionTime = metric.avgExecutionTime || 2500;
+      
+      await storage.updateAiAgent(agentId, {
+        metrics,
+        lastExecutedAt: new Date().toISOString()
+      });
     }
-    
-    // Calculate new success rate
-    if (metrics.totalExecutions > 0) {
-      metrics.successRate = metrics.successfulExecutions / metrics.totalExecutions;
-    }
-    
-    // Update average execution time
-    if (executionTime && success) {
-      const currentAvg = metrics.avgExecutionTime || 2500;
-      const weight = 0.9; // Weight for existing average
-      metrics.avgExecutionTime = Math.round(currentAvg * weight + executionTime * (1 - weight));
-    }
-    
-    // Update last execution time
-    await storage.updateAiAgent(agentId, {
-      metrics,
-      lastExecutedAt: new Date().toISOString()
-    });
   } catch (error) {
     console.error("Failed to update agent metrics:", error);
   }
@@ -585,12 +685,12 @@ async function updateAgentMetrics(agentId: string, success: boolean, executionTi
 // Public API
 export const aiAgentExecutor = {
   // Start/stop the job queue
-  start: () => jobQueue.start(),
+  start: async () => await jobQueue.start(),
   stop: () => jobQueue.stop(),
   
   // Queue a new agent task
-  queueTask: (agentId: string, taskType: string, context: Record<string, any>, targetId?: string) => {
-    return jobQueue.addJob(agentId, taskType, context, targetId);
+  queueTask: async (agentId: string, taskType: string, context: Record<string, any>, targetId?: string, createdBy: string = 'system') => {
+    return await jobQueue.addJob(agentId, taskType, context, targetId, createdBy);
   },
   
   // Get job status
