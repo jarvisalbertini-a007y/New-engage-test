@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal, index, date, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, decimal, index, date, real, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1347,6 +1347,116 @@ export const insertBenchmarkDataSchema = createInsertSchema(benchmarkData).omit(
   createdAt: true,
   lastCalculated: true,
 });
+
+// Content Template System Tables
+export const contentTemplates = pgTable("content_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  contentType: text("content_type").notNull(), // email, linkedin, cold_call_script
+  status: text("status").notNull().default("draft"), // draft, active, archived
+  personaId: varchar("persona_id").references(() => personas.id),
+  defaultTone: text("default_tone").notNull().default("professional"),
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  createdBy: varchar("created_by").references(() => users.id),
+  currentVersionId: varchar("current_version_id"), // Will be updated to reference template_versions.id after creation
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+});
+
+export const templateVersions = pgTable("template_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => contentTemplates.id),
+  versionNumber: integer("version_number").notNull(),
+  subject: text("subject"), // For emails
+  body: text("body").notNull(),
+  content: jsonb("content"), // Channel-specific payload
+  tone: text("tone"),
+  lengthHint: text("length_hint"), // short, medium, long
+  authorId: varchar("author_id").references(() => users.id),
+  source: text("source").notNull(), // ai, manual, imported
+  aiModel: text("ai_model"),
+  personaSnapshot: jsonb("persona_snapshot"),
+  audienceSnapshot: jsonb("audience_snapshot"),
+  promptContext: jsonb("prompt_context"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  publishedAt: timestamp("published_at"),
+});
+
+export const audienceSegments = pgTable("audience_segments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  industries: text("industries").array().default(sql`ARRAY[]::text[]`),
+  titles: text("titles").array().default(sql`ARRAY[]::text[]`),
+  companySizes: text("company_sizes").array().default(sql`ARRAY[]::text[]`),
+  locations: text("locations").array().default(sql`ARRAY[]::text[]`),
+  rules: jsonb("rules"), // Advanced filters
+  createdBy: varchar("created_by").references(() => users.id),
+  isGlobal: boolean("is_global").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const contentTemplateSegments = pgTable("content_template_segments", {
+  templateId: varchar("template_id").notNull().references(() => contentTemplates.id),
+  segmentId: varchar("segment_id").notNull().references(() => audienceSegments.id),
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.templateId, table.segmentId] }),
+  };
+});
+
+export const templateMetrics = pgTable("template_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateVersionId: varchar("template_version_id").notNull().references(() => templateVersions.id),
+  windowStart: date("window_start").notNull(),
+  windowEnd: date("window_end").notNull(),
+  channel: text("channel").notNull(), // email, linkedin, phone
+  sends: integer("sends").notNull().default(0),
+  deliveries: integer("deliveries").notNull().default(0),
+  opens: integer("opens").notNull().default(0),
+  clicks: integer("clicks").notNull().default(0),
+  replies: integer("replies").notNull().default(0),
+  meetings: integer("meetings").notNull().default(0),
+  revenue: real("revenue").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+// Content Template Types
+export const insertContentTemplateSchema = createInsertSchema(contentTemplates).omit({
+  id: true,
+  currentVersionId: true,
+  createdAt: true,
+  updatedAt: true,
+  archivedAt: true,
+});
+export type InsertContentTemplate = z.infer<typeof insertContentTemplateSchema>;
+export type ContentTemplate = typeof contentTemplates.$inferSelect;
+
+export const insertTemplateVersionSchema = createInsertSchema(templateVersions).omit({
+  id: true,
+  createdAt: true,
+  publishedAt: true,
+});
+export type InsertTemplateVersion = z.infer<typeof insertTemplateVersionSchema>;
+export type TemplateVersion = typeof templateVersions.$inferSelect;
+
+export const insertAudienceSegmentSchema = createInsertSchema(audienceSegments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAudienceSegment = z.infer<typeof insertAudienceSegmentSchema>;
+export type AudienceSegment = typeof audienceSegments.$inferSelect;
+
+export const insertTemplateMetricsSchema = createInsertSchema(templateMetrics).omit({
+  id: true,
+  lastUpdated: true,
+});
+export type InsertTemplateMetrics = z.infer<typeof insertTemplateMetricsSchema>;
+export type TemplateMetrics = typeof templateMetrics.$inferSelect;
 
 // Enterprise Tables
 export const whiteLabels = pgTable("white_labels", {

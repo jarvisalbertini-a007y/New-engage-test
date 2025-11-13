@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { api } from "@/lib/api";
-import { Wand2, Copy, Save, Send, User, Building, Lightbulb } from "lucide-react";
+import { Wand2, Copy, Save, Send, User, Building, Lightbulb, Target, Brain, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function ContentStudio() {
   const [selectedPersona, setSelectedPersona] = useState("none");
@@ -21,6 +24,15 @@ export default function ContentStudio() {
   const [tone, setTone] = useState("professional");
   const [customPrompt, setCustomPrompt] = useState("");
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [targetingFilters, setTargetingFilters] = useState({
+    industry: "",
+    companySize: "",
+    title: "",
+    location: ""
+  });
   
   const { toast } = useToast();
 
@@ -56,6 +68,46 @@ export default function ContentStudio() {
       toast({
         title: "Error",
         description: "Failed to generate content. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Save as a sequence with a single step
+      return await apiRequest('/api/sequences', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          status: 'draft',
+          steps: [{
+            stepNumber: 1,
+            type: contentType as 'email' | 'linkedin' | 'phone',
+            delayDays: 0,
+            subject: data.subject,
+            template: data.body
+          }],
+          personaId: selectedPersona !== "none" ? selectedPersona : undefined,
+          createdBy: 'user'
+        })
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      setIsSaveDialogOpen(false);
+      setTemplateName("");
+      setTemplateDescription("");
+      toast({
+        title: "Template Saved",
+        description: "Your content has been saved as a template.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save template. Please try again.",
         variant: "destructive",
       });
     },

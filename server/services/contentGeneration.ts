@@ -561,7 +561,7 @@ async function generateStepEnhancement(
     `Generate a personalized LinkedIn message for sales outreach.
 
 Persona: ${persona.name}
-Industry: ${persona.industry || 'B2B'}
+Industry: ${persona.industries?.[0] || 'B2B'}
 Value Propositions: ${valueProps}
 Step Number: ${step.stepNumber} (${isFirstStep ? 'First connection' : 'Follow-up'})
 
@@ -574,7 +574,7 @@ Keep it short, casual, and focused on connection rather than selling. LinkedIn m
     `Generate personalized email components for a sales sequence.
 
 Persona: ${persona.name}
-Industry: ${persona.industry || 'B2B'}
+Industry: ${persona.industries?.[0] || 'B2B'}
 Value Propositions: ${valueProps}
 Step Number: ${step.stepNumber} (${isFirstStep ? 'First touch' : 'Follow-up'})
 

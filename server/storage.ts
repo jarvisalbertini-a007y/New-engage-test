@@ -66,7 +66,11 @@ import {
   type EnterpriseSecurity, type InsertEnterpriseSecurity,
   type AuditLog, type InsertAuditLog,
   type AccessControl, type InsertAccessControl,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, whiteLabels, enterpriseSecurity, auditLogs, accessControls
+  type ContentTemplate, type InsertContentTemplate,
+  type TemplateVersion, type InsertTemplateVersion,
+  type AudienceSegment, type InsertAudienceSegment,
+  type TemplateMetrics, type InsertTemplateMetrics,
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -517,6 +521,33 @@ export interface IStorage {
   createAccessControl(accessControl: InsertAccessControl): Promise<AccessControl>;
   updateAccessControl(id: string, updates: Partial<AccessControl>): Promise<AccessControl | undefined>;
   deleteAccessControl(id: string): Promise<boolean>;
+
+  // Content Templates
+  listTemplates(params?: {status?: string; personaId?: string; includeArchived?: boolean}): Promise<ContentTemplate[]>;
+  getTemplateWithRelations(id: string): Promise<{ template: ContentTemplate; versions: TemplateVersion[]; segments: AudienceSegment[]; metrics?: TemplateMetrics[] } | undefined>;
+  createTemplate(input: InsertContentTemplate & { segmentIds?: string[] }): Promise<ContentTemplate>;
+  updateTemplate(id: string, updates: Partial<ContentTemplate>): Promise<ContentTemplate | undefined>;
+  archiveTemplate(id: string): Promise<boolean>;
+  attachSegments(templateId: string, segmentIds: string[]): Promise<void>;
+  detachSegment(templateId: string, segmentId: string): Promise<boolean>;
+
+  // Template Versions
+  createTemplateVersion(input: InsertTemplateVersion & { segmentSnapshotIds?: string[] }): Promise<TemplateVersion>;
+  listTemplateVersions(templateId: string, opts?: { includeDrafts?: boolean }): Promise<TemplateVersion[]>;
+  getTemplateVersion(versionId: string): Promise<TemplateVersion | undefined>;
+  publishTemplateVersion(templateId: string, versionId: string): Promise<TemplateVersion | undefined>;
+
+  // Audience Segments
+  listAudienceSegments(filter?: { createdBy?: string; q?: string; includeGlobal?: boolean }): Promise<AudienceSegment[]>;
+  getAudienceSegment(id: string): Promise<AudienceSegment | undefined>;
+  createAudienceSegment(input: InsertAudienceSegment): Promise<AudienceSegment>;
+  updateAudienceSegment(id: string, updates: Partial<AudienceSegment>): Promise<AudienceSegment | undefined>;
+  deleteAudienceSegment(id: string): Promise<boolean>;
+
+  // Template Metrics
+  recordTemplateMetricEvent(event: { templateVersionId: string; channel: string; eventType: string; value?: number; occurredAt?: Date }): Promise<void>;
+  upsertTemplateMetricsWindow(metrics: InsertTemplateMetrics): Promise<TemplateMetrics>;
+  getTemplateMetrics(templateId: string, startDate?: string, endDate?: string): Promise<TemplateMetrics[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -4207,6 +4238,305 @@ export class DbStorage implements IStorage {
   async deleteAccessControl(id: string): Promise<boolean> {
     const result = await db.delete(accessControls).where(eq(accessControls.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Content Template Methods
+  async listTemplates(params?: {status?: string; personaId?: string; includeArchived?: boolean}): Promise<ContentTemplate[]> {
+    let query = db.select().from(contentTemplates);
+    const conditions: any[] = [];
+    
+    if (params?.status) {
+      conditions.push(eq(contentTemplates.status, params.status));
+    }
+    if (params?.personaId) {
+      conditions.push(eq(contentTemplates.personaId, params.personaId));
+    }
+    if (!params?.includeArchived) {
+      conditions.push(sql`${contentTemplates.archivedAt} IS NULL`);
+    }
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async getTemplateWithRelations(id: string): Promise<{ template: ContentTemplate; versions: TemplateVersion[]; segments: AudienceSegment[]; metrics?: TemplateMetrics[] } | undefined> {
+    const template = await db.select().from(contentTemplates).where(eq(contentTemplates.id, id)).limit(1);
+    if (!template[0]) return undefined;
+    
+    const versions = await db.select().from(templateVersions).where(eq(templateVersions.templateId, id));
+    
+    const segmentJoins = await db.select()
+      .from(contentTemplateSegments)
+      .innerJoin(audienceSegments, eq(contentTemplateSegments.segmentId, audienceSegments.id))
+      .where(eq(contentTemplateSegments.templateId, id));
+    
+    const segments = segmentJoins.map(j => j.audience_segments);
+    
+    const metrics = await db.select()
+      .from(templateMetrics)
+      .where(sql`${templateMetrics.templateVersionId} IN (SELECT id FROM ${templateVersions} WHERE template_id = ${id})`);
+    
+    return {
+      template: template[0],
+      versions,
+      segments,
+      metrics
+    };
+  }
+
+  async createTemplate(input: InsertContentTemplate & { segmentIds?: string[] }): Promise<ContentTemplate> {
+    const { segmentIds, ...templateData } = input;
+    
+    const result = await db.insert(contentTemplates).values(templateData).returning();
+    const template = result[0];
+    
+    if (segmentIds && segmentIds.length > 0) {
+      await this.attachSegments(template.id, segmentIds);
+    }
+    
+    return template;
+  }
+
+  async updateTemplate(id: string, updates: Partial<ContentTemplate>): Promise<ContentTemplate | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) {
+      const result = await db.select().from(contentTemplates).where(eq(contentTemplates.id, id)).limit(1);
+      return result[0];
+    }
+    
+    cleaned.updatedAt = new Date();
+    const result = await db.update(contentTemplates).set(cleaned).where(eq(contentTemplates.id, id)).returning();
+    return result[0];
+  }
+
+  async archiveTemplate(id: string): Promise<boolean> {
+    const result = await db.update(contentTemplates)
+      .set({ archivedAt: new Date(), status: 'archived' })
+      .where(eq(contentTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async attachSegments(templateId: string, segmentIds: string[]): Promise<void> {
+    const values = segmentIds.map(segmentId => ({ templateId, segmentId }));
+    
+    // Use onConflictDoNothing to avoid duplicate errors
+    await db.insert(contentTemplateSegments)
+      .values(values)
+      .onConflictDoNothing();
+  }
+
+  async detachSegment(templateId: string, segmentId: string): Promise<boolean> {
+    const result = await db.delete(contentTemplateSegments)
+      .where(and(
+        eq(contentTemplateSegments.templateId, templateId),
+        eq(contentTemplateSegments.segmentId, segmentId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Template Version Methods
+  async createTemplateVersion(input: InsertTemplateVersion & { segmentSnapshotIds?: string[] }): Promise<TemplateVersion> {
+    const { segmentSnapshotIds, ...versionData } = input;
+    
+    // Calculate version number
+    const existing = await db.select({ maxVersion: sql`MAX(${templateVersions.versionNumber})` })
+      .from(templateVersions)
+      .where(eq(templateVersions.templateId, versionData.templateId));
+    
+    versionData.versionNumber = (existing[0]?.maxVersion || 0) + 1;
+    
+    // Capture audience snapshot if segment IDs provided
+    if (segmentSnapshotIds && segmentSnapshotIds.length > 0) {
+      const segments = await db.select()
+        .from(audienceSegments)
+        .where(sql`${audienceSegments.id} = ANY(${segmentSnapshotIds})`);
+      versionData.audienceSnapshot = segments;
+    }
+    
+    // Capture persona snapshot if provided
+    if (versionData.templateId) {
+      const template = await db.select().from(contentTemplates).where(eq(contentTemplates.id, versionData.templateId)).limit(1);
+      if (template[0]?.personaId) {
+        const persona = await db.select().from(personas).where(eq(personas.id, template[0].personaId)).limit(1);
+        if (persona[0]) {
+          versionData.personaSnapshot = persona[0];
+        }
+      }
+    }
+    
+    const result = await db.insert(templateVersions).values(versionData).returning();
+    return result[0];
+  }
+
+  async listTemplateVersions(templateId: string, opts?: { includeDrafts?: boolean }): Promise<TemplateVersion[]> {
+    let query = db.select().from(templateVersions).where(eq(templateVersions.templateId, templateId));
+    
+    if (!opts?.includeDrafts) {
+      query = query.where(sql`${templateVersions.publishedAt} IS NOT NULL`);
+    }
+    
+    return await query;
+  }
+
+  async getTemplateVersion(versionId: string): Promise<TemplateVersion | undefined> {
+    const result = await db.select().from(templateVersions).where(eq(templateVersions.id, versionId)).limit(1);
+    return result[0];
+  }
+
+  async publishTemplateVersion(templateId: string, versionId: string): Promise<TemplateVersion | undefined> {
+    // Set published date on version
+    const version = await db.update(templateVersions)
+      .set({ publishedAt: new Date() })
+      .where(eq(templateVersions.id, versionId))
+      .returning();
+    
+    if (version.length === 0) return undefined;
+    
+    // Update template's current version
+    await db.update(contentTemplates)
+      .set({ currentVersionId: versionId, updatedAt: new Date() })
+      .where(eq(contentTemplates.id, templateId));
+    
+    return version[0];
+  }
+
+  // Audience Segment Methods
+  async listAudienceSegments(filter?: { createdBy?: string; q?: string; includeGlobal?: boolean }): Promise<AudienceSegment[]> {
+    let query = db.select().from(audienceSegments);
+    const conditions: any[] = [];
+    
+    if (filter?.createdBy) {
+      conditions.push(eq(audienceSegments.createdBy, filter.createdBy));
+    }
+    if (filter?.q) {
+      conditions.push(sql`${audienceSegments.name} ILIKE ${'%' + filter.q + '%'} OR ${audienceSegments.description} ILIKE ${'%' + filter.q + '%'}`);
+    }
+    if (!filter?.includeGlobal) {
+      conditions.push(eq(audienceSegments.isGlobal, false));
+    }
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async getAudienceSegment(id: string): Promise<AudienceSegment | undefined> {
+    const result = await db.select().from(audienceSegments).where(eq(audienceSegments.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAudienceSegment(input: InsertAudienceSegment): Promise<AudienceSegment> {
+    const result = await db.insert(audienceSegments).values(input).returning();
+    return result[0];
+  }
+
+  async updateAudienceSegment(id: string, updates: Partial<AudienceSegment>): Promise<AudienceSegment | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) {
+      const result = await db.select().from(audienceSegments).where(eq(audienceSegments.id, id)).limit(1);
+      return result[0];
+    }
+    
+    cleaned.updatedAt = new Date();
+    const result = await db.update(audienceSegments).set(cleaned).where(eq(audienceSegments.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteAudienceSegment(id: string): Promise<boolean> {
+    // Check if segment is global (protected)
+    const segment = await this.getAudienceSegment(id);
+    if (segment?.isGlobal) {
+      throw new Error("Cannot delete global audience segments");
+    }
+    
+    const result = await db.delete(audienceSegments).where(eq(audienceSegments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Template Metrics Methods
+  async recordTemplateMetricEvent(event: { templateVersionId: string; channel: string; eventType: string; value?: number; occurredAt?: Date }): Promise<void> {
+    const occurredAt = event.occurredAt || new Date();
+    const windowStart = new Date(occurredAt.toISOString().split('T')[0]); // Start of day
+    const windowEnd = new Date(windowStart);
+    windowEnd.setDate(windowEnd.getDate() + 1); // Next day
+    
+    const metrics: InsertTemplateMetrics = {
+      templateVersionId: event.templateVersionId,
+      windowStart: windowStart.toISOString().split('T')[0],
+      windowEnd: windowEnd.toISOString().split('T')[0],
+      channel: event.channel,
+      sends: event.eventType === 'send' ? 1 : 0,
+      deliveries: event.eventType === 'delivery' ? 1 : 0,
+      opens: event.eventType === 'open' ? 1 : 0,
+      clicks: event.eventType === 'click' ? 1 : 0,
+      replies: event.eventType === 'reply' ? 1 : 0,
+      meetings: event.eventType === 'meeting' ? 1 : 0,
+      revenue: event.value || 0
+    };
+    
+    await this.upsertTemplateMetricsWindow(metrics);
+  }
+
+  async upsertTemplateMetricsWindow(metrics: InsertTemplateMetrics): Promise<TemplateMetrics> {
+    // Try to find existing metrics for this window
+    const existing = await db.select()
+      .from(templateMetrics)
+      .where(and(
+        eq(templateMetrics.templateVersionId, metrics.templateVersionId),
+        eq(templateMetrics.windowStart, metrics.windowStart as string),
+        eq(templateMetrics.channel, metrics.channel)
+      ))
+      .limit(1);
+    
+    if (existing[0]) {
+      // Update existing metrics (increment counters)
+      const updated = {
+        sends: (existing[0].sends || 0) + (metrics.sends || 0),
+        deliveries: (existing[0].deliveries || 0) + (metrics.deliveries || 0),
+        opens: (existing[0].opens || 0) + (metrics.opens || 0),
+        clicks: (existing[0].clicks || 0) + (metrics.clicks || 0),
+        replies: (existing[0].replies || 0) + (metrics.replies || 0),
+        meetings: (existing[0].meetings || 0) + (metrics.meetings || 0),
+        revenue: (existing[0].revenue || 0) + (metrics.revenue || 0),
+        lastUpdated: new Date()
+      };
+      
+      const result = await db.update(templateMetrics)
+        .set(updated)
+        .where(eq(templateMetrics.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      // Create new metrics window
+      const result = await db.insert(templateMetrics).values(metrics).returning();
+      return result[0];
+    }
+  }
+
+  async getTemplateMetrics(templateId: string, startDate?: string, endDate?: string): Promise<TemplateMetrics[]> {
+    const versionIds = await db.select({ id: templateVersions.id })
+      .from(templateVersions)
+      .where(eq(templateVersions.templateId, templateId));
+    
+    if (versionIds.length === 0) return [];
+    
+    let query = db.select()
+      .from(templateMetrics)
+      .where(sql`${templateMetrics.templateVersionId} = ANY(${versionIds.map(v => v.id)})`);
+    
+    if (startDate) {
+      query = query.where(sql`${templateMetrics.windowStart} >= ${startDate}`);
+    }
+    if (endDate) {
+      query = query.where(sql`${templateMetrics.windowEnd} <= ${endDate}`);
+    }
+    
+    return await query;
   }
 }
 
