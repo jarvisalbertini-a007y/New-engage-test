@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema, insertWhiteLabelSchema, insertEnterpriseSecuritySchema, insertAccessControlSchema } from "@shared/schema";
+import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema, insertWhiteLabelSchema, insertEnterpriseSecuritySchema, insertAccessControlSchema, insertContentTemplateSchema, insertTemplateVersionSchema, insertAudienceSegmentSchema, insertTemplateMetricsSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
 import { generateContent, generateSequenceSteps } from "./services/contentGeneration";
 import { getActiveVisitorIntelligence, trackVisitorActivity } from "./services/visitorIntelligence";
@@ -3662,6 +3662,388 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Content Template Routes
+  // Get all content templates
+  app.get("/api/content-templates", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const status = req.query.status as string;
+      const personaId = req.query.personaId as string;
+      const includeArchived = req.query.includeArchived === 'true';
+      
+      const templates = await storage.listTemplates({
+        status,
+        personaId,
+        includeArchived
+      });
+      
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch templates' });
+    }
+  });
+  
+  // Get a specific template by ID
+  app.get("/api/content-templates/:id", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const templateData = await storage.getTemplateWithRelations(id);
+      
+      if (!templateData) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      res.json(templateData);
+    } catch (error) {
+      console.error("Error fetching template:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch template' });
+    }
+  });
+  
+  // Create a new content template
+  app.post("/api/content-templates", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const parsed = insertContentTemplateSchema.safeParse({
+        ...req.body,
+        createdBy: userId
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const { segmentIds, ...templateData } = parsed.data as any;
+      const template = await storage.createTemplate({
+        ...templateData,
+        segmentIds
+      });
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create template' });
+    }
+  });
+  
+  // Update a content template
+  app.patch("/api/content-templates/:id", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const template = await storage.updateTemplate(id, updates);
+      
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update template' });
+    }
+  });
+  
+  // Archive a content template (instead of delete)
+  app.delete("/api/content-templates/:id", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const archived = await storage.archiveTemplate(id);
+      
+      if (!archived) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      res.json({ success: true, archived: true });
+    } catch (error) {
+      console.error("Error archiving template:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to archive template' });
+    }
+  });
+  
+  // Get template versions
+  app.get("/api/content-templates/:id/versions", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const includeDrafts = req.query.includeDrafts === 'true';
+      const versions = await storage.listTemplateVersions(id, { includeDrafts });
+      
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching versions:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch versions' });
+    }
+  });
+  
+  // Create a new template version
+  app.post("/api/content-templates/:id/versions", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const parsed = insertTemplateVersionSchema.safeParse({
+        ...req.body,
+        templateId: id,
+        createdBy: userId
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const { segmentSnapshotIds, ...versionData } = parsed.data as any;
+      const version = await storage.createTemplateVersion({
+        ...versionData,
+        segmentSnapshotIds
+      });
+      res.json(version);
+    } catch (error) {
+      console.error("Error creating version:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create version' });
+    }
+  });
+  
+  // Publish a template version
+  app.post("/api/content-templates/:id/versions/:versionId/publish", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id, versionId } = req.params;
+      const published = await storage.publishTemplateVersion(id, versionId);
+      
+      if (!published) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+      
+      res.json(published);
+    } catch (error) {
+      console.error("Error publishing version:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to publish version' });
+    }
+  });
+  
+  // Get audience segments
+  app.get("/api/audience-segments", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const q = req.query.q as string;
+      const includeGlobal = req.query.includeGlobal === 'true';
+      const segments = await storage.listAudienceSegments({ 
+        createdBy: userId, 
+        q,
+        includeGlobal
+      });
+      res.json(segments);
+    } catch (error) {
+      console.error("Error fetching segments:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch segments' });
+    }
+  });
+  
+  // Create audience segment
+  app.post("/api/audience-segments", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const parsed = insertAudienceSegmentSchema.safeParse({
+        ...req.body,
+        createdBy: userId
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const segment = await storage.createAudienceSegment(parsed.data);
+      res.json(segment);
+    } catch (error) {
+      console.error("Error creating segment:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create segment' });
+    }
+  });
+  
+  // Update audience segment  
+  app.patch("/api/audience-segments/:id", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const segment = await storage.updateAudienceSegment(id, req.body);
+      
+      if (!segment) {
+        return res.status(404).json({ error: "Segment not found" });
+      }
+      
+      res.json(segment);
+    } catch (error) {
+      console.error("Error updating segment:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update segment' });
+    }
+  });
+  
+  // Delete audience segment
+  app.delete("/api/audience-segments/:id", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const deleted = await storage.deleteAudienceSegment(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Segment not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting segment:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete segment' });
+    }
+  });
+  
+  // Attach segments to a template
+  app.post("/api/content-templates/:id/segments", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const { segmentIds } = req.body;
+      
+      if (!Array.isArray(segmentIds)) {
+        return res.status(400).json({ error: "segmentIds must be an array" });
+      }
+      
+      await storage.attachSegments(id, segmentIds);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error attaching segments:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to attach segments' });
+    }
+  });
+  
+  // Detach a segment from a template
+  app.delete("/api/content-templates/:id/segments/:segmentId", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id, segmentId } = req.params;
+      const detached = await storage.detachSegment(id, segmentId);
+      
+      if (!detached) {
+        return res.status(404).json({ error: "Segment not found on template" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error detaching segment:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to detach segment' });
+    }
+  });
+  
+  // Record template metrics
+  app.post("/api/content-templates/:id/metrics", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const { versionId, channel, eventType, value } = req.body;
+      
+      if (!versionId || !channel || !eventType) {
+        return res.status(400).json({ error: "versionId, channel, and eventType are required" });
+      }
+      
+      await storage.recordTemplateMetricEvent({
+        templateVersionId: versionId,
+        channel,
+        eventType,
+        value: value || 1,
+        occurredAt: new Date()
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording metric:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to record metric' });
+    }
+  });
+  
+  // Get template metrics
+  app.get("/api/content-templates/:id/metrics", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { id } = req.params;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      
+      const metrics = await storage.getTemplateMetrics(id, startDate, endDate);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching metrics:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch metrics' });
+    }
+  });
+
   // Crowd Intelligence Routes
   // Browse shared intelligence
   app.get("/api/crowd-intel", async (req: any, res) => {
