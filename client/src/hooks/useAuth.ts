@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-// TEMPORARY: Testing mode flag
-const TESTING_MODE = true; // Set to false to re-enable normal authentication
+// Authentication is now properly enabled
+const TESTING_MODE = false; // Real authentication is now required
 
 export function useAuth() {
   // In testing mode, return mock authenticated user

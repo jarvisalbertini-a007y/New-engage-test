@@ -51,8 +51,8 @@ function Router() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   
-  // TEMPORARY: Testing mode flag
-  const TESTING_MODE = true; // Must match the flag in useAuth
+  // Authentication is now properly enabled
+  const TESTING_MODE = false; // Real authentication is now required
   
   // Check onboarding status (only for authenticated users)
   const { data: profile, isLoading: profileLoading } = useQuery({

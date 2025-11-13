@@ -639,6 +639,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sequences/generate-steps", async (req, res) => {
     try {
+      console.log("[Generate Steps] Request received:", {
+        hasSession: !!req.session,
+        hasUser: !!req.user,
+        userSub: (req.user as any)?.claims?.sub,
+        headers: req.headers,
+        body: req.body
+      });
+      
       const { name, description, sequenceType = 'email_only' } = req.body;
       
       // Generate AI-powered sequence steps based on name and description

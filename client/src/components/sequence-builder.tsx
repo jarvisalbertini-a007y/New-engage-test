@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Mail, Phone, Linkedin, Clock, Edit, Trash2, Play, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import EmailComposer from "./email-composer";
 
 interface SequenceStep {
@@ -115,36 +116,40 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
       const sequenceName = form.getValues("name") || "New Sequence";
       const sequenceDescription = form.getValues("description") || "";
       
-      const response = await fetch("/api/sequences/generate-steps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: sequenceName,
-          description: sequenceDescription,
-          sequenceType,
-        }),
+      console.log("Generating AI steps with:", { sequenceName, sequenceDescription, sequenceType });
+      
+      const response = await apiRequest("POST", "/api/sequences/generate-steps", {
+        name: sequenceName,
+        description: sequenceDescription,
+        sequenceType,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate steps");
-      }
+      console.log("Response received successfully");
 
       const data = await response.json();
+      console.log("Generated steps data:", data);
+      
+      if (!data.steps || !Array.isArray(data.steps)) {
+        throw new Error("Invalid response format - missing steps array");
+      }
+      
       const aiSteps: SequenceStep[] = data.steps.map((step: any, index: number) => ({
-        stepNumber: index + 1,
+        stepNumber: step.stepNumber || index + 1,
         type: step.type || "email",
         delay: step.delay || 0,
         subject: step.subject,
         template: step.template || step.content || "",
-        isActive: true,
+        isActive: step.isActive !== false,
       }));
       
+      console.log("Processed AI steps:", aiSteps);
       setSteps(aiSteps);
       toast({
         title: "AI Steps Generated",
-        description: "AI has created a multi-step sequence for you.",
+        description: `Successfully created ${aiSteps.length} steps for your sequence.`,
       });
     } catch (error) {
+      console.error("Error generating AI steps:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to generate AI steps. Please try again.",
