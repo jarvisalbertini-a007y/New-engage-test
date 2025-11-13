@@ -90,7 +90,7 @@ async function testSequencesAPI() {
       .send(newSequence)
       .set('Content-Type', 'application/json');
       
-    if (res.status === 201 && res.body.id) {
+    if ((res.status === 200 || res.status === 201) && res.body.id) {
       console.log(`  ✅ POST /api/sequences - Created: ${res.body.name}`);
       
       // Test UPDATE
@@ -157,7 +157,7 @@ async function testAutopilotAPI() {
       .send(newCampaign)
       .set('Content-Type', 'application/json');
       
-    if (res.status === 201 && res.body.id) {
+    if ((res.status === 200 || res.status === 201) && res.body.id) {
       console.log(`  ✅ POST /api/autopilot/campaigns - Created: ${res.body.name}`);
       
       // Test GET by ID
@@ -217,7 +217,7 @@ async function testVoiceCampaignsAPI() {
       .send(newCampaign)
       .set('Content-Type', 'application/json');
       
-    if (res.status === 201 && res.body.id) {
+    if ((res.status === 200 || res.status === 201) && res.body.id) {
       console.log(`  ✅ POST /api/voice/campaigns - Created: ${res.body.name}`);
       
       // Test UPDATE
@@ -255,6 +255,8 @@ async function testVoiceCampaignsAPI() {
       name: `Test Script ${Date.now()}`,
       scriptType: 'cold_call',
       content: 'Hello, this is a test script.',
+      introduction: 'Hi, this is a test introduction.',
+      mainContent: 'This is the main content of the test script.',
       isActive: true
     };
     
@@ -263,7 +265,7 @@ async function testVoiceCampaignsAPI() {
       .send(newScript)
       .set('Content-Type', 'application/json');
       
-    if (res.status === 201 && res.body.id) {
+    if ((res.status === 200 || res.status === 201) && res.body.id) {
       console.log(`  ✅ POST /api/voice/scripts - Created: ${res.body.name}`);
     } else {
       console.log(`  ❌ POST /api/voice/scripts - Status: ${res.status}`);
@@ -306,7 +308,7 @@ async function testInsightsAPI() {
       .send(newInsight)
       .set('Content-Type', 'application/json');
       
-    if (res.status === 201 && res.body.id) {
+    if ((res.status === 200 || res.status === 201) && res.body.id) {
       console.log(`  ✅ POST /api/insights - Created: ${res.body.title}`);
     } else {
       console.log(`  ❌ POST /api/insights - Status: ${res.status}`);

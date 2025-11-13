@@ -43,11 +43,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Global authentication middleware for all /api routes
   app.use('/api/*', (req: any, res, next) => {
-    // Authentication is now properly enforced
-    const TESTING_MODE = false; // Authentication is enabled for production
+    // Check for AUTH_TEST_BYPASS environment variable
+    const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+    const bypassEnabled = process.env.AUTH_TEST_BYPASS === 'true';
+    const notProduction = process.env.NODE_ENV !== 'production';
     
-    if (TESTING_MODE) {
-      // This code path is now disabled - proper authentication required
+    if (bypassEnabled && isTestEnvironment && notProduction) {
+      // Test bypass is active - create a test user if needed
       if (!req.user) {
         req.user = {
           claims: {
@@ -60,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
         };
       }
-      console.log('[AUTH] Testing mode enabled - bypassing authentication');
+      console.log('[AUTH] Test bypass enabled - skipping authentication');
       return next();
     }
     
