@@ -999,6 +999,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Agent Execution routes
+  app.post("/api/agents/:id/execute", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { taskType, context, targetId } = req.body;
+      const userId = req.user?.id || 'system';
+      
+      // Verify agent exists and is active
+      const agent = await storage.getAiAgent(id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      if (agent.status !== 'active') {
+        return res.status(400).json({ error: "Agent is not active" });
+      }
+      
+      // Import and use the aiAgentExecutor
+      const { aiAgentExecutor } = await import("./services/aiAgentExecutor");
+      
+      // Queue the task
+      const jobId = await aiAgentExecutor.queueTask(id, taskType, context, targetId, userId);
+      
+      res.json({ 
+        success: true, 
+        jobId,
+        message: "Task queued for execution"
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/agents/:id/executions", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const status = req.query.status as string;
+      
+      // Get executions for this agent
+      const executions = await storage.getAgentExecutions({ 
+        agentId: id, 
+        status 
+      });
+      
+      res.json(executions);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/agents/:id/metrics", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const date = req.query.date as string;
+      
+      // Get metrics for this agent
+      const metrics = await storage.getAgentMetrics(id, date);
+      
+      if (!metrics) {
+        // Return default metrics if none exist
+        res.json({
+          agentId: id,
+          date: date || new Date().toISOString().split('T')[0],
+          tasksCompleted: 0,
+          tasksFailed: 0,
+          avgExecutionTime: 0,
+          successRate: 0,
+          leadsGenerated: 0,
+          emailsComposed: 0,
+          dataEnriched: 0
+        });
+      } else {
+        res.json(metrics);
+      }
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/executions/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      
+      // First check if it exists in database
+      const execution = await storage.getAgentExecution(jobId);
+      
+      if (!execution) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      res.json(execution);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // Onboarding routes
   app.get("/api/onboarding/profile", async (req, res) => {
     try {

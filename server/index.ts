@@ -130,6 +130,11 @@ app.use((req, res, next) => {
   // Initialize workflow data (templates and agent types)
   // Temporarily disabled to debug startup issues
   
+  // Initialize AI Agent Executor service
+  const { aiAgentExecutor } = await import("./services/aiAgentExecutor");
+  await aiAgentExecutor.start();
+  console.log("[Server] AI Agent Executor service started");
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
