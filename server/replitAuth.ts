@@ -134,33 +134,33 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = (req, res, next) => {
-  // Wrap async logic in an immediately invoked async function
-  (async () => {
-    // Auth bypass for testing - ONLY in development/test environments
-    // Multiple safety checks to prevent accidental production bypass
-    const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
-    const bypassEnabled = process.env.AUTH_TEST_BYPASS === 'true';
-    const notProduction = process.env.NODE_ENV !== 'production';
-    const notReplitProduction = !process.env.REPLIT_DOMAINS?.includes('replit.app');
-    
-    if (bypassEnabled && isTestEnvironment && notProduction && notReplitProduction) {
-      console.warn('[Auth] TEST BYPASS ACTIVE - This should NEVER appear in production logs');
-      // Create a test user for authenticated requests
-      if (!req.user) {
-        req.user = {
-          claims: {
-            sub: 'test-user-bypass',
-            email: 'test@example.com',
-            first_name: 'Test',
-            last_name: 'User',
-            exp: Math.floor(Date.now() / 1000) + 3600 // Expires in 1 hour
-          },
-          expires_at: Math.floor(Date.now() / 1000) + 3600
-        } as any;
-      }
-      return next();
+  // Auth bypass for testing - ONLY in development/test environments
+  // Multiple safety checks to prevent accidental production bypass
+  const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+  const bypassEnabled = process.env.AUTH_TEST_BYPASS === 'true';
+  const notProduction = process.env.NODE_ENV !== 'production';
+  const notReplitProduction = !process.env.REPLIT_DOMAINS?.includes('replit.app');
+  
+  if (bypassEnabled && isTestEnvironment && notProduction && notReplitProduction) {
+    console.warn('[Auth] TEST BYPASS ACTIVE - This should NEVER appear in production logs');
+    // Create a test user for authenticated requests
+    if (!req.user) {
+      req.user = {
+        claims: {
+          sub: 'test-user-bypass',
+          email: 'test@example.com',
+          first_name: 'Test',
+          last_name: 'User',
+          exp: Math.floor(Date.now() / 1000) + 3600 // Expires in 1 hour
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 3600
+      } as any;
     }
-    
+    return next();
+  }
+
+  // Wrap regular auth logic in an immediately invoked async function
+  (async () => {
     const user = req.user as any;
     
     // Debug logging for authentication
