@@ -639,13 +639,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sequences/generate-steps", async (req, res) => {
     try {
-      const { personaId, sequenceType, stepCount } = req.body;
-      const steps = await generateSequenceSteps(personaId, sequenceType, stepCount);
-      res.json(steps);
+      const { name, description, sequenceType = 'email_only' } = req.body;
+      
+      // Generate AI-powered sequence steps based on name and description
+      // We'll create a simple sequence without requiring a persona
+      const stepCount = sequenceType === 'multi_channel' ? 5 : 4;
+      const steps = [];
+      
+      for (let i = 1; i <= stepCount; i++) {
+        if (sequenceType === 'email_only') {
+          steps.push({
+            stepNumber: i,
+            type: 'email',
+            delay: i === 1 ? 0 : (i - 1) * 3, // 0, 3, 6, 9 days
+            subject: i === 1 ? `Introduction - ${name}` : `Follow up ${i} - ${name}`,
+            template: generateEmailTemplate(i, stepCount, name, description),
+            isActive: true
+          });
+        } else {
+          // Multi-channel: email, linkedin, email, phone, email pattern
+          const stepTypes = ['email', 'linkedin', 'email', 'phone', 'email'];
+          const stepType = stepTypes[i - 1] || 'email';
+          
+          steps.push({
+            stepNumber: i,
+            type: stepType,
+            delay: i === 1 ? 0 : (i - 1) * 2, // 0, 2, 4, 6, 8 days
+            subject: stepType === 'email' ? 
+              (i === 1 ? `Introduction - ${name}` : `Follow up - ${name}`) : 
+              undefined,
+            template: generateStepContent(i, stepCount, stepType, name, description),
+            isActive: true
+          });
+        }
+      }
+      
+      res.json({ steps });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      console.error("Error generating sequence steps:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate sequence steps' });
     }
   });
+  
+  // Helper function to generate email templates
+  function generateEmailTemplate(stepNumber: number, totalSteps: number, sequenceName: string, description: string): string {
+    const isFirst = stepNumber === 1;
+    const isLast = stepNumber === totalSteps;
+    
+    if (isFirst) {
+      return `Hi {{firstName}},
+
+I hope this email finds you well. ${description ? description : `I'm reaching out regarding ${sequenceName}.`}
+
+I noticed that {{company}} has been making great progress in {{industry}}, and I believe we could help you achieve even better results.
+
+Would you be interested in a brief 15-minute call to discuss how we can help?
+
+Best regards,
+{{senderName}}`;
+    } else if (isLast) {
+      return `Hi {{firstName}},
+
+I've reached out a few times about how we can help {{company}} with their goals.
+
+If this isn't a priority right now, I completely understand. I'll check back in a few months.
+
+If you are interested but the timing isn't right, just let me know when would be better.
+
+Best regards,
+{{senderName}}`;
+    } else {
+      return `Hi {{firstName}},
+
+I wanted to follow up on my previous email about helping {{company}} achieve their goals.
+
+I'd love to show you how we've helped similar companies in {{industry}} achieve great results.
+
+Do you have 15 minutes this week for a quick call?
+
+Best regards,
+{{senderName}}`;
+    }
+  }
+  
+  // Helper function to generate content for different step types
+  function generateStepContent(stepNumber: number, totalSteps: number, type: string, sequenceName: string, description: string): string {
+    switch (type) {
+      case 'email':
+        return generateEmailTemplate(stepNumber, totalSteps, sequenceName, description);
+      case 'linkedin':
+        return `Hi {{firstName}}, I noticed we're both connected to the {{industry}} space. ${description ? description : `I'd love to connect and share insights about ${sequenceName}.`} Would you be open to connecting?`;
+      case 'phone':
+        return `Call Script:
+1. Introduction: Hi {{firstName}}, this is {{senderName}} from {{companyName}}
+2. Reference previous emails about ${sequenceName}
+3. ${description ? description : 'Share value proposition'}
+4. Ask for meeting or next steps
+5. Handle objections if needed`;
+      case 'wait':
+        return 'Wait step - no action required';
+      default:
+        return '';
+    }
+  }
   
   // Campaigns Route - Aggregates all campaign types
   app.get("/api/campaigns", async (req, res) => {
