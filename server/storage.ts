@@ -1544,11 +1544,7 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  // Voice Campaign implementations
-  voiceCampaigns = new Map<string, VoiceCampaign>();
-  voiceCalls = new Map<string, VoiceCall>();
-  voiceScripts = new Map<string, VoiceScript>();
-  callAnalytics = new Map<string, CallAnalytics>();
+  // Voice Campaign implementations (Maps already declared above)
   
   async getVoiceCampaign(id: string): Promise<VoiceCampaign | undefined> {
     return this.voiceCampaigns.get(id);
