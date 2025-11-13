@@ -75,7 +75,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // Helper to filter out undefined values from partial updates
 function cleanPartial<T extends Record<string, any>>(obj: Partial<T>): Partial<T> {
@@ -1244,10 +1244,9 @@ export class MemStorage implements IStorage {
       creativityLevel: campaign.creativityLevel || 5,
       personalizationDepth: campaign.personalizationDepth || 'moderate',
       toneOfVoice: campaign.toneOfVoice || 'professional',
-      settings: campaign.settings || null,
       startDate: campaign.startDate || null,
       endDate: campaign.endDate || null,
-      lastRunAt: campaign.lastRunAt || null,
+      lastRunAt: null, // This is only set when a run completes
       createdBy: campaign.createdBy || null,
       createdAt: new Date()
     };
@@ -1289,8 +1288,8 @@ export class MemStorage implements IStorage {
       decisions: run.decisions || null,
       qualificationResults: run.qualificationResults || null,
       startedAt: new Date(),
-      completedAt: run.completedAt || null,
-      duration: run.duration || null
+      completedAt: null, // Will be set when run completes
+      duration: null // Will be calculated when run completes
     };
     
     this.autopilotRuns.set(id, newRun);
@@ -1303,6 +1302,223 @@ export class MemStorage implements IStorage {
     
     const updated = { ...run, ...updates };
     this.autopilotRuns.set(id, updated);
+    return updated;
+  }
+
+  // Voice Campaign implementations
+  voiceCampaigns = new Map<string, VoiceCampaign>();
+  voiceCalls = new Map<string, VoiceCall>();
+  voiceScripts = new Map<string, VoiceScript>();
+  callAnalytics = new Map<string, CallAnalytics>();
+  
+  async getVoiceCampaign(id: string): Promise<VoiceCampaign | undefined> {
+    return this.voiceCampaigns.get(id);
+  }
+  
+  async getVoiceCampaigns(filters?: { status?: string; createdBy?: string }): Promise<VoiceCampaign[]> {
+    let campaigns = Array.from(this.voiceCampaigns.values());
+    
+    if (filters?.status) {
+      campaigns = campaigns.filter(c => c.status === filters.status);
+    }
+    if (filters?.createdBy) {
+      campaigns = campaigns.filter(c => c.createdBy === filters.createdBy);
+    }
+    
+    return campaigns;
+  }
+  
+  async createVoiceCampaign(campaign: InsertVoiceCampaign): Promise<VoiceCampaign> {
+    const id = randomUUID();
+    const newCampaign: VoiceCampaign = {
+      id,
+      name: campaign.name,
+      status: campaign.status || 'draft',
+      targetContacts: campaign.targetContacts || null,
+      scriptId: campaign.scriptId || null,
+      voiceSettings: campaign.voiceSettings || null,
+      callSchedule: campaign.callSchedule || null,
+      complianceSettings: campaign.complianceSettings || null,
+      totalCallsScheduled: 0,
+      totalCallsCompleted: 0,
+      totalConversations: 0,
+      avgCallDuration: 0,
+      totalCallbacksScheduled: 0,
+      totalPositiveOutcomes: 0,
+      createdBy: campaign.createdBy || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.voiceCampaigns.set(id, newCampaign);
+    return newCampaign;
+  }
+  
+  async updateVoiceCampaign(id: string, updates: Partial<VoiceCampaign>): Promise<VoiceCampaign | undefined> {
+    const campaign = this.voiceCampaigns.get(id);
+    if (!campaign) return undefined;
+    
+    const updated = { ...campaign, ...updates, updatedAt: new Date() };
+    this.voiceCampaigns.set(id, updated);
+    return updated;
+  }
+  
+  async deleteVoiceCampaign(id: string): Promise<boolean> {
+    return this.voiceCampaigns.delete(id);
+  }
+  
+  // Voice Call methods
+  async getVoiceCall(id: string): Promise<VoiceCall | undefined> {
+    return this.voiceCalls.get(id);
+  }
+  
+  async getVoiceCalls(filters?: { campaignId?: string; contactId?: string; callStatus?: string }): Promise<VoiceCall[]> {
+    let calls = Array.from(this.voiceCalls.values());
+    
+    if (filters?.campaignId) {
+      calls = calls.filter(c => c.campaignId === filters.campaignId);
+    }
+    if (filters?.contactId) {
+      calls = calls.filter(c => c.contactId === filters.contactId);
+    }
+    if (filters?.callStatus) {
+      calls = calls.filter(c => c.callStatus === filters.callStatus);
+    }
+    
+    return calls;
+  }
+  
+  async createVoiceCall(call: InsertVoiceCall): Promise<VoiceCall> {
+    const id = randomUUID();
+    const newCall: VoiceCall = {
+      id,
+      campaignId: call.campaignId || null,
+      contactId: call.contactId || null,
+      phoneNumber: call.phoneNumber,
+      callStatus: call.callStatus || 'pending',
+      direction: call.direction || 'outbound',
+      duration: call.duration || null,
+      recordingUrl: call.recordingUrl || null,
+      transcript: call.transcript || null,
+      aiAnalysis: call.aiAnalysis || null,
+      sentiment: call.sentiment || null,
+      keyMoments: call.keyMoments || null,
+      nextSteps: call.nextSteps || null,
+      scheduledAt: call.scheduledAt || null,
+      startedAt: call.startedAt || null,
+      completedAt: call.completedAt || null,
+      consentObtained: call.consentObtained || false,
+      doNotCallStatus: call.doNotCallStatus || false,
+      createdAt: new Date()
+    };
+    
+    this.voiceCalls.set(id, newCall);
+    return newCall;
+  }
+  
+  async updateVoiceCall(id: string, updates: Partial<VoiceCall>): Promise<VoiceCall | undefined> {
+    const call = this.voiceCalls.get(id);
+    if (!call) return undefined;
+    
+    const updated = { ...call, ...updates };
+    this.voiceCalls.set(id, updated);
+    return updated;
+  }
+  
+  // Voice Script methods
+  async getVoiceScript(id: string): Promise<VoiceScript | undefined> {
+    return this.voiceScripts.get(id);
+  }
+  
+  async getVoiceScripts(filters?: { scriptType?: string; isActive?: boolean; createdBy?: string }): Promise<VoiceScript[]> {
+    let scripts = Array.from(this.voiceScripts.values());
+    
+    if (filters?.scriptType) {
+      scripts = scripts.filter(s => s.scriptType === filters.scriptType);
+    }
+    if (filters?.isActive !== undefined) {
+      scripts = scripts.filter(s => s.isActive === filters.isActive);
+    }
+    if (filters?.createdBy) {
+      scripts = scripts.filter(s => s.createdBy === filters.createdBy);
+    }
+    
+    return scripts;
+  }
+  
+  async createVoiceScript(script: InsertVoiceScript): Promise<VoiceScript> {
+    const id = randomUUID();
+    const newScript: VoiceScript = {
+      id,
+      name: script.name,
+      scriptType: script.scriptType || 'cold_call',
+      content: script.content,
+      variables: script.variables || null,
+      objectionHandlers: script.objectionHandlers || null,
+      talkTracks: script.talkTracks || null,
+      complianceNotes: script.complianceNotes || null,
+      performanceMetrics: script.performanceMetrics || null,
+      isActive: script.isActive !== false,
+      version: script.version || 1,
+      createdBy: script.createdBy || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.voiceScripts.set(id, newScript);
+    return newScript;
+  }
+  
+  async updateVoiceScript(id: string, updates: Partial<VoiceScript>): Promise<VoiceScript | undefined> {
+    const script = this.voiceScripts.get(id);
+    if (!script) return undefined;
+    
+    const updated = { ...script, ...updates, updatedAt: new Date() };
+    this.voiceScripts.set(id, updated);
+    return updated;
+  }
+  
+  async deleteVoiceScript(id: string): Promise<boolean> {
+    return this.voiceScripts.delete(id);
+  }
+  
+  // Call Analytics methods
+  async getCallAnalytics(callId: string): Promise<CallAnalytics | undefined> {
+    return Array.from(this.callAnalytics.values()).find(a => a.callId === callId);
+  }
+  
+  async getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]> {
+    return Array.from(this.callAnalytics.values()).filter(a => a.campaignId === campaignId);
+  }
+  
+  async createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics> {
+    const id = randomUUID();
+    const newAnalytics: CallAnalytics = {
+      id,
+      callId: analytics.callId,
+      campaignId: analytics.campaignId || null,
+      talkTimeRatio: analytics.talkTimeRatio || 0,
+      interruptionCount: analytics.interruptionCount || 0,
+      sentimentScore: analytics.sentimentScore || 0,
+      objectionCount: analytics.objectionCount || 0,
+      questionCount: analytics.questionCount || 0,
+      competitorMentions: analytics.competitorMentions || null,
+      keywordsDetected: analytics.keywordsDetected || null,
+      complianceIssues: analytics.complianceIssues || null,
+      coachingNotes: analytics.coachingNotes || null,
+      createdAt: new Date()
+    };
+    
+    this.callAnalytics.set(id, newAnalytics);
+    return newAnalytics;
+  }
+  
+  async updateCallAnalytics(id: string, updates: Partial<CallAnalytics>): Promise<CallAnalytics | undefined> {
+    const analytics = this.callAnalytics.get(id);
+    if (!analytics) return undefined;
+    
+    const updated = { ...analytics, ...updates };
+    this.callAnalytics.set(id, updated);
     return updated;
   }
 
