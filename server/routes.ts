@@ -572,12 +572,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Content Generation Routes
+  // Original endpoint for backward compatibility
   app.post("/api/content/generate", async (req, res) => {
     try {
       const content = await generateContent(req.body);
       res.json(content);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // New endpoint used by Content Studio
+  app.post("/api/content-generation/generate", async (req: any, res) => {
+    try {
+      console.log("Content generation request received:", {
+        body: req.body,
+        user: req.user,
+        authenticated: !!req.user
+      });
+      
+      // For now, just call generateContent with the request body
+      // TODO: Update generateContent to accept userId when needed
+      const content = await generateContent(req.body);
+      console.log("Content generated successfully:", content);
+      res.json(content);
+    } catch (error) {
+      console.error("Content generation error details:", {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        request: req.body
+      });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate content' });
     }
   });
 

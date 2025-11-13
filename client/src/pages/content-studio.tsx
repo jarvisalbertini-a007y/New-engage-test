@@ -44,17 +44,29 @@ export default function ContentStudio() {
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["/api/contacts"],
-    queryFn: () => api.getContacts({ limit: 100 }),
+    queryFn: async () => {
+      const response = await api.getContacts({ limit: 100 });
+      // Ensure we always return an array, even if the API returns an error
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: companies = [] } = useQuery({
     queryKey: ["/api/companies"],
-    queryFn: () => api.getCompanies(100),
+    queryFn: async () => {
+      const response = await api.getCompanies(100);
+      // Ensure we always return an array, even if the API returns an error
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: insights = [] } = useQuery({
     queryKey: ["/api/insights"],
-    queryFn: () => api.getInsights({ limit: 20 }),
+    queryFn: async () => {
+      const response = await api.getInsights({ limit: 20 });
+      // Ensure we always return an array, even if the API returns an error
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: audienceSegments = [] } = useQuery({
@@ -282,7 +294,7 @@ export default function ContentStudio() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {contacts?.slice(0, 20).map((contact: any) => (
+                      {Array.isArray(contacts) && contacts.slice(0, 20).map((contact: any) => (
                         <SelectItem key={contact.id} value={contact.id}>
                           {contact.firstName} {contact.lastName}
                         </SelectItem>
@@ -299,7 +311,7 @@ export default function ContentStudio() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {companies?.slice(0, 20).map((company: any) => (
+                      {Array.isArray(companies) && companies.slice(0, 20).map((company: any) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
                         </SelectItem>

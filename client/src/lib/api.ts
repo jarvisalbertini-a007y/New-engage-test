@@ -56,7 +56,7 @@ export const api = {
   
   // Content Generation
   generateContent: async (request: any) => {
-    const response = await apiRequest("POST", "/api/content/generate", request);
+    const response = await apiRequest("POST", "/api/content-generation/generate", request);
     return response.json();
   },
   generatePersonalizedEmail: async (context: any) => {
