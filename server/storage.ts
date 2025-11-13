@@ -1068,55 +1068,156 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  // Phone Calls (stub implementations)
+  // Phone Calls implementation
+  private phoneCalls: Map<string, PhoneCall> = new Map();
+  
   async getPhoneCall(id: string): Promise<PhoneCall | undefined> {
-    return undefined;
+    return this.phoneCalls.get(id);
   }
 
   async getPhoneCalls(filters?: { contactId?: string; userId?: string; status?: string }): Promise<PhoneCall[]> {
-    return [];
+    let calls = Array.from(this.phoneCalls.values());
+    
+    if (filters?.contactId) {
+      calls = calls.filter(c => c.contactId === filters.contactId);
+    }
+    if (filters?.userId) {
+      calls = calls.filter(c => c.userId === filters.userId);
+    }
+    if (filters?.status) {
+      calls = calls.filter(c => c.status === filters.status);
+    }
+    
+    return calls;
   }
 
   async createPhoneCall(call: InsertPhoneCall): Promise<PhoneCall> {
-    return { ...call, id: randomUUID(), createdAt: new Date() } as PhoneCall;
+    const id = randomUUID();
+    const newCall: PhoneCall = { 
+      id,
+      contactId: call.contactId || null,
+      userId: call.userId || null,
+      phoneNumber: call.phoneNumber,
+      direction: call.direction,
+      status: call.status,
+      duration: call.duration || null,
+      recordingUrl: call.recordingUrl || null,
+      transcription: call.transcription || null,
+      sentiment: call.sentiment || null,
+      talkTrackId: call.talkTrackId || null,
+      notes: call.notes || null,
+      scheduledAt: call.scheduledAt || null,
+      startedAt: call.startedAt || null,
+      endedAt: call.endedAt || null,
+      createdAt: new Date()
+    };
+    this.phoneCalls.set(id, newCall);
+    return newCall;
   }
 
   async updatePhoneCall(id: string, updates: Partial<PhoneCall>): Promise<PhoneCall | undefined> {
-    return undefined;
+    const call = this.phoneCalls.get(id);
+    if (!call) return undefined;
+    
+    const updated = { ...call, ...updates };
+    this.phoneCalls.set(id, updated);
+    return updated;
   }
 
-  // Call Scripts (stub implementations)
+  // Call Scripts implementation
+  private callScripts: Map<string, CallScript> = new Map();
+  
   async getCallScript(id: string): Promise<CallScript | undefined> {
-    return undefined;
+    return this.callScripts.get(id);
   }
 
   async getCallScripts(filters?: { type?: string; personaId?: string }): Promise<CallScript[]> {
-    return [];
+    let scripts = Array.from(this.callScripts.values());
+    
+    if (filters?.type) {
+      scripts = scripts.filter(s => s.type === filters.type);
+    }
+    if (filters?.personaId) {
+      scripts = scripts.filter(s => s.personaId === filters.personaId);
+    }
+    
+    return scripts;
   }
 
   async createCallScript(script: InsertCallScript): Promise<CallScript> {
-    return { ...script, id: randomUUID(), createdAt: new Date(), usageCount: 0 } as CallScript;
+    const id = randomUUID();
+    const newScript: CallScript = {
+      id,
+      name: script.name,
+      type: script.type,
+      personaId: script.personaId || null,
+      opening: script.opening,
+      valueProps: script.valueProps || null,
+      questions: script.questions || null,
+      objectionHandlers: script.objectionHandlers || null,
+      closing: script.closing || null,
+      aiGenerated: script.aiGenerated || false,
+      successRate: script.successRate || null,
+      usageCount: script.usageCount || 0,
+      createdAt: new Date()
+    };
+    this.callScripts.set(id, newScript);
+    return newScript;
   }
 
   async updateCallScript(id: string, updates: Partial<CallScript>): Promise<CallScript | undefined> {
-    return undefined;
+    const script = this.callScripts.get(id);
+    if (!script) return undefined;
+    
+    const updated = { ...script, ...updates };
+    this.callScripts.set(id, updated);
+    return updated;
   }
 
-  // Voicemails (stub implementations)
+  // Voicemails implementation
+  private voicemails: Map<string, Voicemail> = new Map();
+  
   async getVoicemail(id: string): Promise<Voicemail | undefined> {
-    return undefined;
+    return this.voicemails.get(id);
   }
 
   async getVoicemails(filters?: { contactId?: string; isListened?: boolean }): Promise<Voicemail[]> {
-    return [];
+    let vms = Array.from(this.voicemails.values());
+    
+    if (filters?.contactId) {
+      vms = vms.filter(v => v.contactId === filters.contactId);
+    }
+    if (filters?.isListened !== undefined) {
+      vms = vms.filter(v => v.isListened === filters.isListened);
+    }
+    
+    return vms;
   }
 
   async createVoicemail(voicemail: InsertVoicemail): Promise<Voicemail> {
-    return { ...voicemail, id: randomUUID(), createdAt: new Date() } as Voicemail;
+    const id = randomUUID();
+    const newVoicemail: Voicemail = {
+      id,
+      callId: voicemail.callId || null,
+      contactId: voicemail.contactId || null,
+      scriptId: voicemail.scriptId || null,
+      audioUrl: voicemail.audioUrl || null,
+      transcription: voicemail.transcription || null,
+      duration: voicemail.duration || null,
+      isListened: voicemail.isListened || false,
+      createdAt: new Date()
+    };
+    this.voicemails.set(id, newVoicemail);
+    return newVoicemail;
   }
 
   async updateVoicemail(id: string, updates: Partial<Voicemail>): Promise<Voicemail | undefined> {
-    return undefined;
+    const vm = this.voicemails.get(id);
+    if (!vm) return undefined;
+    
+    const updated = { ...vm, ...updates };
+    this.voicemails.set(id, updated);
+    return updated;
   }
 
   // AI Agents implementation
