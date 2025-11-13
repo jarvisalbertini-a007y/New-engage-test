@@ -629,10 +629,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sequences", async (req, res) => {
     try {
-      const validatedData = insertSequenceSchema.parse(req.body);
+      // Add createdBy from authenticated user
+      const userId = (req.user as any)?.claims?.sub || null;
+      const sequenceData = {
+        ...req.body,
+        createdBy: userId,
+        // Ensure steps is properly formatted
+        steps: req.body.steps || [],
+        // Ensure targets is properly formatted
+        targets: req.body.targets || null
+      };
+      
+      const validatedData = insertSequenceSchema.parse(sequenceData);
       const sequence = await storage.createSequence(validatedData);
       res.json(sequence);
     } catch (error) {
+      console.error('Sequence creation error:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
@@ -1819,13 +1831,199 @@ Best regards,
   app.post("/api/playbooks/:id/apply", async (req, res) => {
     try {
       const { id } = req.params;
-      const playbook = await storage.getPlaybook(id);
-      if (!playbook) {
-        return res.status(404).json({ error: 'Playbook not found' });
+      const { sequences: selectedSequences } = req.body;
+      const userId = (req.user as any)?.claims?.sub || 'system';
+      
+      // For template playbooks, we need to find them in the hardcoded templates
+      // since they're not in the database yet
+      let playbook: any;
+      
+      // Check if it's a template ID (e.g., "saas-enterprise", "smb-quick")
+      const templatePlaybooks: { [key: string]: any } = {
+        "saas-enterprise": {
+          id: "saas-enterprise",
+          name: "Enterprise SaaS Outreach",
+          industry: "SaaS",
+          sequences: [
+            {
+              name: "Executive Outreach",
+              steps: 12,
+              channels: ["Email", "LinkedIn", "Phone"],
+              duration: "21 days"
+            },
+            {
+              name: "Champion Building",
+              steps: 8,
+              channels: ["Email", "LinkedIn"],
+              duration: "14 days"
+            }
+          ],
+          emailTemplates: {
+            initial: {
+              subject: "Quick question about {{company}}'s sales tech stack",
+              preview: "Hi {{firstName}},\n\nI noticed {{company}} has been expanding rapidly. Many companies at your stage struggle with sales efficiency.\n\nWould you be open to learning how similar companies increased their pipeline velocity by 40%?"
+            },
+            followUp1: {
+              subject: "Thoughts on my previous note?",
+              preview: "Hi {{firstName}},\n\nI wanted to follow up on my previous email. I've helped companies like yours streamline their sales process.\n\nWould a 15-minute call next week be valuable to discuss your current sales challenges?"
+            },
+            breakup: {
+              subject: "Should I close your file?",
+              preview: "Hi {{firstName}},\n\nI haven't heard back from you, so I'm assuming the timing isn't right.\n\nIf you'd like to revisit this in the future, just let me know. Otherwise, I'll close your file for now."
+            }
+          },
+          targetAudience: {
+            titles: ["VP Sales", "CRO", "Head of Sales", "Sales Director"],
+            companySize: "500+ employees",
+            industries: ["Technology", "Financial Services", "Healthcare"]
+          }
+        },
+        "smb-quick": {
+          id: "smb-quick",
+          name: "SMB Quick Connect",
+          industry: "SMB",
+          sequences: [
+            {
+              name: "Quick Touch",
+              steps: 6,
+              channels: ["Email", "Phone"],
+              duration: "7 days"
+            },
+            {
+              name: "Referral Request",
+              steps: 4,
+              channels: ["Email"],
+              duration: "5 days"
+            }
+          ],
+          emailTemplates: {
+            initial: {
+              subject: "Quick idea for {{company}}",
+              preview: "Hi {{firstName}},\n\nI have a quick idea that could help {{company}} increase sales efficiency. It takes just 5 minutes to implement.\n\nAre you free for a brief call this week?"
+            },
+            followUp1: {
+              subject: "5-minute chat?",
+              preview: "Hi {{firstName}},\n\nI know you're busy running {{company}}. I have one specific strategy that's helped similar businesses increase revenue by 25%.\n\nCan we chat for 5 minutes tomorrow?"
+            }
+          },
+          targetAudience: {
+            titles: ["Owner", "CEO", "General Manager", "Operations Manager"],
+            companySize: "10-200 employees",
+            industries: ["Retail", "Professional Services", "Local Business"]
+          }
+        },
+        "event-followup": {
+          id: "event-followup",
+          name: "Event Follow-Up Accelerator",
+          industry: "Event",
+          sequences: [
+            {
+              name: "Hot Lead Follow-Up",
+              steps: 5,
+              channels: ["Email", "Phone", "SMS"],
+              duration: "3 days"
+            },
+            {
+              name: "Warm Lead Nurture",
+              steps: 7,
+              channels: ["Email", "LinkedIn"],
+              duration: "10 days"
+            }
+          ],
+          emailTemplates: {
+            initial: {
+              subject: "Great meeting you at {{event}}",
+              preview: "Hi {{firstName}},\n\nIt was great meeting you at {{event}}! I loved our conversation about {{topic}}.\n\nAs promised, here's the resource I mentioned. When would be a good time to continue our discussion?"
+            },
+            followUp1: {
+              subject: "Resources from our {{event}} chat",
+              preview: "Hi {{firstName}},\n\nI hope you found the materials I sent helpful. Based on our conversation at {{event}}, I think you'd also benefit from this case study.\n\nWould you like to schedule a quick call to discuss how this applies to {{company}}?"
+            }
+          },
+          targetAudience: {
+            titles: ["Attendees", "Booth Visitors", "Session Participants"],
+            companySize: "All sizes",
+            industries: ["All industries"]
+          }
+        },
+        "product-led": {
+          id: "product-led",
+          name: "Product-Led Growth",
+          industry: "PLG",
+          sequences: [
+            {
+              name: "Trial Conversion",
+              steps: 8,
+              channels: ["Email", "In-app"],
+              duration: "14 days"
+            },
+            {
+              name: "Feature Upsell",
+              steps: 6,
+              channels: ["Email"],
+              duration: "7 days"
+            }
+          ],
+          emailTemplates: {
+            initial: {
+              subject: "You're using {{feature}} like a pro!",
+              preview: "Hi {{firstName}},\n\nI noticed you've been getting great results with {{feature}}. You're in the top 10% of users!\n\nThere's an advanced feature that could 2x your results. Interested in a quick demo?"
+            },
+            followUp1: {
+              subject: "Unlock more with Pro",
+              preview: "Hi {{firstName}},\n\nYour usage shows you're getting value from our platform. Pro users like you typically see 3x ROI within the first month.\n\nCan I show you what you're missing?"
+            }
+          },
+          targetAudience: {
+            titles: ["Power Users", "Trial Users", "Free Tier"],
+            companySize: "All sizes",
+            industries: ["Technology", "StartUps"]
+          }
+        },
+        "account-based": {
+          id: "account-based",
+          name: "Account-Based Marketing",
+          industry: "ABM",
+          sequences: [
+            {
+              name: "Executive Multi-Touch",
+              steps: 15,
+              channels: ["Email", "LinkedIn", "Direct Mail", "Phone"],
+              duration: "30 days"
+            },
+            {
+              name: "Stakeholder Mapping",
+              steps: 10,
+              channels: ["Email", "LinkedIn"],
+              duration: "21 days"
+            }
+          ],
+          emailTemplates: {
+            initial: {
+              subject: "{{company}}'s 2024 growth strategy",
+              preview: "Hi {{firstName}},\n\nI've been following {{company}}'s impressive growth. Your recent expansion into {{market}} aligns perfectly with what we've helped similar companies achieve.\n\nWould you be interested in seeing how we helped {{competitor}} increase market share by 30%?"
+            }
+          },
+          targetAudience: {
+            titles: ["Multiple Stakeholders", "Buying Committee"],
+            companySize: "1000+ employees",
+            industries: ["Enterprise", "Fortune 500"]
+          }
+        }
+      };
+      
+      if (templatePlaybooks[id]) {
+        playbook = templatePlaybooks[id];
+      } else {
+        // Try to find in database
+        playbook = await storage.getPlaybook(id);
+        if (!playbook) {
+          return res.status(404).json({ error: 'Playbook not found' });
+        }
       }
       
       // Apply the playbook - create sequences, templates, etc.
-      const results = await applyPlaybook(playbook);
+      const results = await applyPlaybook(playbook, userId, selectedSequences);
       res.json({ success: true, applied: results });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -1863,7 +2061,36 @@ Best regards,
 
   app.post("/api/autopilot/campaigns", async (req, res) => {
     try {
-      const campaign = await storage.createAutopilotCampaign(req.body);
+      // Add createdBy from authenticated user
+      const userId = (req.user as any)?.claims?.sub || null;
+      const campaignData = {
+        ...req.body,
+        createdBy: userId,
+        // Set default values for required fields
+        status: req.body.status || "draft",
+        totalLeadsProcessed: 0,
+        totalEmailsSent: 0,
+        totalCallsMade: 0,
+        totalLinkedInMessages: 0,
+        totalReplies: 0,
+        totalMeetingsBooked: 0,
+        // Ensure settings are properly formatted
+        settings: {
+          dailyTargetLeads: req.body.dailyTargetLeads || 50,
+          dailySendLimit: req.body.dailySendLimit || 100,
+          personalizationDepth: req.body.personalizationDepth || "moderate",
+          creativityLevel: req.body.creativityLevel || 5,
+          toneOfVoice: req.body.toneOfVoice || "professional",
+          workingHours: req.body.workingHours || { start: "09:00", end: "17:00", timezone: "UTC" },
+          workingDays: req.body.workingDays || ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          autoProspect: req.body.autoProspect !== false,
+          autoFollowUp: req.body.autoFollowUp !== false,
+          autoQualify: req.body.autoQualify || false,
+          autoBookMeetings: req.body.autoBookMeetings || false
+        }
+      };
+      
+      const campaign = await storage.createAutopilotCampaign(campaignData);
       res.json(campaign);
     } catch (error: any) {
       console.error("Error creating autopilot campaign:", error);
@@ -3243,13 +3470,59 @@ Best regards,
   // Create voice campaign
   app.post("/api/voice/campaigns", async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const validatedData = insertVoiceCampaignSchema.parse({ ...req.body, createdBy: userId });
+      const userId = (req.user as any)?.claims?.sub || null;
+      
+      if (!userId) {
+        return res.status(401).json({ 
+          error: 'User authentication required',
+          details: 'Please log in to create a voice campaign' 
+        });
+      }
+      
+      // Add required fields and defaults
+      const campaignData = {
+        ...req.body,
+        createdBy: userId,
+        status: req.body.status || 'draft',
+        totalCallsCompleted: 0,
+        totalCallsScheduled: 0,
+        totalConversations: 0,
+        avgCallDuration: 0,
+        totalCallbacksScheduled: 0,
+        totalPositiveOutcomes: 0
+      };
+      
+      const validatedData = insertVoiceCampaignSchema.parse(campaignData);
       const campaign = await createVoiceCampaign(validatedData);
       res.json(campaign);
     } catch (error) {
       console.error("Error creating voice campaign:", error);
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to create voice campaign' });
+      
+      // Provide detailed error messages
+      if (error instanceof Error) {
+        if (error.name === 'ZodError') {
+          const zodError = error as any;
+          const issues = zodError.issues?.map((issue: any) => ({
+            field: issue.path.join('.'),
+            message: issue.message
+          }));
+          return res.status(400).json({ 
+            error: 'Validation failed',
+            details: 'Please check the following fields',
+            issues 
+          });
+        }
+        
+        return res.status(400).json({ 
+          error: error.message,
+          details: 'Please check your input and try again'
+        });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to create voice campaign',
+        details: 'An unexpected error occurred. Please try again later.'
+      });
     }
   });
   
@@ -4723,12 +4996,170 @@ async function createDefaultWorkflowTriggers() {
   }
 }
 
-async function applyPlaybook(playbook: any) {
-  // Implementation to apply playbook settings
-  // This would create sequences, templates, scripts, etc.
-  return {
-    sequencesCreated: playbook.sequences?.length || 0,
-    templatesCreated: Object.keys(playbook.emailTemplates || {}).length,
-    scriptsCreated: Object.keys(playbook.callScripts || {}).length
+async function applyPlaybook(playbook: any, userId: string, selectedSequenceNames?: string[]) {
+  const results = {
+    sequencesCreated: [] as any[],
+    templatesCreated: [] as any[],
+    scriptsCreated: [] as any[],
+    errors: [] as string[]
   };
+
+  try {
+    // Filter sequences if specific ones were selected
+    const sequencesToCreate = playbook.sequences?.filter((seq: any) => 
+      !selectedSequenceNames || selectedSequenceNames.includes(seq.name)
+    ) || [];
+
+    // Create each sequence
+    for (const seqTemplate of sequencesToCreate) {
+      try {
+        // Parse duration (e.g., "21 days" -> 21)
+        const durationDays = parseInt(seqTemplate.duration) || 14;
+        
+        // Generate sequence steps based on template
+        const steps = [];
+        const stepCount = seqTemplate.steps || 5;
+        const daysBetweenSteps = Math.floor(durationDays / stepCount);
+        
+        for (let i = 0; i < stepCount; i++) {
+          const stepType = seqTemplate.channels?.[i % seqTemplate.channels.length]?.toLowerCase() || 'email';
+          const delay = i === 0 ? 0 : i * daysBetweenSteps;
+          
+          // Find corresponding email template if it exists
+          let content = '';
+          let subject = '';
+          if (stepType === 'email' && playbook.emailTemplates) {
+            const templateKeys = Object.keys(playbook.emailTemplates);
+            const templateKey = templateKeys[i % templateKeys.length];
+            const template = playbook.emailTemplates[templateKey];
+            if (template) {
+              subject = template.subject || `Follow-up ${i + 1}`;
+              content = template.preview || `Step ${i + 1} content for ${seqTemplate.name}`;
+            }
+          } else {
+            subject = `${seqTemplate.name} - Step ${i + 1}`;
+            content = `This is step ${i + 1} of the ${seqTemplate.name} sequence.`;
+          }
+          
+          steps.push({
+            stepNumber: i + 1,
+            type: stepType,
+            delay: delay,
+            subject: subject,
+            body: content,
+            isActive: true
+          });
+        }
+        
+        // Create the sequence
+        const newSequence = await storage.createSequence({
+          name: seqTemplate.name,
+          description: `Applied from playbook: ${playbook.name}`,
+          steps: JSON.stringify(steps),
+          status: 'draft',
+          createdBy: userId,
+          targets: JSON.stringify({
+            titles: playbook.targetAudience?.titles || [],
+            companySize: playbook.targetAudience?.companySize || 'All',
+            industries: playbook.targetAudience?.industries || []
+          })
+        });
+        
+        results.sequencesCreated.push({
+          id: newSequence.id,
+          name: newSequence.name,
+          stepCount: steps.length
+        });
+        
+      } catch (error) {
+        console.error(`Failed to create sequence ${seqTemplate.name}:`, error);
+        results.errors.push(`Failed to create sequence: ${seqTemplate.name}`);
+      }
+    }
+    
+    // Create email templates as content templates with versions
+    if (playbook.emailTemplates) {
+      for (const [key, template] of Object.entries(playbook.emailTemplates)) {
+        try {
+          // Create the template metadata
+          const contentTemplate = await storage.createTemplate({
+            name: `${playbook.name} - ${key}`,
+            contentType: 'email',
+            description: `Template from ${playbook.name} playbook`,
+            personaId: null,
+            status: 'active',
+            createdBy: userId,
+            defaultTone: 'professional',
+            tags: [playbook.industry, 'playbook']
+          });
+          
+          // Create the template version with actual content
+          await storage.createTemplateVersion({
+            templateId: contentTemplate.id,
+            versionNumber: 1,
+            status: 'published',
+            subject: (template as any).subject || `Template: ${key}`,
+            previewText: ((template as any).preview || '').substring(0, 100),
+            contentText: (template as any).preview || '',
+            contentHtml: null,
+            personaSnapshot: null,
+            audienceSnapshot: null,
+            aiMetadata: {
+              model: 'playbook-import',
+              prompt: null
+            },
+            testResults: null,
+            approvedBy: null,
+            approvedAt: null,
+            publishedAt: new Date(),
+            notes: `Imported from ${playbook.name} playbook`
+          });
+          
+          results.templatesCreated.push({
+            id: contentTemplate.id,
+            name: contentTemplate.name,
+            type: 'email'
+          });
+        } catch (error) {
+          console.error(`Failed to create template ${key}:`, error);
+          results.errors.push(`Failed to create template: ${key}`);
+        }
+      }
+    }
+    
+    // Create call scripts if available
+    if (playbook.callScripts) {
+      for (const [key, script] of Object.entries(playbook.callScripts)) {
+        try {
+          const callScript = await storage.createCallScript({
+            type: key,
+            name: `${playbook.name} - ${key}`,
+            opening: (script as any).opening || (script as any).script || '',
+            personaId: null,
+            valueProps: (script as any).valueProps || null,
+            questions: (script as any).questions || null,
+            objectionHandlers: (script as any).objectionHandlers || null,
+            closing: (script as any).closing || null,
+            aiGenerated: true,
+            successRate: null
+          });
+          
+          results.scriptsCreated.push({
+            id: callScript.id,
+            name: callScript.name,
+            type: key
+          });
+        } catch (error) {
+          console.error(`Failed to create script ${key}:`, error);
+          results.errors.push(`Failed to create script: ${key}`);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error applying playbook:', error);
+    results.errors.push('General error applying playbook');
+  }
+  
+  return results;
 }
