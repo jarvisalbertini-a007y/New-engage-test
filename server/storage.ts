@@ -70,6 +70,7 @@ import {
   type TemplateVersion, type InsertTemplateVersion,
   type AudienceSegment, type InsertAudienceSegment,
   type TemplateMetrics, type InsertTemplateMetrics,
+  type InboxMessage, type InsertInboxMessage,
   users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -1203,37 +1204,106 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  // Autopilot stubs
+  // Autopilot - Proper implementations following schema
+  autopilotCampaigns = new Map<string, AutopilotCampaign>();
+  autopilotRuns = new Map<string, AutopilotRun>();
+  
   async getAutopilotCampaign(id: string): Promise<AutopilotCampaign | undefined> {
-    return undefined;
+    return this.autopilotCampaigns.get(id);
   }
 
   async getAutopilotCampaigns(filters?: { status?: string; createdBy?: string }): Promise<AutopilotCampaign[]> {
-    return [];
+    let campaigns = Array.from(this.autopilotCampaigns.values());
+    
+    if (filters?.status) {
+      campaigns = campaigns.filter(c => c.status === filters.status);
+    }
+    if (filters?.createdBy) {
+      campaigns = campaigns.filter(c => c.createdBy === filters.createdBy);
+    }
+    
+    return campaigns;
   }
 
   async createAutopilotCampaign(campaign: InsertAutopilotCampaign): Promise<AutopilotCampaign> {
-    return { ...campaign, id: randomUUID(), createdAt: new Date() } as AutopilotCampaign;
+    const id = randomUUID();
+    const newCampaign: AutopilotCampaign = { 
+      id,
+      name: campaign.name,
+      status: campaign.status || 'paused',
+      targetPersona: campaign.targetPersona || null,
+      sequence: campaign.sequence || null,
+      dailyTargetLeads: campaign.dailyTargetLeads || 50,
+      dailySendLimit: campaign.dailySendLimit || 100,
+      workingHours: campaign.workingHours || null,
+      workingDays: campaign.workingDays || null,
+      autoProspect: campaign.autoProspect !== false,
+      autoFollowUp: campaign.autoFollowUp !== false,
+      autoQualify: campaign.autoQualify || false,
+      autoBookMeetings: campaign.autoBookMeetings || false,
+      creativityLevel: campaign.creativityLevel || 5,
+      personalizationDepth: campaign.personalizationDepth || 'moderate',
+      toneOfVoice: campaign.toneOfVoice || 'professional',
+      settings: campaign.settings || null,
+      startDate: campaign.startDate || null,
+      endDate: campaign.endDate || null,
+      lastRunAt: campaign.lastRunAt || null,
+      createdBy: campaign.createdBy || null,
+      createdAt: new Date()
+    };
+    
+    this.autopilotCampaigns.set(id, newCampaign);
+    return newCampaign;
   }
 
   async updateAutopilotCampaign(id: string, updates: Partial<AutopilotCampaign>): Promise<AutopilotCampaign | undefined> {
-    return { id, ...updates, createdAt: new Date() } as AutopilotCampaign;
+    const campaign = this.autopilotCampaigns.get(id);
+    if (!campaign) return undefined;
+    
+    const updated = { ...campaign, ...updates };
+    this.autopilotCampaigns.set(id, updated);
+    return updated;
   }
 
   async getAutopilotRun(id: string): Promise<AutopilotRun | undefined> {
-    return undefined;
+    return this.autopilotRuns.get(id);
   }
 
   async getAutopilotRunsByCampaign(campaignId: string): Promise<AutopilotRun[]> {
-    return [];
+    return Array.from(this.autopilotRuns.values())
+      .filter(run => run.campaignId === campaignId)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   }
 
   async createAutopilotRun(run: InsertAutopilotRun): Promise<AutopilotRun> {
-    return { ...run, id: randomUUID(), startedAt: new Date() } as AutopilotRun;
+    const id = randomUUID();
+    const newRun: AutopilotRun = { 
+      id,
+      campaignId: run.campaignId,
+      status: run.status || 'running',
+      runType: run.runType,
+      leadsProcessed: run.leadsProcessed || 0,
+      emailsSent: run.emailsSent || 0,
+      emailsSkipped: run.emailsSkipped || 0,
+      errors: run.errors || null,
+      decisions: run.decisions || null,
+      qualificationResults: run.qualificationResults || null,
+      startedAt: new Date(),
+      completedAt: run.completedAt || null,
+      duration: run.duration || null
+    };
+    
+    this.autopilotRuns.set(id, newRun);
+    return newRun;
   }
 
   async updateAutopilotRun(id: string, updates: Partial<AutopilotRun>): Promise<AutopilotRun | undefined> {
-    return { id, ...updates, startedAt: new Date() } as AutopilotRun;
+    const run = this.autopilotRuns.get(id);
+    if (!run) return undefined;
+    
+    const updated = { ...run, ...updates };
+    this.autopilotRuns.set(id, updated);
+    return updated;
   }
 
   // Lead Scoring Model stub methods
