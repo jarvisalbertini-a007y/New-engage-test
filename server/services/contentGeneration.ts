@@ -82,7 +82,7 @@ async function fetchTemplate(
         if (templateData) {
           const hasSegment = templateData.segments.some(s => s.id === audienceSegmentId);
           if (hasSegment) {
-            const publishedVersion = templateData.versions.find(v => v.isPublished === true);
+            const publishedVersion = templateData.versions.find(v => v.publishedAt !== null);
             if (publishedVersion) {
               return { 
                 template: templateData.template, 
@@ -98,7 +98,7 @@ async function fetchTemplate(
     if (matchingTemplates.length > 0) {
       const templateData = await storage.getTemplateWithRelations(matchingTemplates[0].id);
       if (templateData) {
-        const publishedVersion = templateData.versions.find(v => v.isPublished === true);
+        const publishedVersion = templateData.versions.find(v => v.publishedAt !== null);
         if (publishedVersion) {
           return { 
             template: templateData.template, 

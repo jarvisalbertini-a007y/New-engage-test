@@ -33,6 +33,8 @@ export default function ContentStudio() {
     title: "",
     location: ""
   });
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+  const [templateTags, setTemplateTags] = useState<string[]>([]);
   
   const { toast } = useToast();
 
@@ -55,6 +57,26 @@ export default function ContentStudio() {
     queryFn: () => api.getInsights({ limit: 20 }),
   });
 
+  const { data: audienceSegments = [] } = useQuery({
+    queryKey: ["/api/audience-segments"],
+    queryFn: async () => {
+      const response = await apiRequest('/api/audience-segments', {
+        method: 'GET'
+      });
+      return response;
+    }
+  });
+
+  const { data: contentTemplates = [] } = useQuery({
+    queryKey: ["/api/content-templates"],
+    queryFn: async () => {
+      const response = await apiRequest('/api/content-templates', {
+        method: 'GET'
+      });
+      return response;
+    }
+  });
+
   const generateContentMutation = useMutation({
     mutationFn: api.generateContent,
     onSuccess: (data) => {
@@ -75,33 +97,51 @@ export default function ContentStudio() {
 
   const saveTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Save as a sequence with a single step
-      return await apiRequest('/api/sequences', {
+      // First, create the content template
+      const template = await apiRequest('/api/content-templates', {
         method: 'POST',
         body: JSON.stringify({
           name: data.name,
           description: data.description,
-          status: 'draft',
-          steps: [{
-            stepNumber: 1,
-            type: contentType as 'email' | 'linkedin' | 'phone',
-            delayDays: 0,
-            subject: data.subject,
-            template: data.body
-          }],
+          contentType: contentType,
+          status: 'active',
+          defaultTone: tone,
           personaId: selectedPersona !== "none" ? selectedPersona : undefined,
-          createdBy: 'user'
+          tags: data.tags || [],
+          segmentIds: data.segmentIds || []
         })
       });
+      
+      // Then create the first version of the template
+      const version = await apiRequest(`/api/content-templates/${template.id}/versions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: data.subject,
+          body: data.body,
+          tone: tone,
+          authorId: 'user',
+          metadata: {
+            targetingFilters: data.targetingFilters
+          }
+        })
+      });
+      
+      // Publish the version using the correct version ID
+      await apiRequest(`/api/content-templates/${template.id}/versions/${version.id}/publish`, {
+        method: 'POST'
+      });
+      
+      return template;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/content-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] }); // Still invalidate for backward compatibility
       setIsSaveDialogOpen(false);
       setTemplateName("");
       setTemplateDescription("");
       toast({
         title: "Template Saved",
-        description: "Your content has been saved as a template.",
+        description: "Your content has been saved as a reusable template.",
       });
     },
     onError: () => {
@@ -413,7 +453,11 @@ export default function ContentStudio() {
                           <Copy className="h-4 w-4 mr-2" />
                           Copy
                         </Button>
-                        <Button variant="outline" data-testid="button-save-content">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsSaveDialogOpen(true)}
+                          data-testid="button-save-content"
+                        >
                           <Save className="h-4 w-4 mr-2" />
                           Save Template
                         </Button>
@@ -507,6 +551,152 @@ export default function ContentStudio() {
           </div>
         </div>
       </main>
+      
+      {/* Save Template Dialog */}
+      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>
+              Save this content as a reusable template with audience targeting options
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="template-name">Template Name</Label>
+              <Input
+                id="template-name"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="e.g., SaaS Cold Outreach"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="template-description">Description</Label>
+              <Textarea
+                id="template-description"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="Describe when and how to use this template"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label>Audience Segments</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Select target audience segments for this template
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {audienceSegments.map((segment: any) => (
+                  <div key={segment.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`segment-${segment.id}`}
+                      className="mr-2"
+                      checked={selectedSegments.includes(segment.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSegments([...selectedSegments, segment.id]);
+                        } else {
+                          setSelectedSegments(selectedSegments.filter(id => id !== segment.id));
+                        }
+                      }}
+                    />
+                    <label htmlFor={`segment-${segment.id}`} className="text-sm">
+                      {segment.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {audienceSegments.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">
+                  No audience segments defined yet
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label>Tags (comma-separated)</Label>
+              <Input
+                value={templateTags.join(', ')}
+                onChange={(e) => setTemplateTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                placeholder="e.g., cold-email, enterprise, follow-up"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label>Targeting Filters</Label>
+              <div className="grid grid-cols-2 gap-3 mt-1">
+                <div>
+                  <Label className="text-xs">Industry</Label>
+                  <Input
+                    value={targetingFilters.industry}
+                    onChange={(e) => setTargetingFilters({...targetingFilters, industry: e.target.value})}
+                    placeholder="e.g., SaaS, Healthcare"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Company Size</Label>
+                  <Input
+                    value={targetingFilters.companySize}
+                    onChange={(e) => setTargetingFilters({...targetingFilters, companySize: e.target.value})}
+                    placeholder="e.g., 50-200"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Title</Label>
+                  <Input
+                    value={targetingFilters.title}
+                    onChange={(e) => setTargetingFilters({...targetingFilters, title: e.target.value})}
+                    placeholder="e.g., VP Sales"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Location</Label>
+                  <Input
+                    value={targetingFilters.location}
+                    onChange={(e) => setTargetingFilters({...targetingFilters, location: e.target.value})}
+                    placeholder="e.g., US, EU"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (templateName && generatedContent) {
+                    saveTemplateMutation.mutate({
+                      name: templateName,
+                      description: templateDescription,
+                      subject: generatedContent.subject,
+                      body: generatedContent.body,
+                      targetingFilters,
+                      segmentIds: selectedSegments,
+                      tags: templateTags
+                    });
+                  }
+                }}
+                disabled={!templateName || saveTemplateMutation.isPending}
+              >
+                {saveTemplateMutation.isPending ? "Saving..." : "Save Template"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
