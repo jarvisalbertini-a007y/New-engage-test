@@ -1416,6 +1416,38 @@ export const accessControls = pgTable("access_controls", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// AI Agent Execution Tables
+export const agentExecutions = pgTable("agent_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").notNull().references(() => aiAgents.id),
+  taskType: text("task_type").notNull(), // find_leads, enrich_data, compose_email, etc.
+  targetId: varchar("target_id"), // Contact or Company ID if applicable
+  context: jsonb("context").notNull().default('{}'), // Task parameters
+  status: text("status").notNull().default('pending'), // pending, processing, completed, failed
+  result: jsonb("result"), // Task results
+  error: text("error"), // Error message if failed
+  executionTimeMs: integer("execution_time_ms"), // Time taken in milliseconds
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: varchar("created_by").notNull(),
+});
+
+export const agentMetrics = pgTable("agent_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").notNull().references(() => aiAgents.id),
+  date: date("date").notNull(), // Daily aggregation
+  tasksCompleted: integer("tasks_completed").notNull().default(0),
+  tasksFailed: integer("tasks_failed").notNull().default(0),
+  avgExecutionTime: integer("avg_execution_time").notNull().default(0), // in milliseconds
+  successRate: real("success_rate").notNull().default(0), // 0-1
+  leadsGenerated: integer("leads_generated").default(0),
+  emailsComposed: integer("emails_composed").default(0),
+  dataEnriched: integer("data_enriched").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Enterprise Insert Schemas
 export const insertWhiteLabelSchema = createInsertSchema(whiteLabels).omit({
   id: true,
@@ -1435,6 +1467,19 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 export const insertAccessControlSchema = createInsertSchema(accessControls).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgentExecutionSchema = createInsertSchema(agentExecutions).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+
+export const insertAgentMetricsSchema = createInsertSchema(agentMetrics).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1650,3 +1695,9 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type AccessControl = typeof accessControls.$inferSelect;
 export type InsertAccessControl = z.infer<typeof insertAccessControlSchema>;
+
+export type AgentExecution = typeof agentExecutions.$inferSelect;
+export type InsertAgentExecution = z.infer<typeof insertAgentExecutionSchema>;
+
+export type AgentMetric = typeof agentMetrics.$inferSelect;
+export type InsertAgentMetric = z.infer<typeof insertAgentMetricsSchema>;
