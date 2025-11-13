@@ -1,6 +1,6 @@
 import { openAIClient } from "./openaiClient";
 import { storage } from "../storage";
-import { type Persona, type Contact, type Company, type Insight } from "@shared/schema";
+import { type Persona, type Contact, type Company, type Insight, type ContentTemplate, type TemplateVersion } from "@shared/schema";
 
 export interface ContentGenerationRequest {
   personaId?: string;
@@ -10,6 +10,8 @@ export interface ContentGenerationRequest {
   customPrompt?: string;
   tone?: 'professional' | 'casual' | 'friendly' | 'urgent';
   type: 'email' | 'linkedin' | 'cold_call_script';
+  templateId?: string; // Optional specific template to use
+  audienceSegmentId?: string; // Optional audience segment for template selection
 }
 
 export interface GeneratedContent {
@@ -18,6 +20,8 @@ export interface GeneratedContent {
   tone: string;
   personalizationElements: string[];
   confidence: number;
+  templateUsed?: string; // Track which template was used
+  versionUsed?: string; // Track which version was used
 }
 
 // Helper function to format value propositions as readable text
@@ -34,6 +38,124 @@ function formatValuePropositions(props: any): string {
   }
   
   return 'our AI-powered sales platform';
+}
+
+// Fetch appropriate template from storage based on type and audience
+async function fetchTemplate(
+  type: string,
+  tone: string,
+  audienceSegmentId?: string,
+  templateId?: string
+): Promise<{ template: ContentTemplate | null; version: TemplateVersion | null }> {
+  try {
+    // If specific template ID is provided, use that
+    if (templateId) {
+      const templateData = await storage.getTemplateWithRelations(templateId);
+      if (templateData) {
+        // Get the latest published version
+        const publishedVersion = templateData.versions.find(v => v.publishedAt !== null);
+        if (publishedVersion) {
+          return { 
+            template: templateData.template, 
+            version: publishedVersion 
+          };
+        }
+      }
+    }
+    
+    // Otherwise, find best matching template
+    const templates = await storage.listTemplates({
+      status: 'active',
+      includeArchived: false
+    });
+    
+    // Filter templates by type and tone
+    const matchingTemplates = templates.filter(t => 
+      t.contentType === type && 
+      (t.defaultTone === tone || !tone)
+    );
+    
+    // If audience segment is specified, prefer templates with that segment
+    if (audienceSegmentId && matchingTemplates.length > 0) {
+      for (const template of matchingTemplates) {
+        const templateData = await storage.getTemplateWithRelations(template.id);
+        if (templateData) {
+          const hasSegment = templateData.segments.some(s => s.id === audienceSegmentId);
+          if (hasSegment) {
+            const publishedVersion = templateData.versions.find(v => v.isPublished === true);
+            if (publishedVersion) {
+              return { 
+                template: templateData.template, 
+                version: publishedVersion 
+              };
+            }
+          }
+        }
+      }
+    }
+    
+    // Fall back to first matching template
+    if (matchingTemplates.length > 0) {
+      const templateData = await storage.getTemplateWithRelations(matchingTemplates[0].id);
+      if (templateData) {
+        const publishedVersion = templateData.versions.find(v => v.isPublished === true);
+        if (publishedVersion) {
+          return { 
+            template: templateData.template, 
+            version: publishedVersion 
+          };
+        }
+      }
+    }
+    
+    return { template: null, version: null };
+  } catch (error) {
+    console.error('Error fetching template:', error);
+    return { template: null, version: null };
+  }
+}
+
+// Track template usage metrics
+async function trackTemplateUsage(
+  templateId: string,
+  versionId: string,
+  type: string
+): Promise<void> {
+  try {
+    await storage.recordTemplateMetricEvent({
+      templateVersionId: versionId,
+      channel: type,
+      eventType: 'generated',
+      value: 1,
+      occurredAt: new Date()
+    });
+  } catch (error) {
+    console.error('Error tracking template usage:', error);
+  }
+}
+
+// Personalize template content with placeholders
+function personalizeTemplate(
+  content: string,
+  variables: Record<string, string | undefined>
+): string {
+  let personalizedContent = content;
+  
+  // Replace all placeholders in format {{variableName}}
+  Object.entries(variables).forEach(([key, value]) => {
+    const regex = new RegExp(`{{${key}}}`, 'gi');
+    personalizedContent = personalizedContent.replace(regex, value || '');
+  });
+  
+  // Also handle common variations like {variableName} and [[variableName]]
+  Object.entries(variables).forEach(([key, value]) => {
+    const regex1 = new RegExp(`{${key}}`, 'gi');
+    const regex2 = new RegExp(`\\[\\[${key}\\]\\]`, 'gi');
+    personalizedContent = personalizedContent.replace(regex1, value || '');
+    personalizedContent = personalizedContent.replace(regex2, value || '');
+  });
+  
+  return personalizedContent;
 }
 
 // Generate personalized email with AI or fallback to templates
@@ -167,19 +289,62 @@ async function generateEmailContent(
   company: Company | null,
   insight: Insight | null
 ): Promise<GeneratedContent> {
-  const context = {
-    firstName: contact?.firstName || 'there',
-    company: company?.name || 'your company',
-    industry: company?.industry || undefined,
-    title: contact?.title || undefined,
-    insight: insight?.description,
-    valueProposition: persona?.valuePropositions ? 
-      formatValuePropositions(persona.valuePropositions) : 
-      'our AI-powered sales platform that increases reply rates by 40%',
-    tone: request.tone || 'professional'
-  };
+  const tone = request.tone || 'professional';
   
-  const generated = await generatePersonalizedEmail(context);
+  // First, try to fetch a template from storage
+  const { template, version } = await fetchTemplate(
+    'email',
+    tone,
+    request.audienceSegmentId,
+    request.templateId
+  );
+  
+  let subject: string | undefined;
+  let body: string;
+  let templateUsed: string | undefined;
+  let versionUsed: string | undefined;
+  
+  if (template && version) {
+    // Use the template version content
+    const variables = {
+      firstName: contact?.firstName || 'there',
+      company: company?.name || 'your company',
+      industry: company?.industry || 'your industry',
+      title: contact?.title || 'professional',
+      insight: insight?.description || 'recent developments',
+      valueProposition: persona?.valuePropositions ? 
+        formatValuePropositions(persona.valuePropositions) : 
+        'our AI-powered sales platform',
+      senderName: '{{senderName}}'  // Will be replaced by sender
+    };
+    
+    // Personalize the template content
+    subject = version.subject ? personalizeTemplate(version.subject, variables) : undefined;
+    body = personalizeTemplate(version.body, variables);
+    
+    // Track template usage
+    await trackTemplateUsage(template.id, version.id, 'email');
+    
+    templateUsed = template.id;
+    versionUsed = version.id;
+  } else {
+    // Fall back to AI generation or default templates
+    const context = {
+      firstName: contact?.firstName || 'there',
+      company: company?.name || 'your company',
+      industry: company?.industry || undefined,
+      title: contact?.title || undefined,
+      insight: insight?.description,
+      valueProposition: persona?.valuePropositions ? 
+        formatValuePropositions(persona.valuePropositions) : 
+        'our AI-powered sales platform that increases reply rates by 40%',
+      tone
+    };
+    
+    const generated = await generatePersonalizedEmail(context);
+    subject = generated.subject;
+    body = generated.body;
+  }
   
   const personalizationElements = [];
   if (contact?.firstName) personalizationElements.push('First name');
@@ -189,11 +354,13 @@ async function generateEmailContent(
   if (insight) personalizationElements.push('Recent insight');
   
   return {
-    subject: generated.subject,
-    body: generated.body,
-    tone: request.tone || 'professional',
+    subject,
+    body,
+    tone,
     personalizationElements,
-    confidence: calculateConfidence(personalizationElements.length, !!persona, !!insight)
+    confidence: calculateConfidence(personalizationElements.length, !!persona, !!insight),
+    templateUsed,
+    versionUsed
   };
 }
 
