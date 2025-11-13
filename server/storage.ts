@@ -1250,13 +1250,20 @@ export class MemStorage implements IStorage {
     const newAgent: AiAgent = { 
       id,
       name: agent.name,
-      type: agent.type || 'general',
-      status: agent.status || 'inactive',
-      configuration: agent.configuration || null,
-      capabilities: agent.capabilities || null,
-      performance: agent.performance || null,
-      learningData: agent.learningData || null,
-      lastExecutionAt: agent.lastExecutionAt || null,
+      type: agent.type || 'prospecting',
+      description: agent.description || null,
+      status: agent.status || 'active',
+      persona: agent.persona || null,
+      targetsPerDay: agent.targetsPerDay || 50,
+      currentProgress: agent.currentProgress || 0,
+      successRate: agent.successRate || '0',
+      totalContacted: agent.totalContacted || 0,
+      totalQualified: agent.totalQualified || 0,
+      totalResponded: agent.totalResponded || 0,
+      totalBooked: agent.totalBooked || 0,
+      totalAttended: agent.totalAttended || 0,
+      settings: agent.settings || {},
+      lastRun: agent.lastRun || null,
       createdBy: agent.createdBy || null,
       createdAt: new Date() 
     };
@@ -1303,15 +1310,17 @@ export class MemStorage implements IStorage {
     const newExecution: AgentExecution = {
       id,
       agentId: execution.agentId,
-      taskType: execution.taskType || 'task',
-      inputData: execution.inputData || null,
-      outputData: execution.outputData || null,
+      taskType: execution.taskType,
+      targetId: execution.targetId || null,
+      context: execution.context || {},
       status: execution.status || 'pending',
+      result: execution.result || null,
       error: execution.error || null,
       executionTimeMs: execution.executionTimeMs || null,
-      resourcesUsed: execution.resourcesUsed || null,
       createdAt: new Date(),
-      completedAt: execution.completedAt || null
+      startedAt: execution.startedAt || null,
+      completedAt: execution.completedAt || null,
+      createdBy: execution.createdBy
     };
     this.agentExecutions.set(id, newExecution);
     return newExecution;
@@ -1347,13 +1356,13 @@ export class MemStorage implements IStorage {
       id,
       agentId: metric.agentId,
       date: metric.date,
-      totalExecutions: metric.totalExecutions || 0,
-      successfulExecutions: metric.successfulExecutions || 0,
-      failedExecutions: metric.failedExecutions || 0,
-      avgExecutionTimeMs: metric.avgExecutionTimeMs || 0,
-      totalResourcesUsed: metric.totalResourcesUsed || null,
-      errorRate: metric.errorRate || 0,
-      performanceScore: metric.performanceScore || 0,
+      tasksCompleted: metric.tasksCompleted || 0,
+      tasksFailed: metric.tasksFailed || 0,
+      avgExecutionTime: metric.avgExecutionTime || 0,
+      successRate: metric.successRate || 0,
+      leadsGenerated: metric.leadsGenerated || null,
+      emailsComposed: metric.emailsComposed || null,
+      dataEnriched: metric.dataEnriched || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
