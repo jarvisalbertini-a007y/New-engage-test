@@ -2989,6 +2989,9 @@ export class DbStorage implements IStorage {
   }
 
   async getInsights(filters?: { companyId?: string; type?: string; limit?: number }): Promise<Insight[]> {
+    // Seed sample insights if none exist
+    await this.ensureSampleInsights();
+    
     let query = db.select().from(insights);
     const conditions = [];
     
@@ -3005,6 +3008,129 @@ export class DbStorage implements IStorage {
     }
     
     return await query.limit(filters?.limit || 20);
+  }
+
+  async ensureSampleInsights(): Promise<void> {
+    // Check if insights already exist
+    const existing = await db.select().from(insights).limit(1);
+    if (existing.length > 0) return;
+
+    // Get or create sample companies first
+    const companiesExist = await db.select().from(companies).limit(1);
+    if (companiesExist.length === 0) {
+      await this.ensureSampleCompanies();
+    }
+
+    const sampleCompanies = await db.select().from(companies).limit(5);
+    if (sampleCompanies.length === 0) return;
+
+    const insightTypes = ['funding', 'hiring', 'product_launch', 'expansion', 'partnership', 'leadership_change'];
+    const sampleInsights = [];
+
+    for (const company of sampleCompanies) {
+      // Generate 2-3 insights per company
+      const numInsights = Math.floor(Math.random() * 2) + 2;
+      for (let i = 0; i < numInsights; i++) {
+        const type = insightTypes[Math.floor(Math.random() * insightTypes.length)];
+        const insight = {
+          companyId: company.id,
+          type,
+          title: this.getInsightTitle(type, company.name),
+          description: this.getInsightDescription(type, company.name),
+          importance: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
+          source: ['news', 'press_release', 'social_media', 'company_website'][Math.floor(Math.random() * 4)],
+          sourceUrl: `https://example.com/insight/${company.id}/${type}`,
+          detectedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
+          metadata: {
+            confidence: Math.floor(Math.random() * 20) + 80, // 80-100
+            keywords: [type, company.industry || 'tech', 'opportunity']
+          }
+        };
+        sampleInsights.push(insight);
+      }
+    }
+
+    for (const insight of sampleInsights) {
+      await db.insert(insights).values(insight as any).onConflictDoNothing();
+    }
+  }
+
+  private getInsightTitle(type: string, companyName: string): string {
+    const titles: Record<string, string> = {
+      funding: `${companyName} Raises New Funding Round`,
+      hiring: `${companyName} Expanding Team - Multiple Openings`,
+      product_launch: `${companyName} Launches New Product Line`,
+      expansion: `${companyName} Expands to New Markets`,
+      partnership: `${companyName} Announces Strategic Partnership`,
+      leadership_change: `New Leadership at ${companyName}`
+    };
+    return titles[type] || `${companyName} Business Update`;
+  }
+
+  private getInsightDescription(type: string, companyName: string): string {
+    const descriptions: Record<string, string> = {
+      funding: `${companyName} has secured a new round of funding, signaling growth and potential need for new solutions to scale operations.`,
+      hiring: `${companyName} is actively hiring across multiple departments, indicating expansion and potential pain points around scaling.`,
+      product_launch: `${companyName} recently launched a new product offering, presenting opportunities for complementary solutions.`,
+      expansion: `${companyName} is expanding operations to new geographic markets, creating needs for localized support and infrastructure.`,
+      partnership: `${companyName} has formed a strategic partnership, potentially changing their technology requirements.`,
+      leadership_change: `${companyName} has new leadership in place, often a catalyst for evaluating new vendors and solutions.`
+    };
+    return descriptions[type] || `Important business development at ${companyName} creating potential sales opportunity.`;
+  }
+
+  async ensureSampleCompanies(): Promise<void> {
+    const sampleCompanies = [
+      {
+        name: 'TechCorp Solutions',
+        domain: 'techcorp.com',
+        industry: 'SaaS',
+        employeeCount: 250,
+        description: 'Leading provider of enterprise software solutions',
+        website: 'https://techcorp.com',
+        linkedin: 'https://linkedin.com/company/techcorp'
+      },
+      {
+        name: 'DataFlow Analytics',
+        domain: 'dataflow.io',
+        industry: 'Data Analytics',
+        employeeCount: 150,
+        description: 'Advanced data analytics and business intelligence platform',
+        website: 'https://dataflow.io',
+        linkedin: 'https://linkedin.com/company/dataflow'
+      },
+      {
+        name: 'CloudScale Systems',
+        domain: 'cloudscale.com',
+        industry: 'Cloud Infrastructure',
+        employeeCount: 500,
+        description: 'Cloud infrastructure and DevOps automation tools',
+        website: 'https://cloudscale.com',
+        linkedin: 'https://linkedin.com/company/cloudscale'
+      },
+      {
+        name: 'SecureNet Pro',
+        domain: 'securenet.pro',
+        industry: 'Cybersecurity',
+        employeeCount: 300,
+        description: 'Enterprise cybersecurity and threat detection platform',
+        website: 'https://securenet.pro',
+        linkedin: 'https://linkedin.com/company/securenet'
+      },
+      {
+        name: 'AI Innovations',
+        domain: 'ai-innovations.com',
+        industry: 'Artificial Intelligence',
+        employeeCount: 100,
+        description: 'AI-powered automation and machine learning solutions',
+        website: 'https://ai-innovations.com',
+        linkedin: 'https://linkedin.com/company/ai-innovations'
+      }
+    ];
+
+    for (const company of sampleCompanies) {
+      await db.insert(companies).values(company as any).onConflictDoNothing();
+    }
   }
 
   async createInsight(insertInsight: InsertInsight): Promise<Insight> {
