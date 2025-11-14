@@ -99,12 +99,14 @@ export interface IStorage {
   getCompaniesByDomain(domain: string): Promise<Company[]>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, updates: Partial<Company>): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<boolean>;
 
   // Contacts
   getContact(id: string): Promise<Contact | undefined>;
   getContacts(filters?: { companyId?: string; limit?: number }): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, updates: Partial<Contact>): Promise<Contact | undefined>;
+  deleteContact(id: string): Promise<boolean>;
 
   // Visitor Sessions
   getVisitorSession(id: string): Promise<VisitorSession | undefined>;
@@ -118,6 +120,7 @@ export interface IStorage {
   getSequences(filters?: { createdBy?: string; status?: string }): Promise<Sequence[]>;
   createSequence(sequence: InsertSequence): Promise<Sequence>;
   updateSequence(id: string, updates: Partial<Sequence>): Promise<Sequence | undefined>;
+  deleteSequence(id: string): Promise<boolean>;
 
   // Emails
   getEmail(id: string): Promise<Email | undefined>;
@@ -3374,6 +3377,11 @@ export class DbStorage implements IStorage {
   }
 
   async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]> {
+    // Seed template playbooks if none exist
+    if (filters?.isTemplate === true) {
+      await this.ensureTemplatePlaybooks();
+    }
+    
     let query = db.select().from(playbooks);
     
     const conditions: any[] = [];
@@ -3385,6 +3393,74 @@ export class DbStorage implements IStorage {
     }
     
     return await query;
+  }
+
+  async ensureTemplatePlaybooks(): Promise<void> {
+    // Check if template playbooks already exist
+    const existing = await db.select().from(playbooks).where(eq(playbooks.isTemplate, true)).limit(1);
+    if (existing.length > 0) return;
+
+    // Create template playbooks
+    const templates = [
+      {
+        name: "SaaS Sales Acceleration",
+        description: "Complete outreach playbook for B2B SaaS companies targeting mid-market",
+        industry: "SaaS",
+        targetICP: "VP Sales, CRO at 50-500 employee companies",
+        sequences: [
+          { name: "Initial Outreach", channels: ["email", "linkedin"], duration: "14 days", steps: 5 },
+          { name: "Follow-up Nurture", channels: ["email"], duration: "30 days", steps: 3 }
+        ],
+        emailTemplates: [
+          { subject: "Quick question about [Company]'s sales process", type: "initial" },
+          { subject: "Following up - sales efficiency", type: "followup" }
+        ],
+        bestPractices: ["Personalize first line", "Reference recent company news", "Keep emails under 150 words"],
+        expectedResults: { replyRate: 15, meetingRate: 5 },
+        isTemplate: true,
+        createdBy: "system"
+      },
+      {
+        name: "Enterprise Account Penetration",
+        description: "Multi-threaded approach for enterprise accounts with long sales cycles",
+        industry: "Enterprise",
+        targetICP: "Director/VP at Fortune 500 companies",
+        sequences: [
+          { name: "Executive Outreach", channels: ["email", "phone"], duration: "45 days", steps: 7 },
+          { name: "Champion Building", channels: ["email", "linkedin"], duration: "60 days", steps: 10 }
+        ],
+        emailTemplates: [
+          { subject: "Strategic initiative alignment", type: "executive" },
+          { subject: "Quick win opportunity for Q[X]", type: "champion" }
+        ],
+        bestPractices: ["Multi-thread across departments", "Lead with ROI", "Leverage mutual connections"],
+        expectedResults: { replyRate: 8, meetingRate: 3 },
+        isTemplate: true,
+        createdBy: "system"
+      },
+      {
+        name: "Startup Fast Track",
+        description: "Rapid outreach for startups and fast-growing companies",
+        industry: "Startup",
+        targetICP: "Founders, CEO at seed to Series B startups",
+        sequences: [
+          { name: "Founder Direct", channels: ["email", "linkedin"], duration: "7 days", steps: 3 },
+          { name: "Growth Team", channels: ["email"], duration: "14 days", steps: 4 }
+        ],
+        emailTemplates: [
+          { subject: "Congrats on [recent milestone]", type: "initial" },
+          { subject: "How [competitor] achieved [result]", type: "case_study" }
+        ],
+        bestPractices: ["Reference recent funding", "Keep it informal", "Focus on growth metrics"],
+        expectedResults: { replyRate: 20, meetingRate: 8 },
+        isTemplate: true,
+        createdBy: "system"
+      }
+    ];
+
+    for (const template of templates) {
+      await db.insert(playbooks).values(template as any).onConflictDoNothing();
+    }
   }
 
   async createPlaybook(playbook: InsertPlaybook): Promise<Playbook> {

@@ -1,6 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage as legacyStorage } from "./storage";
+import { ContentStudioStorage } from "./storage/contentStudioStorage";
+
+// Use legacy storage directly for most routes
+const storage = legacyStorage;
+// Create typed facade for Content Studio endpoints only
+const contentStudioStorage = new ContentStudioStorage(legacyStorage);
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertUserSchema, insertContactSchema, insertCompanySchema, insertSequenceSchema, insertPersonaSchema, insertTaskSchema, insertLeadScoringModelSchema, insertLeadScoreSchema, insertAutopilotCampaignSchema, insertAutopilotRunSchema, insertMarketplaceAgentSchema, insertAgentRatingSchema, insertIntentSignalSchema, insertVoiceCampaignSchema, insertVoiceScriptSchema, insertWhiteLabelSchema, insertEnterpriseSecuritySchema, insertAccessControlSchema, insertContentTemplateSchema, insertTemplateVersionSchema, insertAudienceSegmentSchema, insertTemplateMetricsSchema } from "@shared/schema";
 import { analyzeEmail, improveEmail, analyzeSpamRisk, optimizeSubjectLine } from "./services/emailAnalysis";
@@ -1924,6 +1930,34 @@ Best regards,
       // Apply the playbook - create sequences, templates, etc.
       const results = await applyPlaybook(playbook, userId, selectedSequences);
       res.json({ success: true, applied: results });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/playbooks/:id/duplicate", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req.user as any)?.claims?.sub || 'system';
+      
+      // Get the original playbook
+      const original = await storage.getPlaybook(id);
+      
+      if (!original) {
+        return res.status(404).json({ error: 'Playbook not found' });
+      }
+      
+      // Create a copy with a new name and mark it as not a template
+      const duplicate = await storage.createPlaybook({
+        ...original,
+        id: undefined as any,
+        name: `Copy of ${original.name}`,
+        isTemplate: false,
+        createdBy: userId,
+        createdAt: new Date()
+      });
+      
+      res.json(duplicate);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
@@ -3976,7 +4010,7 @@ Best regards,
       const personaId = req.query.personaId as string;
       const includeArchived = req.query.includeArchived === 'true';
       
-      const templates = await storage.listTemplates({
+      const templates = await contentStudioStorage.listTemplates({
         status,
         personaId,
         includeArchived
@@ -3998,7 +4032,7 @@ Best regards,
       }
       
       const { id } = req.params;
-      const templateData = await storage.getTemplateWithRelations(id);
+      const templateData = await contentStudioStorage.getTemplateWithRelations(id);
       
       if (!templateData) {
         return res.status(404).json({ error: "Template not found" });
@@ -4029,7 +4063,7 @@ Best regards,
       }
       
       const { segmentIds, ...templateData } = parsed.data as any;
-      const template = await storage.createTemplate({
+      const template = await contentStudioStorage.createTemplate({
         ...templateData,
         segmentIds
       });
@@ -4052,7 +4086,7 @@ Best regards,
       const { id } = req.params;
       const updates = req.body;
       
-      const template = await storage.updateTemplate(id, updates);
+      const template = await contentStudioStorage.updateTemplate(id, updates);
       
       if (!template) {
         return res.status(404).json({ error: "Template not found" });
@@ -4074,7 +4108,7 @@ Best regards,
       }
       
       const { id } = req.params;
-      const archived = await storage.archiveTemplate(id);
+      const archived = await contentStudioStorage.archiveTemplate(id);
       
       if (!archived) {
         return res.status(404).json({ error: "Template not found" });
@@ -4097,7 +4131,7 @@ Best regards,
       
       const { id } = req.params;
       const includeDrafts = req.query.includeDrafts === 'true';
-      const versions = await storage.listTemplateVersions(id, { includeDrafts });
+      const versions = await contentStudioStorage.listTemplateVersions(id, { includeDrafts });
       
       res.json(versions);
     } catch (error) {
@@ -4126,7 +4160,7 @@ Best regards,
       }
       
       const { segmentSnapshotIds, ...versionData } = parsed.data as any;
-      const version = await storage.createTemplateVersion({
+      const version = await contentStudioStorage.createTemplateVersion({
         ...versionData,
         segmentSnapshotIds
       });
@@ -4146,7 +4180,7 @@ Best regards,
       }
       
       const { id, versionId } = req.params;
-      const published = await storage.publishTemplateVersion(id, versionId);
+      const published = await contentStudioStorage.publishTemplateVersion(id, versionId);
       
       if (!published) {
         return res.status(404).json({ error: "Version not found" });
@@ -4169,7 +4203,7 @@ Best regards,
       
       const q = req.query.q as string;
       const includeGlobal = req.query.includeGlobal === 'true';
-      const segments = await storage.listAudienceSegments({ 
+      const segments = await contentStudioStorage.listAudienceSegments({ 
         createdBy: userId, 
         q,
         includeGlobal
@@ -4265,7 +4299,7 @@ Best regards,
         return res.status(400).json({ error: "segmentIds must be an array" });
       }
       
-      await storage.attachSegments(id, segmentIds);
+      await contentStudioStorage.attachSegments(id, segmentIds);
       res.json({ success: true });
     } catch (error) {
       console.error("Error attaching segments:", error);
@@ -4282,7 +4316,7 @@ Best regards,
       }
       
       const { id, segmentId } = req.params;
-      const detached = await storage.detachSegment(id, segmentId);
+      const detached = await contentStudioStorage.detachSegment(id, segmentId);
       
       if (!detached) {
         return res.status(404).json({ error: "Segment not found on template" });
@@ -4310,7 +4344,7 @@ Best regards,
         return res.status(400).json({ error: "versionId, channel, and eventType are required" });
       }
       
-      await storage.recordTemplateMetricEvent({
+      await contentStudioStorage.recordTemplateMetricEvent({
         templateVersionId: versionId,
         channel,
         eventType,
@@ -4337,7 +4371,7 @@ Best regards,
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       
-      const metrics = await storage.getTemplateMetrics(id, startDate, endDate);
+      const metrics = await contentStudioStorage.getTemplateMetrics(id, startDate, endDate);
       res.json(metrics);
     } catch (error) {
       console.error("Error fetching metrics:", error);
