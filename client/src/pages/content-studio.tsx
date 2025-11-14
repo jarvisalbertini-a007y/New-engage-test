@@ -522,31 +522,61 @@ export default function ContentStudio() {
                 <CardTitle>Recent Templates</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-md">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">SaaS Outreach Template</p>
-                        <p className="text-xs text-muted-foreground">Email • Professional tone</p>
+                {contentTemplates && contentTemplates.length > 0 ? (
+                  <div className="space-y-3">
+                    {contentTemplates.slice(0, 5).map((template: any) => (
+                      <div key={template.id} className="p-3 border rounded-md">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{template.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {template.contentType} • {template.defaultTone || 'Professional'} tone
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            data-testid={`button-use-template-${template.id}`}
+                            onClick={async () => {
+                              // Load the template version
+                              try {
+                                const versions = await api.get(`/api/content-templates/${template.id}/versions`);
+                                if (versions && versions.length > 0) {
+                                  const latestVersion = versions[0];
+                                  setGeneratedContent({
+                                    subject: latestVersion.subject,
+                                    body: latestVersion.body,
+                                    tone: latestVersion.tone || template.defaultTone,
+                                    confidence: 85,
+                                    personalizationElements: []
+                                  });
+                                  setContentType(template.contentType);
+                                  setTone(latestVersion.tone || template.defaultTone);
+                                  toast({
+                                    title: "Template Loaded",
+                                    description: `${template.name} template has been loaded`,
+                                  });
+                                }
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to load template",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            Use Template
+                          </Button>
+                        </div>
                       </div>
-                      <Button size="sm" variant="outline" data-testid="button-use-template-1">
-                        Use Template
-                      </Button>
-                    </div>
+                    ))}
                   </div>
-                  
-                  <div className="p-3 border rounded-md">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">Funding Follow-up</p>
-                        <p className="text-xs text-muted-foreground">LinkedIn • Friendly tone</p>
-                      </div>
-                      <Button size="sm" variant="outline" data-testid="button-use-template-2">
-                        Use Template
-                      </Button>
-                    </div>
+                ) : (
+                  <div className="text-center py-6 text-sm text-muted-foreground">
+                    No templates created yet. Generate content and save it as a template to get started.
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

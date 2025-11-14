@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { api as apiHelpers } from "@/lib/apiHelpers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -260,6 +261,7 @@ export function PlaybooksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookTemplate | null>(null);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
   // Fetch user's custom playbooks
@@ -270,7 +272,7 @@ export function PlaybooksPage() {
   // Apply playbook mutation
   const applyPlaybook = useMutation({
     mutationFn: async ({ playbookId, sequences }: { playbookId: string; sequences: string[] }) => {
-      return apiRequest(`/api/playbooks/${playbookId}/apply`, "POST", { sequences });
+      return apiHelpers.post(`/api/playbooks/${playbookId}/apply`, { sequences });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
