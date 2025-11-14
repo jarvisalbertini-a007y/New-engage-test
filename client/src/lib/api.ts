@@ -1,4 +1,5 @@
 import { apiRequest } from "./queryClient";
+import { api as apiHelpers } from "./apiHelpers";
 
 export const api = {
   // Dashboard
@@ -124,12 +125,10 @@ export const api = {
   
   // Phone Calls
   initiateCall: async (data: { contactId: string; userId: string; scriptType: string }) => {
-    const response = await apiRequest("POST", "/api/calls/initiate", data);
-    return response.json();
+    return apiHelpers.post("/api/calls/initiate", data);
   },
   startCallCampaign: async (data: { contactIds: string[]; userId: string; scriptType: string }) => {
-    const response = await apiRequest("POST", "/api/calls/campaign", data);
-    return response.json();
+    return apiHelpers.post("/api/calls/campaign", data);
   },
   getCallAnalytics: (userId?: string) => {
     const params = userId ? `?userId=${userId}` : "";
@@ -150,8 +149,7 @@ export const api = {
     return fetch(`/api/call-scripts?${params}`).then(res => res.json());
   },
   generateCallScript: async (data: { type: string; contactId?: string }) => {
-    const response = await apiRequest("POST", "/api/call-scripts/generate", data);
-    return response.json();
+    return apiHelpers.post("/api/call-scripts/generate", data);
   },
   getVoicemails: (filters?: { contactId?: string; isListened?: boolean }) => {
     const params = new URLSearchParams();
