@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeWorkflowData } from "./services/workflowTemplates";
+import { initializePlaybookTemplates } from "./services/seedPlaybooks";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -132,6 +133,10 @@ app.use((req, res, next) => {
 async function initializeServer(): Promise<Server> {
   // Initialize workflow data (templates and agent types)
   // Temporarily disabled to debug startup issues
+  
+  // Initialize playbook templates
+  await initializePlaybookTemplates();
+  console.log("[Server] Playbook templates initialized");
   
   // Initialize AI Agent Executor service
   const { aiAgentExecutor } = await import("./services/aiAgentExecutor");
