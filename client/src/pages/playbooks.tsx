@@ -86,8 +86,8 @@ export function PlaybooksPage() {
   // Handle opening apply modal
   const handleApplyClick = (playbook: Playbook) => {
     setSelectedPlaybook(playbook);
-    const sequences = (playbook.sequences as any) || [];
-    setSelectedSequences(sequences.map((s: any) => s.name)); // Select all by default
+    const sequences = playbook.sequences ?? [];
+    setSelectedSequences(sequences.map((s) => s.name)); // Select all by default
     setApplyModalOpen(true);
   };
 
@@ -125,7 +125,7 @@ export function PlaybooksPage() {
   // Calculate average metrics
   const avgReplyRate = templatePlaybooks.length > 0 
     ? templatePlaybooks.reduce((acc, t) => {
-        const metrics = (t.successMetrics as any) || {};
+        const metrics = t.successMetrics ?? {};
         const rate = parseInt(metrics.avgReplyRate || "0");
         return acc + rate;
       }, 0) / templatePlaybooks.length
@@ -133,8 +133,8 @@ export function PlaybooksPage() {
 
   const avgTimeToReply = templatePlaybooks.length > 0
     ? templatePlaybooks.reduce((acc, t) => {
-        const metrics = (t.successMetrics as any) || {};
-        const time = parseFloat(metrics.timeToFirst || "0");
+        const metrics = t.successMetrics ?? {};
+        const time = parseFloat(metrics.timeToResponse || "0");
         return acc + time;
       }, 0) / templatePlaybooks.length
     : 0;
@@ -262,9 +262,9 @@ export function PlaybooksPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredTemplates.map((template) => {
-                  const sequences = (template.sequences as any) || [];
-                  const targetAudience = (template.targetAudience as any) || {};
-                  const metrics = (template.successMetrics as any) || {};
+                  const sequences = template.sequences ?? [];
+                  const targetAudience = template.targetAudience ?? {};
+                  const metrics = template.successMetrics ?? {};
                   
                   return (
                     <Card key={template.id} className="hover:shadow-lg transition-shadow">
@@ -287,12 +287,12 @@ export function PlaybooksPage() {
                         <div>
                           <p className="text-sm font-medium mb-2">Target Audience</p>
                           <div className="flex flex-wrap gap-1">
-                            {(targetAudience.titles || []).slice(0, 3).map((title: string, idx: number) => (
+                            {(targetAudience.titles || []).slice(0, 3).map((title, idx) => (
                               <Badge key={idx} variant="outline" className="text-xs">
                                 {title}
                               </Badge>
                             ))}
-                            {targetAudience.titles?.length > 3 && (
+                            {targetAudience.titles && targetAudience.titles.length > 3 && (
                               <Badge variant="outline" className="text-xs">
                                 +{targetAudience.titles.length - 3}
                               </Badge>
@@ -304,7 +304,7 @@ export function PlaybooksPage() {
                         <div>
                           <p className="text-sm font-medium mb-2">Sequences</p>
                           <div className="space-y-2">
-                            {sequences.slice(0, 2).map((seq: any, idx: number) => (
+                            {sequences.slice(0, 2).map((seq, idx) => (
                               <div key={idx} className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">{seq.name}</span>
                                 <div className="flex items-center gap-2">
@@ -387,8 +387,8 @@ export function PlaybooksPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {customPlaybooks.map((playbook) => {
-                  const sequences = (playbook.sequences as any) || [];
-                  const metrics = (playbook.successMetrics as any) || {};
+                  const sequences = playbook.sequences ?? [];
+                  const metrics = playbook.successMetrics ?? {};
                   
                   return (
                     <Card key={playbook.id} className="hover:shadow-lg transition-shadow">
@@ -450,7 +450,7 @@ export function PlaybooksPage() {
               <div>
                 <Label className="text-sm font-medium">Sequences to Create</Label>
                 <div className="space-y-2 mt-2">
-                  {((selectedPlaybook?.sequences as any) || []).map((seq: any) => (
+                  {(selectedPlaybook?.sequences ?? []).map((seq) => (
                     <div key={seq.name} className="flex items-center space-x-2">
                       <Checkbox 
                         id={seq.name}
@@ -510,7 +510,7 @@ export function PlaybooksPage() {
                   <div>
                     <h3 className="font-semibold mb-3">Email Templates</h3>
                     <div className="space-y-3">
-                      {Object.entries(selectedPlaybook.emailTemplates as any).map(([key, template]: [string, any]) => (
+                      {Object.entries(selectedPlaybook.emailTemplates ?? {}).map(([key, template]) => (
                         <Card key={key}>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</CardTitle>
@@ -532,7 +532,7 @@ export function PlaybooksPage() {
                   <div>
                     <h3 className="font-semibold mb-3">Expected Performance</h3>
                     <div className="grid grid-cols-3 gap-4">
-                      {Object.entries(selectedPlaybook.successMetrics as any).map(([key, value]) => (
+                      {Object.entries(selectedPlaybook.successMetrics ?? {}).map(([key, value]) => (
                         <Card key={key}>
                           <CardContent className="p-4 text-center">
                             <p className="text-2xl font-bold text-primary">{String(value)}</p>

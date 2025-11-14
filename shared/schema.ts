@@ -490,17 +490,55 @@ export const autopilotRuns = pgTable("autopilot_runs", {
   duration: integer("duration"), // in seconds
 });
 
+// Type definitions for Playbook JSONB fields
+export const PlaybookSequenceSchema = z.object({
+  name: z.string(),
+  steps: z.number(),
+  channels: z.array(z.string()),
+  duration: z.string() // Changed from 'timing' to 'duration' to match seed data
+});
+
+export const PlaybookEmailTemplateItemSchema = z.object({
+  subject: z.string(),
+  preview: z.string() // Changed from 'body' to 'preview' to match seed data
+});
+
+// Email templates are a record/object, not an array
+export const PlaybookEmailTemplatesSchema = z.record(z.string(), PlaybookEmailTemplateItemSchema);
+
+export const PlaybookTargetAudienceSchema = z.object({
+  titles: z.array(z.string()),
+  companySize: z.string(),
+  industries: z.array(z.string())
+});
+
+export const PlaybookCallScriptSchema = z.object({
+  scenario: z.string(),
+  script: z.string()
+});
+
+export const PlaybookObjectionSchema = z.object({
+  objection: z.string(),
+  response: z.string()
+});
+
+export const PlaybookSuccessMetricsSchema = z.object({
+  avgReplyRate: z.string(),
+  avgMeetingRate: z.string(), // Changed from 'avgMeetingsBooked' to match seed data
+  timeToFirst: z.string() // Changed from 'timeToResponse' to match seed data
+});
+
 export const playbooks = pgTable("playbooks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   industry: text("industry").notNull(),
   description: text("description"),
-  targetAudience: jsonb("target_audience"), // ICP definition
-  sequences: jsonb("sequences"), // Pre-built sequences
-  emailTemplates: jsonb("email_templates"),
-  callScripts: jsonb("call_scripts"),
-  objectionHandling: jsonb("objection_handling"),
-  successMetrics: jsonb("success_metrics"),
+  targetAudience: jsonb("target_audience").$type<z.infer<typeof PlaybookTargetAudienceSchema>>(), // ICP definition
+  sequences: jsonb("sequences").$type<z.infer<typeof PlaybookSequenceSchema>[]>(), // Pre-built sequences
+  emailTemplates: jsonb("email_templates").$type<z.infer<typeof PlaybookEmailTemplatesSchema>>(), // Record/object, not array
+  callScripts: jsonb("call_scripts").$type<z.infer<typeof PlaybookCallScriptSchema>[]>(),
+  objectionHandling: jsonb("objection_handling").$type<z.infer<typeof PlaybookObjectionSchema>[]>(),
+  successMetrics: jsonb("success_metrics").$type<z.infer<typeof PlaybookSuccessMetricsSchema>>(),
   isTemplate: boolean("is_template").default(true),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
