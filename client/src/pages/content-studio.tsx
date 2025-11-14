@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { api } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
+import { api as oldApi } from "@/lib/api";
+import { api } from "@/lib/apiHelpers";
 import { Wand2, Copy, Save, Send, User, Building, Lightbulb, Target, Brain, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +46,7 @@ export default function ContentStudio() {
   const { data: contacts = [] } = useQuery({
     queryKey: ["/api/contacts"],
     queryFn: async () => {
-      const response = await api.getContacts({ limit: 100 });
+      const response = await oldApi.getContacts({ limit: 100 });
       // Ensure we always return an array, even if the API returns an error
       return Array.isArray(response) ? response : [];
     },
@@ -54,7 +55,7 @@ export default function ContentStudio() {
   const { data: companies = [] } = useQuery({
     queryKey: ["/api/companies"],
     queryFn: async () => {
-      const response = await api.getCompanies(100);
+      const response = await oldApi.getCompanies(100);
       // Ensure we always return an array, even if the API returns an error
       return Array.isArray(response) ? response : [];
     },
@@ -63,7 +64,7 @@ export default function ContentStudio() {
   const { data: insights = [] } = useQuery({
     queryKey: ["/api/insights"],
     queryFn: async () => {
-      const response = await api.getInsights({ limit: 20 });
+      const response = await oldApi.getInsights({ limit: 20 });
       // Ensure we always return an array, even if the API returns an error
       return Array.isArray(response) ? response : [];
     },
@@ -72,25 +73,21 @@ export default function ContentStudio() {
   const { data: audienceSegments = [] } = useQuery({
     queryKey: ["/api/audience-segments"],
     queryFn: async () => {
-      const response = await apiRequest('/api/audience-segments', {
-        method: 'GET'
-      });
-      return response;
+      const response = await api.get('/api/audience-segments');
+      return response || [];
     }
   });
 
   const { data: contentTemplates = [] } = useQuery({
     queryKey: ["/api/content-templates"],
     queryFn: async () => {
-      const response = await apiRequest('/api/content-templates', {
-        method: 'GET'
-      });
-      return response;
+      const response = await api.get('/api/content-templates');
+      return response || [];
     }
   });
 
   const generateContentMutation = useMutation({
-    mutationFn: api.generateContent,
+    mutationFn: oldApi.generateContent,
     onSuccess: (data) => {
       setGeneratedContent(data);
       toast({
@@ -110,38 +107,30 @@ export default function ContentStudio() {
   const saveTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
       // First, create the content template
-      const template = await apiRequest('/api/content-templates', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: data.name,
-          description: data.description,
-          contentType: contentType,
-          status: 'active',
-          defaultTone: tone,
-          personaId: selectedPersona !== "none" ? selectedPersona : undefined,
-          tags: data.tags || [],
-          segmentIds: data.segmentIds || []
-        })
+      const template = await api.post('/api/content-templates', {
+        name: data.name,
+        description: data.description,
+        contentType: contentType,
+        status: 'active',
+        defaultTone: tone,
+        personaId: selectedPersona !== "none" ? selectedPersona : undefined,
+        tags: data.tags || [],
+        segmentIds: data.segmentIds || []
       });
       
       // Then create the first version of the template
-      const version = await apiRequest(`/api/content-templates/${template.id}/versions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          subject: data.subject,
-          body: data.body,
-          tone: tone,
-          authorId: 'user',
-          metadata: {
-            targetingFilters: data.targetingFilters
-          }
-        })
+      const version = await api.post(`/api/content-templates/${template.id}/versions`, {
+        subject: data.subject,
+        body: data.body,
+        tone: tone,
+        authorId: 'user',
+        metadata: {
+          targetingFilters: data.targetingFilters
+        }
       });
       
       // Publish the version using the correct version ID
-      await apiRequest(`/api/content-templates/${template.id}/versions/${version.id}/publish`, {
-        method: 'POST'
-      });
+      await api.post(`/api/content-templates/${template.id}/versions/${version.id}/publish`);
       
       return template;
     },

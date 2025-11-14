@@ -23,9 +23,12 @@ testUsers.set("test@example.com", {
 
 // Development authentication middleware
 export function setupDevAuth(app: Express) {
-  // Only enable in development
-  if (process.env.NODE_ENV === 'production') {
-    console.log('[DevAuth] Skipping development auth setup in production');
+  // Only enable in development with explicit flag
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const devAuthEnabled = process.env.DEV_AUTH_ENABLED === 'true';
+  
+  if (!isDevelopment || !devAuthEnabled) {
+    console.log('[DevAuth] Skipping development auth setup (requires NODE_ENV != production AND DEV_AUTH_ENABLED=true)');
     return;
   }
 

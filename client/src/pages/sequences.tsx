@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { apiRequest } from "@/lib/queryClient";
+import { api as apiHelpers } from "@/lib/apiHelpers";
 import { Plus, Play, Pause, Copy, Edit, Trash2, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import SequenceBuilder from "@/components/sequence-builder";
 import { useToast } from "@/hooks/use-toast";
 
@@ -96,8 +99,7 @@ export default function Sequences() {
 
   const startSequenceMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/sequences/${id}/start`);
-      return response.json();
+      return apiHelpers.post(`/api/sequences/${id}/start`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
@@ -117,8 +119,7 @@ export default function Sequences() {
 
   const pauseSequenceMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/sequences/${id}/pause`);
-      return response.json();
+      return apiHelpers.post(`/api/sequences/${id}/pause`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
@@ -138,8 +139,7 @@ export default function Sequences() {
 
   const updateSequenceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const response = await apiRequest("PATCH", `/api/sequences/${id}`, data);
-      return response.json();
+      return apiHelpers.patch(`/api/sequences/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
@@ -333,7 +333,12 @@ export default function Sequences() {
                           </div>
                           
                           <div className="flex items-center space-x-2 pt-2">
-                            <Button size="sm" variant="outline" data-testid={`button-edit-${sequence.id}`}>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setEditingSequence(sequence)}
+                              data-testid={`button-edit-${sequence.id}`}
+                            >
                               <Edit className="h-3 w-3 mr-1" />
                               Edit
                             </Button>
@@ -392,6 +397,64 @@ export default function Sequences() {
           </CardContent>
         </Card>
         </div>
+        
+        {/* Edit Sequence Modal */}
+        <Dialog open={!!editingSequence} onOpenChange={(open) => !open && setEditingSequence(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Sequence</DialogTitle>
+              <DialogDescription>
+                Update your sequence name, description, and steps
+              </DialogDescription>
+            </DialogHeader>
+            {editingSequence && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingSequence.name}
+                    onChange={(e) => setEditingSequence({...editingSequence, name: e.target.value})}
+                    placeholder="Sequence name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editingSequence.description || ""}
+                    onChange={(e) => setEditingSequence({...editingSequence, description: e.target.value})}
+                    placeholder="Describe your sequence..."
+                    rows={3}
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingSequence(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      updateSequenceMutation.mutate({
+                        id: editingSequence.id,
+                        data: {
+                          name: editingSequence.name,
+                          description: editingSequence.description,
+                        }
+                      });
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

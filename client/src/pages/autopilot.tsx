@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { api } from "@/lib/apiHelpers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,14 +73,34 @@ export function AutopilotPage() {
   // Create campaign mutation
   const createCampaign = useMutation({
     mutationFn: async (campaign: typeof newCampaign) => {
-      return apiRequest("/api/autopilot/campaigns", "POST", campaign);
+      return api.post("/api/autopilot/campaigns", campaign);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/autopilot/campaigns"] });
       setShowCreate(false);
+      setNewCampaign({
+        name: "",
+        targetPersona: "",
+        sequence: "",
+        dailyTargetLeads: 20,
+        dailySendLimit: 50,
+        creativityLevel: 5,
+        autoFollowUp: true,
+        autoQualify: false,
+        autoBookMeetings: false,
+        workingHours: { start: "09:00", end: "17:00", timezone: "UTC" },
+        workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+      });
       toast({
         title: "Campaign Created!",
         description: "Your autopilot campaign has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create campaign",
+        variant: "destructive",
       });
     },
   });
@@ -87,7 +108,7 @@ export function AutopilotPage() {
   // Toggle campaign mutation
   const toggleCampaign = useMutation({
     mutationFn: async (campaignId: string) => {
-      return apiRequest(`/api/autopilot/campaigns/${campaignId}/toggle`, "POST");
+      return api.post(`/api/autopilot/campaigns/${campaignId}/toggle`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/autopilot/campaigns"] });
@@ -101,7 +122,7 @@ export function AutopilotPage() {
   // Run campaign mutation
   const runCampaign = useMutation({
     mutationFn: async (campaignId: string) => {
-      return apiRequest(`/api/autopilot/campaigns/${campaignId}/run`, "POST");
+      return api.post(`/api/autopilot/campaigns/${campaignId}/run`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/autopilot/campaigns/${selectedCampaign}/runs`] });
