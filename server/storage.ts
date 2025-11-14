@@ -1162,7 +1162,7 @@ export class MemStorage implements IStorage {
       totalBooked: agent.totalBooked || 0,
       totalAttended: agent.totalAttended || 0,
       settings: agent.settings || {},
-      lastRunAt: null, // lastRunAt is not part of InsertAiAgent
+      lastRun: null, // lastRun is not part of InsertAiAgent
       createdBy: agent.createdBy || null,
       createdAt: new Date() 
     };

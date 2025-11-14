@@ -263,29 +263,24 @@ export async function processSequenceEmailMetrics(sequenceExecutionId: string): 
   };
   
   // Generate insight for high-performing sequence
+  // Note: Simplified to work without needing sequence execution details
+  // High-performing sequences are tracked based on metrics alone
   if (sent >= 10 && (metrics.replyRate >= 15 || metrics.clickRate >= 30)) {
-    const execution = await storage.getSequenceExecution(sequenceExecutionId);
-    if (execution?.sequenceId) {
-      const sequence = await storage.getSequence(execution.sequenceId);
-      if (sequence) {
-        await insightsOrchestrator.acceptTrigger({
-          source: 'sequence',
-          eventType: EventTypes.sequence.HIGH_ENGAGEMENT,
-          companyId: '', // Sequences are not company-specific
-          data: {
-            sequenceId: execution.sequenceId,
-            sequenceName: sequence.name,
-            executionId: sequenceExecutionId,
-            metrics: {
-              sent,
-              replyRate: Math.round(metrics.replyRate),
-              clickRate: Math.round(metrics.clickRate)
-            }
-          },
-          timestamp: new Date()
-        });
-      }
-    }
+    await insightsOrchestrator.acceptTrigger({
+      source: 'sequence',
+      eventType: EventTypes.sequence.HIGH_ENGAGEMENT,
+      companyId: '', // Sequences are not company-specific
+      data: {
+        sequenceExecutionId,
+        metrics: {
+          sent,
+          replyRate: Math.round(metrics.replyRate),
+          clickRate: Math.round(metrics.clickRate),
+          openRate: Math.round(metrics.openRate)
+        }
+      },
+      timestamp: new Date()
+    });
   }
   
   return metrics;
