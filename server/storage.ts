@@ -765,6 +765,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteCompany(id: string): Promise<boolean> {
+    return this.companies.delete(id);
+  }
+
   // Contact methods
   async getContact(id: string): Promise<Contact | undefined> {
     return this.contacts.get(id);
