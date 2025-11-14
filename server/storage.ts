@@ -1787,7 +1787,7 @@ export class MemStorage implements IStorage {
   }
   
   async getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]> {
-    return Array.from(this.callAnalyticsMap.values()).filter(a => a.callId);
+    return Array.from(this.callAnalyticsMap.values()).filter(a => a.campaignId === campaignId);
   }
   
   async createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics> {
