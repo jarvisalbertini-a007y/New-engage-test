@@ -596,118 +596,13 @@ export class MemStorage implements IStorage {
   private enterpriseSecurity: Map<string, EnterpriseSecurity> = new Map();
   private auditLogs: Map<string, AuditLog> = new Map();
   private accessControls: Map<string, AccessControl> = new Map();
+  // Marketplace-related maps (missing before)
+  private marketplaceAgents: Map<string, MarketplaceAgent> = new Map();
+  private agentRatings: Map<string, AgentRating> = new Map();
+  private agentPurchases: Map<string, AgentPurchase> = new Map();
 
   constructor() {
-    this.seedData();
-  }
-
-  private seedData() {
-    // Create sample companies
-    const companies = [
-      {
-        id: "comp1",
-        name: "TechCorp Solutions",
-        domain: "techcorp.com",
-        industry: "SaaS",
-        size: "50-200",
-        location: "San Francisco, CA",
-        revenue: "$10M-50M",
-        technologies: ["React", "Node.js", "AWS"],
-        description: "Leading SaaS platform for enterprise automation",
-        linkedinUrl: "https://linkedin.com/company/techcorp",
-        createdAt: new Date(),
-      },
-      {
-        id: "comp2",
-        name: "DataFlow Inc",
-        domain: "dataflow.com",
-        industry: "Fintech",
-        size: "200-500",
-        location: "Austin, TX",
-        revenue: "$50M-100M",
-        technologies: ["Python", "PostgreSQL", "Kubernetes"],
-        description: "Financial data processing solutions",
-        linkedinUrl: "https://linkedin.com/company/dataflow",
-        createdAt: new Date(),
-      },
-      {
-        id: "comp3",
-        name: "NextGen Analytics",
-        domain: "nextgen.com",
-        industry: "Healthcare",
-        size: "100-300",
-        location: "Denver, CO",
-        revenue: "$25M-50M",
-        technologies: ["Angular", "MongoDB", "Docker"],
-        description: "Healthcare analytics and insights platform",
-        linkedinUrl: "https://linkedin.com/company/nextgen",
-        createdAt: new Date(),
-      }
-    ];
-
-    companies.forEach(company => this.companies.set(company.id, company));
-
-    // Create sample visitor sessions
-    const sessions = [
-      {
-        id: "session1",
-        companyId: "comp1",
-        ipAddress: "192.168.1.100",
-        userAgent: "Mozilla/5.0...",
-        pagesViewed: ["/pricing", "/features", "/demo"],
-        timeOnSite: 450,
-        intentScore: 94,
-        isActive: true,
-        lastActivity: new Date(),
-        createdAt: new Date(),
-      },
-      {
-        id: "session2",
-        companyId: "comp2",
-        ipAddress: "192.168.1.101",
-        userAgent: "Mozilla/5.0...",
-        pagesViewed: ["/features", "/about"],
-        timeOnSite: 180,
-        intentScore: 72,
-        isActive: true,
-        lastActivity: new Date(),
-        createdAt: new Date(),
-      }
-    ];
-
-    sessions.forEach(session => this.visitorSessions.set(session.id, session));
-
-    // Create sample insights
-    const insights = [
-      {
-        id: "insight1",
-        companyId: "comp1",
-        type: "funding",
-        title: "TechCorp raised $15M Series A",
-        description: "Perfect timing to reach out about scaling solutions",
-        source: "TechCrunch",
-        confidence: "0.95",
-        relevanceScore: 88,
-        actionable: true,
-        data: { amount: "$15M", round: "Series A" },
-        createdAt: new Date(),
-      },
-      {
-        id: "insight2",
-        companyId: "comp2",
-        type: "leadership_change",
-        title: "New CTO at DataFlow Inc",
-        description: "Sarah Chen joined as CTO - focus on tech stack modernization",
-        source: "LinkedIn",
-        confidence: "0.87",
-        relevanceScore: 92,
-        actionable: true,
-        data: { person: "Sarah Chen", role: "CTO" },
-        createdAt: new Date(),
-      }
-    ];
-
-    insights.forEach(insight => this.insights.set(insight.id, insight));
+    // No mock data - user explicitly requested NO mock data without permission
   }
 
   // User methods - Required for Replit Auth
@@ -1381,6 +1276,170 @@ export class MemStorage implements IStorage {
     const updated = { ...metric, ...updates, updatedAt: new Date() };
     this.agentMetrics.set(id, updated);
     return updated;
+  }
+
+  // Marketplace Agent methods (critical missing methods)
+  async getMarketplaceAgent(id: string): Promise<MarketplaceAgent | undefined> {
+    return this.marketplaceAgents.get(id);
+  }
+
+  async getMarketplaceAgents(filters?: { category?: string; author?: string; minRating?: number; maxPrice?: number; tags?: string[] }): Promise<MarketplaceAgent[]> {
+    let agents = Array.from(this.marketplaceAgents.values());
+    
+    if (filters?.category) {
+      agents = agents.filter(a => a.category === filters.category);
+    }
+    if (filters?.author) {
+      agents = agents.filter(a => a.author === filters.author);
+    }
+    if (filters?.minRating) {
+      agents = agents.filter(a => 
+        a.rating ? parseFloat(a.rating) >= filters.minRating : false
+      );
+    }
+    if (filters?.maxPrice) {
+      agents = agents.filter(a => 
+        parseFloat(a.price) <= filters.maxPrice
+      );
+    }
+    if (filters?.tags && filters.tags.length > 0) {
+      agents = agents.filter(a => 
+        a.tags?.some(tag => filters.tags?.includes(tag))
+      );
+    }
+    
+    return agents;
+  }
+
+  async getMarketplaceAgentsByUser(userId: string): Promise<MarketplaceAgent[]> {
+    return Array.from(this.marketplaceAgents.values()).filter(a => a.author === userId);
+  }
+
+  async createMarketplaceAgent(agent: InsertMarketplaceAgent): Promise<MarketplaceAgent> {
+    const id = randomUUID();
+    const newAgent: MarketplaceAgent = {
+      id,
+      ...agent,
+      downloads: 0,
+      rating: null,
+      reviewCount: 0,
+      lastUpdated: new Date(),
+      createdAt: new Date()
+    };
+    this.marketplaceAgents.set(id, newAgent);
+    return newAgent;
+  }
+
+  async updateMarketplaceAgent(id: string, updates: Partial<MarketplaceAgent>): Promise<MarketplaceAgent | undefined> {
+    const agent = this.marketplaceAgents.get(id);
+    if (!agent) return undefined;
+    
+    const updated = { ...agent, ...updates, lastUpdated: new Date() };
+    this.marketplaceAgents.set(id, updated);
+    return updated;
+  }
+
+  async deleteMarketplaceAgent(id: string): Promise<boolean> {
+    return this.marketplaceAgents.delete(id);
+  }
+
+  async incrementAgentDownloads(id: string): Promise<void> {
+    const agent = this.marketplaceAgents.get(id);
+    if (agent) {
+      agent.downloads = (agent.downloads || 0) + 1;
+      this.marketplaceAgents.set(id, agent);
+    }
+  }
+
+  // Agent Rating methods (critical missing methods)
+  async getAgentRating(id: string): Promise<AgentRating | undefined> {
+    return this.agentRatings.get(id);
+  }
+
+  async getAgentRatings(agentId: string): Promise<AgentRating[]> {
+    return Array.from(this.agentRatings.values()).filter(r => r.agentId === agentId);
+  }
+
+  async getUserAgentRating(agentId: string, userId: string): Promise<AgentRating | undefined> {
+    return Array.from(this.agentRatings.values()).find(r => 
+      r.agentId === agentId && r.userId === userId
+    );
+  }
+
+  async createAgentRating(rating: InsertAgentRating): Promise<AgentRating> {
+    const id = randomUUID();
+    const newRating: AgentRating = {
+      id,
+      ...rating,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.agentRatings.set(id, newRating);
+    
+    // Update average rating for the agent
+    await this.updateAgentAverageRating(rating.agentId);
+    
+    return newRating;
+  }
+
+  async updateAgentRating(id: string, updates: Partial<AgentRating>): Promise<AgentRating | undefined> {
+    const rating = this.agentRatings.get(id);
+    if (!rating) return undefined;
+    
+    const updated = { ...rating, ...updates, updatedAt: new Date() };
+    this.agentRatings.set(id, updated);
+    
+    // Update average rating for the agent
+    await this.updateAgentAverageRating(rating.agentId);
+    
+    return updated;
+  }
+
+  async updateAgentAverageRating(agentId: string): Promise<void> {
+    const ratings = await this.getAgentRatings(agentId);
+    const agent = await this.getMarketplaceAgent(agentId);
+    
+    if (agent && ratings.length > 0) {
+      const avgRating = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+      agent.rating = avgRating.toFixed(1);
+      agent.reviewCount = ratings.length;
+      this.marketplaceAgents.set(agentId, agent);
+    }
+  }
+
+  // Agent Purchase methods (critical missing methods)
+  async getAgentPurchase(id: string): Promise<AgentPurchase | undefined> {
+    return this.agentPurchases.get(id);
+  }
+
+  async getAgentPurchases(filters?: { agentId?: string; userId?: string }): Promise<AgentPurchase[]> {
+    let purchases = Array.from(this.agentPurchases.values());
+    
+    if (filters?.agentId) {
+      purchases = purchases.filter(p => p.agentId === filters.agentId);
+    }
+    if (filters?.userId) {
+      purchases = purchases.filter(p => p.userId === filters.userId);
+    }
+    
+    return purchases;
+  }
+
+  async createAgentPurchase(purchase: InsertAgentPurchase): Promise<AgentPurchase> {
+    const id = randomUUID();
+    const newPurchase: AgentPurchase = {
+      id,
+      ...purchase,
+      purchasedAt: new Date()
+    };
+    this.agentPurchases.set(id, newPurchase);
+    return newPurchase;
+  }
+
+  async hasUserPurchasedAgent(agentId: string, userId: string): Promise<boolean> {
+    return Array.from(this.agentPurchases.values()).some(p => 
+      p.agentId === agentId && p.userId === userId
+    );
   }
   
   // Onboarding (stub implementations)
