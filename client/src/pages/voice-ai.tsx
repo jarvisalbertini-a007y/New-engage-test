@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { 
   Phone, PhoneOff, PhoneCall, Mic, MicOff, Volume2, 
   PlayCircle, PauseCircle, Calendar, Users, BarChart3, 
@@ -112,16 +111,31 @@ export default function VoiceAIPage() {
   // Fetch campaigns
   const { data: campaigns, isLoading: loadingCampaigns } = useQuery<VoiceCampaign[]>({
     queryKey: ["/api/voice/campaigns"],
+    queryFn: async () => {
+      const response = await fetch("/api/voice/campaigns");
+      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      return response.json();
+    },
   });
 
   // Fetch calls
   const { data: calls, isLoading: loadingCalls } = useQuery<VoiceCall[]>({
     queryKey: ["/api/voice/calls"],
+    queryFn: async () => {
+      const response = await fetch("/api/voice/calls");
+      if (!response.ok) throw new Error("Failed to fetch calls");
+      return response.json();
+    },
   });
 
   // Fetch scripts
   const { data: scripts, isLoading: loadingScripts } = useQuery<VoiceScript[]>({
     queryKey: ["/api/voice/scripts"],
+    queryFn: async () => {
+      const response = await fetch("/api/voice/scripts");
+      if (!response.ok) throw new Error("Failed to fetch scripts");
+      return response.json();
+    },
   });
 
   // Fetch analytics
@@ -131,11 +145,24 @@ export default function VoiceAIPage() {
     period: string;
   }>({
     queryKey: ["/api/voice/analytics"],
+    queryFn: async () => {
+      const response = await fetch("/api/voice/analytics");
+      if (!response.ok) throw new Error("Failed to fetch analytics");
+      return response.json();
+    },
   });
 
   // Create campaign mutation
   const createCampaignMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/voice/campaigns", "POST", data),
+    mutationFn: async (data: any) => {
+      const response = await fetch("/api/voice/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to create campaign");
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice/campaigns"] });
       toast({
@@ -163,7 +190,15 @@ export default function VoiceAIPage() {
 
   // Create script mutation
   const createScriptMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/voice/scripts", "POST", data),
+    mutationFn: async (data: any) => {
+      const response = await fetch("/api/voice/scripts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to create script");
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice/scripts"] });
       toast({
@@ -190,8 +225,15 @@ export default function VoiceAIPage() {
 
   // Initiate call mutation
   const initiateCallMutation = useMutation({
-    mutationFn: (data: { contactId: string; scriptId: string; campaignId?: string }) =>
-      apiRequest("/api/voice/call", "POST", data),
+    mutationFn: async (data: { contactId: string; scriptId: string; campaignId?: string }) => {
+      const response = await fetch("/api/voice/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to initiate call");
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice/calls"] });
       toast({
