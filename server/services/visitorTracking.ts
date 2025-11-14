@@ -9,38 +9,31 @@ import { EventTypes } from "./insightsOrchestrator";
 export async function trackVisitorSession(
   sessionData: {
     companyId?: string;
-    companyDomain?: string;
-    companyName?: string;
-    pageViews: number;
-    totalDuration: number;
-    referrerSource?: string;
+    ipAddress: string;
+    userAgent?: string;
+    pagesViewed: string[];
+    timeOnSite: number;
   }
 ): Promise<VisitorSession> {
-  // Create or update visitor session
+  // Create visitor session
   const session = await storage.createVisitorSession({
     companyId: sessionData.companyId,
-    companyDomain: sessionData.companyDomain,
-    visitorId: Math.random().toString(36).substr(2, 9),
-    firstSeen: new Date().toISOString(),
-    lastSeen: new Date().toISOString(),
-    pageViews: sessionData.pageViews,
-    totalDuration: sessionData.totalDuration,
-    referrerSource: sessionData.referrerSource,
-    entryPage: "/",
-    exitPage: "/",
-    technology: [],
-    location: null,
-    industry: null,
-    isQualifiedLead: false,
-    leadScore: 0
+    ipAddress: sessionData.ipAddress,
+    userAgent: sessionData.userAgent,
+    pagesViewed: sessionData.pagesViewed,
+    timeOnSite: sessionData.timeOnSite,
+    intentScore: 0,
+    isActive: true
   });
   
   // If we have a company, emit insight triggers
   if (sessionData.companyId) {
     const company = await storage.getCompany(sessionData.companyId);
     if (company) {
-      // Emit trigger for new company visit if first session
+      // Get all sessions for this company
       const sessions = await storage.getVisitorSessionsByCompany(sessionData.companyId);
+      
+      // Emit trigger for new company visit if first session
       if (sessions.length === 1) {
         await insightsOrchestrator.acceptTrigger({
           source: 'visitor',
@@ -49,16 +42,16 @@ export async function trackVisitorSession(
           companyName: company.name,
           data: {
             sessionId: session.id,
-            pageViews: sessionData.pageViews,
-            duration: sessionData.totalDuration,
-            referrer: sessionData.referrerSource
+            pagesViewed: sessionData.pagesViewed.length,
+            duration: sessionData.timeOnSite,
+            ipAddress: sessionData.ipAddress
           },
           timestamp: new Date()
         });
       }
       
       // Emit trigger for high engagement if applicable
-      if (sessionData.pageViews >= 5 || sessionData.totalDuration >= 300) {
+      if (sessionData.pagesViewed.length >= 5 || sessionData.timeOnSite >= 300) {
         await insightsOrchestrator.acceptTrigger({
           source: 'visitor',
           eventType: EventTypes.visitor.HIGH_ENGAGEMENT,
@@ -66,26 +59,25 @@ export async function trackVisitorSession(
           companyName: company.name,
           data: {
             sessionId: session.id,
-            pageViews: sessionData.pageViews,
-            duration: sessionData.totalDuration,
-            pagesViewed: sessionData.pageViews,
-            timeOnSite: `${Math.floor(sessionData.totalDuration / 60)}m`
+            pagesViewed: sessionData.pagesViewed.length,
+            duration: sessionData.timeOnSite,
+            timeOnSite: `${Math.floor(sessionData.timeOnSite / 60)}m`
           },
           timestamp: new Date()
         });
       }
       
-      // Emit trigger for repeat visit
+      // Emit trigger for multi visit
       if (sessions.length > 1) {
         await insightsOrchestrator.acceptTrigger({
           source: 'visitor',
-          eventType: EventTypes.visitor.REPEAT_VISIT,
+          eventType: EventTypes.visitor.MULTI_VISIT,
           companyId: sessionData.companyId,
           companyName: company.name,
           data: {
             sessionId: session.id,
             totalVisits: sessions.length,
-            previousVisit: sessions[sessions.length - 2]?.lastSeen
+            previousVisit: sessions[sessions.length - 2]?.lastActivity
           },
           timestamp: new Date()
         });
@@ -97,44 +89,46 @@ export async function trackVisitorSession(
 }
 
 /**
- * Enrich a visitor session with company data
+ * Update visitor session activity
  */
-export async function enrichVisitorSession(
+export async function updateVisitorActivity(
   sessionId: string,
-  enrichmentData: {
-    companyId?: string;
-    companyDomain?: string;
-    technology?: string[];
-    location?: string;
-    industry?: string;
+  activityData: {
+    newPages?: string[];
+    additionalTime?: number;
   }
 ): Promise<VisitorSession | undefined> {
   const session = await storage.getVisitorSession(sessionId);
   if (!session) return undefined;
   
+  const updatedPages = [
+    ...(session.pagesViewed || []),
+    ...(activityData.newPages || [])
+  ];
+  
+  const updatedTime = (session.timeOnSite || 0) + (activityData.additionalTime || 0);
+  
   const updated = await storage.updateVisitorSession(sessionId, {
-    companyId: enrichmentData.companyId || session.companyId,
-    companyDomain: enrichmentData.companyDomain || session.companyDomain,
-    technology: enrichmentData.technology || session.technology,
-    location: enrichmentData.location || session.location,
-    industry: enrichmentData.industry || session.industry,
-    lastSeen: new Date().toISOString()
+    pagesViewed: updatedPages,
+    timeOnSite: updatedTime,
+    lastActivity: new Date(),
+    isActive: true
   });
   
-  // If we just enriched with a company, emit new company trigger
-  if (enrichmentData.companyId && !session.companyId) {
-    const company = await storage.getCompany(enrichmentData.companyId);
+  // Check for intent spike if significant activity
+  if (session.companyId && updatedPages.length >= 10) {
+    const company = await storage.getCompany(session.companyId);
     if (company) {
       await insightsOrchestrator.acceptTrigger({
-        source: 'enrichment',
-        eventType: EventTypes.enrichment.COMPANY_IDENTIFIED,
-        companyId: enrichmentData.companyId,
+        source: 'visitor',
+        eventType: EventTypes.visitor.INTENT_SPIKE,
+        companyId: session.companyId,
         companyName: company.name,
         data: {
           sessionId,
-          technology: enrichmentData.technology,
-          industry: enrichmentData.industry,
-          location: enrichmentData.location
+          pagesViewed: updatedPages.length,
+          timeOnSite: `${Math.floor(updatedTime / 60)}m`,
+          recentPages: updatedPages.slice(-5)
         },
         timestamp: new Date()
       });
@@ -145,43 +139,42 @@ export async function enrichVisitorSession(
 }
 
 /**
- * Calculate lead score for a visitor session
+ * Calculate intent score for a visitor session
  */
-export async function calculateLeadScore(sessionId: string): Promise<number> {
+export async function calculateIntentScore(sessionId: string): Promise<number> {
   const session = await storage.getVisitorSession(sessionId);
   if (!session) return 0;
   
   let score = 0;
   
   // Page views scoring
-  if (session.pageViews >= 10) score += 30;
-  else if (session.pageViews >= 5) score += 20;
-  else if (session.pageViews >= 3) score += 10;
+  const pageCount = session.pagesViewed?.length || 0;
+  if (pageCount >= 10) score += 30;
+  else if (pageCount >= 5) score += 20;
+  else if (pageCount >= 3) score += 10;
   
   // Duration scoring (in seconds)
-  if (session.totalDuration >= 600) score += 30;
-  else if (session.totalDuration >= 300) score += 20;
-  else if (session.totalDuration >= 120) score += 10;
+  const duration = session.timeOnSite || 0;
+  if (duration >= 600) score += 30;
+  else if (duration >= 300) score += 20;
+  else if (duration >= 120) score += 10;
   
-  // Company enrichment
+  // Company association
   if (session.companyId) score += 20;
   
-  // Technology stack matching
-  if (session.technology && session.technology.length > 0) {
-    const targetTech = ['React', 'Node.js', 'AWS', 'Salesforce'];
-    const matches = session.technology.filter(t => targetTech.includes(t));
-    score += matches.length * 5;
-  }
-  
-  // Industry matching
-  if (session.industry && ['SaaS', 'Technology', 'Financial Services'].includes(session.industry)) {
-    score += 10;
+  // High-value pages (pricing, demo, contact)
+  if (session.pagesViewed) {
+    const highValuePages = ['/pricing', '/demo', '/contact', '/trial'];
+    const viewedHighValue = session.pagesViewed.some(page => 
+      highValuePages.some(hvp => page.includes(hvp))
+    );
+    if (viewedHighValue) score += 20;
   }
   
   // Update the session with the calculated score
   await storage.updateVisitorSession(sessionId, {
-    leadScore: score,
-    isQualifiedLead: score >= 50
+    intentScore: score,
+    isActive: score >= 50
   });
   
   // If high score, emit trigger
@@ -190,13 +183,13 @@ export async function calculateLeadScore(sessionId: string): Promise<number> {
     if (company) {
       await insightsOrchestrator.acceptTrigger({
         source: 'visitor',
-        eventType: EventTypes.visitor.HIGH_ENGAGEMENT,
+        eventType: EventTypes.visitor.INTENT_SPIKE,
         companyId: session.companyId,
         companyName: company.name,
         data: {
           sessionId,
-          leadScore: score,
-          qualificationReason: 'High engagement and company match'
+          intentScore: score,
+          qualificationReason: 'High intent score from engagement patterns'
         },
         timestamp: new Date()
       });
@@ -204,4 +197,13 @@ export async function calculateLeadScore(sessionId: string): Promise<number> {
   }
   
   return score;
+}
+
+/**
+ * Mark session as inactive after period of no activity
+ */
+export async function deactivateSession(sessionId: string): Promise<void> {
+  await storage.updateVisitorSession(sessionId, {
+    isActive: false
+  });
 }
