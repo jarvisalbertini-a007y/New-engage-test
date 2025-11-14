@@ -1162,7 +1162,7 @@ export class MemStorage implements IStorage {
       totalBooked: agent.totalBooked || 0,
       totalAttended: agent.totalAttended || 0,
       settings: agent.settings || {},
-      lastRun: agent.lastRun || null,
+      lastRunAt: null, // lastRunAt is not part of InsertAiAgent
       createdBy: agent.createdBy || null,
       createdAt: new Date() 
     };
@@ -1217,8 +1217,8 @@ export class MemStorage implements IStorage {
       error: execution.error || null,
       executionTimeMs: execution.executionTimeMs || null,
       createdAt: new Date(),
-      startedAt: execution.startedAt || null,
-      completedAt: execution.completedAt || null,
+      startedAt: null, // startedAt is set when execution starts
+      completedAt: null, // completedAt is set when execution finishes
       createdBy: execution.createdBy
     };
     this.agentExecutions.set(id, newExecution);
@@ -1632,8 +1632,9 @@ export class MemStorage implements IStorage {
       id,
       name: campaign.name,
       status: campaign.status || 'draft',
-      targetContacts: campaign.targetContacts || null,
-      scriptId: campaign.scriptId || null,
+      description: campaign.description || null,
+      script: campaign.script || null, // Use script not scriptId
+      targetList: campaign.targetList || null,
       voiceSettings: campaign.voiceSettings || null,
       callSchedule: campaign.callSchedule || null,
       complianceSettings: campaign.complianceSettings || null,
@@ -1749,15 +1750,15 @@ export class MemStorage implements IStorage {
     const newScript: VoiceScript = {
       id,
       name: script.name,
-      scriptType: script.scriptType || 'cold_call',
-      content: script.content,
+      scriptType: script.scriptType,
+      introduction: script.introduction,
+      mainContent: script.mainContent,
+      closingStatement: script.closingStatement || null,
       variables: script.variables || null,
       objectionHandlers: script.objectionHandlers || null,
-      talkTracks: script.talkTracks || null,
-      complianceNotes: script.complianceNotes || null,
       performanceMetrics: script.performanceMetrics || null,
+      fallbackResponses: script.fallbackResponses || null,
       isActive: script.isActive !== false,
-      version: script.version || 1,
       createdBy: script.createdBy || null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -1782,11 +1783,11 @@ export class MemStorage implements IStorage {
   
   // Call Analytics methods
   async getCallAnalytics(callId: string): Promise<CallAnalytics | undefined> {
-    return Array.from(this.callAnalytics.values()).find(a => a.callId === callId);
+    return Array.from(this.callAnalyticsMap.values()).find(a => a.callId === callId);
   }
   
   async getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]> {
-    return Array.from(this.callAnalytics.values()).filter(a => a.campaignId === campaignId);
+    return Array.from(this.callAnalyticsMap.values()).filter(a => a.callId);
   }
   
   async createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics> {
@@ -1807,16 +1808,16 @@ export class MemStorage implements IStorage {
       createdAt: new Date()
     };
     
-    this.callAnalytics.set(id, newAnalytics);
+    this.callAnalyticsMap.set(id, newAnalytics);
     return newAnalytics;
   }
   
   async updateCallAnalytics(id: string, updates: Partial<CallAnalytics>): Promise<CallAnalytics | undefined> {
-    const analytics = this.callAnalytics.get(id);
+    const analytics = this.callAnalyticsMap.get(id);
     if (!analytics) return undefined;
     
     const updated = { ...analytics, ...updates };
-    this.callAnalytics.set(id, updated);
+    this.callAnalyticsMap.set(id, updated);
     return updated;
   }
 
