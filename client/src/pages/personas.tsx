@@ -254,37 +254,66 @@ export default function Personas() {
                   </div>
 
                   <div>
-                    <Label htmlFor="valueProps">Value Propositions (JSON)</Label>
+                    <Label htmlFor="valueProps">Value Propositions</Label>
                     <Textarea
                       id="valueProps"
-                      placeholder='{"primary": "Increase sales efficiency by 40%", "secondary": "Reduce manual work"}'
+                      placeholder="Describe the key value propositions for this persona. For example: Increase sales efficiency by 40%, reduce manual work, improve team collaboration."
                       onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value);
-                          setValue("valuePropositions", parsed);
-                        } catch {
-                          // Invalid JSON, ignore
-                        }
+                        // Store as a simple object with the text
+                        setValue("valuePropositions", { 
+                          description: e.target.value 
+                        });
                       }}
                       data-testid="textarea-value-props"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="toneGuidelines">Tone Guidelines (JSON)</Label>
-                    <Textarea
-                      id="toneGuidelines"
-                      placeholder='{"tone": "professional", "style": "consultative", "avoid": ["too casual", "pushy"]}'
-                      onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value);
-                          setValue("toneGuidelines", parsed);
-                        } catch {
-                          // Invalid JSON, ignore
-                        }
-                      }}
-                      data-testid="textarea-tone-guidelines"
-                    />
+                    <Label>Tone & Style (Select Multiple)</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {['Professional', 'Casual', 'Friendly', 'Urgent', 'Consultative', 'Educational', 'Conversational', 'Executive', 'Technical'].map((tone) => (
+                        <label key={tone} className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            value={tone.toLowerCase()}
+                            onChange={(e) => {
+                              const currentGuidelines = watch("toneGuidelines") || {};
+                              const selectedTones = currentGuidelines.tones || [];
+                              
+                              if (e.target.checked) {
+                                setValue("toneGuidelines", {
+                                  ...currentGuidelines,
+                                  tones: [...selectedTones, e.target.value]
+                                });
+                              } else {
+                                setValue("toneGuidelines", {
+                                  ...currentGuidelines,
+                                  tones: selectedTones.filter((t: string) => t !== e.target.value)
+                                });
+                              }
+                            }}
+                            className="h-4 w-4"
+                            data-testid={`checkbox-tone-${tone.toLowerCase()}`}
+                          />
+                          <span className="text-sm">{tone}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3">
+                      <Label htmlFor="additionalGuidelines">Additional Guidelines (Optional)</Label>
+                      <Textarea
+                        id="additionalGuidelines"
+                        placeholder="Any additional tone or style guidelines for this persona..."
+                        onChange={(e) => {
+                          const currentGuidelines = watch("toneGuidelines") || {};
+                          setValue("toneGuidelines", {
+                            ...currentGuidelines,
+                            additional: e.target.value
+                          });
+                        }}
+                        data-testid="textarea-additional-guidelines"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-3">
@@ -326,7 +355,7 @@ export default function Personas() {
                 <div>
                   <p className="text-sm text-muted-foreground">Active Sequences</p>
                   <p className="text-3xl font-bold text-chart-2" data-testid="text-active-sequences">
-                    {Math.floor(Math.random() * 15 + 5)}
+                    0
                   </p>
                 </div>
                 <Target className="h-8 w-8 text-chart-2" />
@@ -340,7 +369,7 @@ export default function Personas() {
                 <div>
                   <p className="text-sm text-muted-foreground">Messages Generated</p>
                   <p className="text-3xl font-bold text-chart-3" data-testid="text-messages-generated">
-                    {Math.floor(Math.random() * 500 + 200)}
+                    0
                   </p>
                 </div>
                 <MessageSquare className="h-8 w-8 text-chart-3" />
