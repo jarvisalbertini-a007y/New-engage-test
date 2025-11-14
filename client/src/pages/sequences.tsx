@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { apiRequest } from "@/lib/queryClient";
 import { Plus, Play, Pause, Copy, Edit, Trash2, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,56 @@ export default function Sequences() {
     };
     delete duplicatedSequence.id;
     createSequenceMutation.mutate(duplicatedSequence);
+  };
+
+  const startSequenceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/sequences/${id}/start`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      toast({
+        title: "Sequence Started",
+        description: "The sequence is now active and will begin processing.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to start sequence",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pauseSequenceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/sequences/${id}/pause`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      toast({
+        title: "Sequence Paused",
+        description: "The sequence has been paused.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to pause sequence",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleSequence = (sequence: any) => {
+    if (sequence.status === 'active') {
+      pauseSequenceMutation.mutate(sequence.id);
+    } else {
+      startSequenceMutation.mutate(sequence.id);
+    }
   };
 
   return (
@@ -275,6 +326,7 @@ export default function Sequences() {
                             <Button 
                               size="sm" 
                               variant={sequence.status === 'active' ? 'outline' : 'default'}
+                              onClick={() => toggleSequence(sequence)}
                               data-testid={`button-toggle-${sequence.id}`}
                             >
                               {sequence.status === 'active' ? (

@@ -651,6 +651,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a sequence
+  app.patch("/api/sequences/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const sequence = await storage.updateSequence(id, req.body);
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      res.json(sequence);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Delete a sequence
+  app.delete("/api/sequences/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteSequence(id);
+      if (!success) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Start/activate a sequence
+  app.post("/api/sequences/:id/start", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req.user as any)?.claims?.sub || null;
+      
+      const sequence = await storage.updateSequence(id, {
+        status: "active"
+      });
+      
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
+      res.json(sequence);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Pause a sequence
+  app.post("/api/sequences/:id/pause", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const sequence = await storage.updateSequence(id, {
+        status: "paused"
+      });
+      
+      if (!sequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
+      res.json(sequence);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   app.post("/api/sequences/generate-steps", async (req, res) => {
     try {
       console.log("[Generate Steps] Request received:", {
@@ -711,7 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isFirst) {
       return `Hi {{firstName}},
 
-I hope this email finds you well. ${description ? description : `I'm reaching out regarding ${sequenceName}.`}
+I hope this email finds you well. I'm reaching out regarding ${sequenceName}.
 
 I noticed that {{company}} has been making great progress in {{industry}}, and I believe we could help you achieve even better results.
 
