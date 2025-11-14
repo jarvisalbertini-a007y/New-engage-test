@@ -3923,6 +3923,9 @@ export class DbStorage implements IStorage {
   }
 
   async getMarketplaceAgents(filters?: { category?: string; author?: string; minRating?: number; maxPrice?: number; tags?: string[] }): Promise<MarketplaceAgent[]> {
+    // Seed sample marketplace agents if none exist
+    await this.ensureSampleMarketplaceAgents();
+    
     let query = db.select().from(marketplaceAgents);
     const conditions: any[] = [];
 
@@ -3957,6 +3960,80 @@ export class DbStorage implements IStorage {
     }
     
     return result;
+  }
+
+  async ensureSampleMarketplaceAgents(): Promise<void> {
+    // Check if marketplace agents already exist
+    const existing = await db.select().from(marketplaceAgents).limit(1);
+    if (existing.length > 0) return;
+
+    // Create sample marketplace agents
+    const sampleAgents = [
+      {
+        name: "Email Outreach Optimizer",
+        description: "AI agent that automatically optimizes cold email campaigns for maximum response rates.",
+        category: "outreach",
+        author: "marketplace-system",
+        price: "29.99",
+        currency: "USD",
+        systemPrompt: "You are an expert email outreach specialist...",
+        configTemplate: { emailProvider: "gmail", dailyLimit: 50 },
+        inputSchema: { type: "object", properties: { targetAudience: { type: "string" } } },
+        outputSchema: { type: "object", properties: { optimizedSubjects: { type: "array" } } },
+        tags: ["email", "outreach", "optimization"],
+        version: "1.2.0",
+        downloads: 1250,
+        rating: "4.8",
+        isPublic: true,
+        isFeatured: true,
+        documentation: "## How to use\n\nThis agent helps optimize cold email campaigns.",
+        changeLog: { "1.2.0": "Added sentiment analysis", "1.0.0": "Initial release" }
+      },
+      {
+        name: "Lead Qualification Bot",
+        description: "Automatically qualifies leads using BANT and MEDDIC frameworks.",
+        category: "qualification",
+        author: "marketplace-system",
+        price: "0",
+        currency: "USD",
+        systemPrompt: "You are an expert sales qualifier...",
+        configTemplate: { frameworks: ["BANT", "MEDDIC"] },
+        inputSchema: { type: "object", properties: { leadData: { type: "object" } } },
+        outputSchema: { type: "object", properties: { score: { type: "number" } } },
+        tags: ["qualification", "BANT", "MEDDIC", "free"],
+        version: "2.0.1",
+        downloads: 3420,
+        rating: "4.9",
+        isPublic: true,
+        isFeatured: true,
+        documentation: "## Overview\n\nLead qualification using multiple frameworks.",
+        changeLog: { "2.0.0": "Added MEDDIC", "1.0.0": "Initial BANT release" }
+      },
+      {
+        name: "LinkedIn Engagement Assistant",
+        description: "Automates LinkedIn outreach with personalized messages.",
+        category: "social",
+        author: "marketplace-system",
+        price: "49.99",
+        currency: "USD",
+        systemPrompt: "You are a LinkedIn specialist...",
+        configTemplate: { connectionsPerDay: 20, personalizationLevel: "high" },
+        inputSchema: { type: "object", properties: { profile: { type: "object" } } },
+        outputSchema: { type: "object", properties: { message: { type: "string" } } },
+        tags: ["linkedin", "social", "automation"],
+        version: "1.5.2",
+        downloads: 890,
+        rating: "4.6",
+        isPublic: true,
+        isFeatured: false,
+        documentation: "## Setup\n\nConfigure LinkedIn credentials...",
+        changeLog: { "1.5.0": "Added multi-language", "1.0.0": "Initial release" }
+      }
+    ];
+
+    for (const agent of sampleAgents) {
+      await db.insert(marketplaceAgents).values(agent as any).onConflictDoNothing();
+    }
   }
 
   async getMarketplaceAgentsByUser(userId: string): Promise<MarketplaceAgent[]> {
