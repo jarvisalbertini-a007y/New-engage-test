@@ -17,19 +17,15 @@ export async function generateInsight(trigger: TriggerData): Promise<Insight> {
 }
 
 export async function discoverInsights(): Promise<Insight[]> {
-  // In a real implementation, this would connect to various data sources
-  // For now, we'll simulate discovering insights
+  // Use the orchestrator to replay historical events and generate real insights
+  const { insightsOrchestrator } = await import("./insightsOrchestrator");
+  const since = new Date();
+  since.setDate(since.getDate() - 7); // Look back 7 days
   
-  const companies = await storage.getCompanies(20);
-  const newInsights: Insight[] = [];
+  // Replay historical events to generate insights from real activity
+  const newInsights = await insightsOrchestrator.replayHistoricalEvents(since);
   
-  for (const company of companies) {
-    const insights = await simulateInsightDiscovery(company);
-    for (const insight of insights) {
-      newInsights.push(await storage.createInsight(insight));
-    }
-  }
-  
+  // If no insights were generated, return empty array (UI will handle empty state)
   return newInsights;
 }
 

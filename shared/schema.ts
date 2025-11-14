@@ -159,7 +159,7 @@ export const agentTypes = pgTable("agent_types", {
   outputs: jsonb("outputs"), // Expected output schema
   modelPreference: text("model_preference"), // gpt-4, claude-3, etc.
   maxTokens: integer("max_tokens").default(2000),
-  temperature: decimal("temperature", { precision: 2, scale: 1 }).default(0.7),
+  temperature: decimal("temperature", { precision: 2, scale: 1 }).default("0.7"),
   systemPrompt: text("system_prompt"),
   examples: jsonb("examples"), // Few-shot examples
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -739,7 +739,7 @@ export const pipelineHealth = pgTable("pipeline_health", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   snapshotDate: timestamp("snapshot_date").defaultNow().notNull(),
   totalDeals: integer("total_deals").notNull().default(0),
-  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull().default(0),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull().default("0"),
   byStage: jsonb("by_stage").notNull(), // Stage-wise breakdown of deals
   velocity: jsonb("velocity").notNull(), // Deal velocity metrics
   conversion: jsonb("conversion").notNull(), // Conversion rates between stages
@@ -1829,7 +1829,6 @@ export type InsertBenchmarkData = z.infer<typeof insertBenchmarkDataSchema>;
 
 // User types for Replit Auth
 export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
 
 // Enterprise Types
 export type WhiteLabel = typeof whiteLabels.$inferSelect;
