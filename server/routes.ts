@@ -1963,6 +1963,105 @@ Best regards,
     }
   });
 
+  // Unified Inbox Routes
+  app.get("/api/inbox", async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const messages = await storage.getInboxMessages({ userId });
+      
+      // Transform for frontend format
+      const transformed = messages.map(msg => ({
+        id: msg.id,
+        from: msg.fromEmail || '',
+        fromName: msg.fromName || 'Unknown Sender',
+        subject: msg.subject || 'No Subject',
+        preview: msg.content ? msg.content.substring(0, 100) + '...' : '',
+        content: msg.content || '',
+        timestamp: msg.createdAt,
+        category: msg.category || 'other',
+        isRead: msg.isRead || false,
+        isStarred: msg.isStarred || false,
+        company: msg.companyId || 'Unknown Company',
+        avatar: undefined
+      }));
+      
+      res.json(transformed);
+    } catch (error) {
+      console.error('Error fetching inbox messages:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to fetch messages' });
+    }
+  });
+
+  app.patch("/api/inbox/:id/read", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.updateInboxMessage(id, { isRead: true });
+      res.json(message);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to mark as read' });
+    }
+  });
+
+  app.patch("/api/inbox/:id/star", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.getInboxMessage(id);
+      if (message) {
+        const updated = await storage.updateInboxMessage(id, { isStarred: !message.isStarred });
+        res.json(updated);
+      } else {
+        res.status(404).json({ error: 'Message not found' });
+      }
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to toggle star' });
+    }
+  });
+
+  app.patch("/api/inbox/:id/archive", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.updateInboxMessage(id, { isArchived: true });
+      res.json(message);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to archive message' });
+    }
+  });
+
+  app.post("/api/inbox/:id/reply", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { content } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Get original message
+      const originalMessage = await storage.getInboxMessage(id);
+      if (!originalMessage) {
+        return res.status(404).json({ error: 'Original message not found' });
+      }
+      
+      // Create reply message
+      const reply = await storage.createInboxMessage({
+        userId,
+        contactId: originalMessage.contactId,
+        companyId: originalMessage.companyId,
+        channel: originalMessage.channel,
+        direction: 'outbound',
+        toEmail: originalMessage.fromEmail,
+        fromEmail: originalMessage.toEmail,
+        fromName: 'You',
+        subject: `Re: ${originalMessage.subject}`,
+        content,
+        category: 'reply',
+        threadId: originalMessage.threadId || id,
+        isRead: true
+      });
+      
+      res.json(reply);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to send reply' });
+    }
+  });
+
   // Autopilot Campaigns
   app.get("/api/autopilot/campaigns", async (req, res) => {
     try {

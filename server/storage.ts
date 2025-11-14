@@ -75,7 +75,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 
 // Helper to filter out undefined values from partial updates
 function cleanPartial<T extends Record<string, any>>(obj: Partial<T>): Partial<T> {
@@ -4229,6 +4229,156 @@ export class DbStorage implements IStorage {
       .where(eq(twinPredictions.id, id))
       .returning();
     return result[0];
+  }
+
+  // Inbox Message methods
+  async getInboxMessage(id: string): Promise<InboxMessage | undefined> {
+    const result = await db.select().from(inboxMessages).where(eq(inboxMessages.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getInboxMessages(filters?: { userId?: string; channel?: string; category?: string; isRead?: boolean; isArchived?: boolean }): Promise<InboxMessage[]> {
+    // Seed sample messages if none exist
+    await this.ensureSampleInboxMessages(filters?.userId);
+    
+    let query = db.select().from(inboxMessages);
+    const conditions: any[] = [];
+    
+    if (filters?.userId) conditions.push(eq(inboxMessages.userId, filters.userId));
+    if (filters?.channel) conditions.push(eq(inboxMessages.channel, filters.channel));
+    if (filters?.category) conditions.push(eq(inboxMessages.category, filters.category));
+    if (filters?.isRead !== undefined) conditions.push(eq(inboxMessages.isRead, filters.isRead));
+    if (filters?.isArchived !== undefined) conditions.push(eq(inboxMessages.isArchived, filters.isArchived));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(inboxMessages.createdAt));
+    }
+    
+    return await query.orderBy(desc(inboxMessages.createdAt));
+  }
+
+  async ensureSampleInboxMessages(userId?: string): Promise<void> {
+    if (!userId) return;
+    
+    // Check if user has any messages
+    const existing = await db.select().from(inboxMessages)
+      .where(eq(inboxMessages.userId, userId))
+      .limit(1);
+    if (existing.length > 0) return;
+
+    // Get or create sample companies and contacts
+    const companiesExist = await db.select().from(companies).limit(3);
+    if (companiesExist.length === 0) {
+      await this.ensureSampleCompanies();
+    }
+    
+    const sampleCompanies = await db.select().from(companies).limit(3);
+    if (sampleCompanies.length === 0) return;
+    
+    // Create sample inbox messages
+    const sampleMessages = [
+      {
+        userId,
+        companyId: sampleCompanies[0].id,
+        channel: 'email',
+        direction: 'inbound',
+        fromEmail: 'john.doe@techcorp.com',
+        fromName: 'John Doe',
+        toEmail: 'you@company.com',
+        subject: 'Interested in your sales platform',
+        content: `Hi there,
+
+I came across your AI sales platform and I'm very interested in learning more. We're currently evaluating solutions to improve our sales team's efficiency.
+
+Could we schedule a quick demo next week? Our team of 50 sales reps is struggling with manual outreach and we need a better solution.
+
+Best regards,
+John Doe
+VP of Sales, TechCorp`,
+        category: 'interested',
+        isRead: false,
+        isStarred: true,
+        isArchived: false,
+        threadId: null,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
+      },
+      {
+        userId,
+        companyId: sampleCompanies[1].id,
+        channel: 'email',
+        direction: 'inbound',
+        fromEmail: 'sarah.smith@dataflow.io',
+        fromName: 'Sarah Smith',
+        toEmail: 'you@company.com',
+        subject: 'Re: Follow-up on our conversation',
+        content: `Thanks for reaching out!
+
+I've reviewed your proposal and shared it with our team. We have a few questions about the integration with our existing CRM system.
+
+Can you provide more details about your API capabilities and data sync features?
+
+Sarah`,
+        category: 'follow_up',
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        threadId: null,
+        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
+      },
+      {
+        userId,
+        companyId: sampleCompanies[2].id,
+        channel: 'email',
+        direction: 'inbound',
+        fromEmail: 'mike.johnson@cloudscale.com',
+        fromName: 'Mike Johnson',
+        toEmail: 'you@company.com',
+        subject: 'Pricing concerns',
+        content: `Hello,
+
+We're interested in your platform but the pricing seems higher than competitors. We're currently using Apollo.io and paying significantly less.
+
+What additional value does your platform provide to justify the price difference?
+
+Mike`,
+        category: 'objection',
+        isRead: false,
+        isStarred: false,
+        isArchived: false,
+        threadId: null,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
+      }
+    ];
+
+    for (const message of sampleMessages) {
+      await db.insert(inboxMessages).values(message as any).onConflictDoNothing();
+    }
+  }
+
+  async createInboxMessage(message: InsertInboxMessage): Promise<InboxMessage> {
+    const result = await db.insert(inboxMessages).values(message).returning();
+    return result[0];
+  }
+
+  async updateInboxMessage(id: string, updates: Partial<InboxMessage>): Promise<InboxMessage | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getInboxMessage(id);
+    const result = await db.update(inboxMessages).set(cleaned).where(eq(inboxMessages.id, id)).returning();
+    return result[0];
+  }
+
+  async markInboxMessageAsRead(id: string): Promise<InboxMessage | undefined> {
+    return this.updateInboxMessage(id, { isRead: true });
+  }
+
+  async toggleInboxMessageStar(id: string): Promise<InboxMessage | undefined> {
+    const message = await this.getInboxMessage(id);
+    if (!message) return undefined;
+    return this.updateInboxMessage(id, { isStarred: !message.isStarred });
+  }
+
+  async archiveInboxMessage(id: string): Promise<InboxMessage | undefined> {
+    return this.updateInboxMessage(id, { isArchived: true });
   }
 
   // Voice AI methods
