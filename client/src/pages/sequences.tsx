@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Sequences() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [editingSequence, setEditingSequence] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -130,6 +131,28 @@ export default function Sequences() {
       toast({
         title: "Error",
         description: error?.message || "Failed to pause sequence",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSequenceMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/sequences/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      toast({
+        title: "Sequence Updated",
+        description: "Your sequence has been updated successfully.",
+      });
+      setEditingSequence(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update sequence",
         variant: "destructive",
       });
     },

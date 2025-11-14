@@ -21,8 +21,14 @@ import { browserExtensionService } from "./services/browserExtension";
 import { crowdIntelNetwork } from "./services/crowdIntel";
 import { insertSharedIntelSchema, insertIntelRatingSchema } from "@shared/schema";
 import { enterpriseManager } from "./services/enterprise";
+import { setupDevAuth } from "./devAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup development authentication ONLY if not in production
+  if (process.env.NODE_ENV !== 'production') {
+    setupDevAuth(app);
+  }
+  
   // Auth middleware setup - from blueprint:javascript_log_in_with_replit
   console.log("[Auth Setup] Starting authentication setup...");
   try {
@@ -38,7 +44,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     '/api/login',
     '/api/callback',
     '/api/logout',
-    '/api/health' // Add any other public endpoints here
+    '/api/health', // Add any other public endpoints here
+    // Development-only public endpoints
+    '/api/dev/create-user',
+    '/api/dev/login',
+    '/api/dev/auto-login',
+    '/api/dev/users'
   ];
   
   // Global authentication middleware for all /api routes
