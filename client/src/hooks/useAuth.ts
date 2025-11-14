@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-// Authentication is now properly enabled
-const TESTING_MODE = false; // Real authentication is now required
+// Authentication can be bypassed in demo mode for testing
+const TESTING_MODE = window.location.hostname === 'localhost' && 
+  new URLSearchParams(window.location.search).get('demo') === 'true';
 
 export function useAuth() {
   // In testing mode, return mock authenticated user
