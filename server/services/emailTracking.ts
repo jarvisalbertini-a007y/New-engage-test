@@ -11,8 +11,7 @@ export async function trackEmailSent(
     contactId: string;
     subject: string;
     body: string;
-    sequenceId?: string;
-    templateId?: string;
+    sequenceExecutionId?: string;
   }
 ): Promise<Email> {
   // Create email record
@@ -21,11 +20,8 @@ export async function trackEmailSent(
     subject: emailData.subject,
     body: emailData.body,
     status: 'sent',
-    sentAt: new Date().toISOString(),
-    sequenceId: emailData.sequenceId,
-    templateId: emailData.templateId,
-    openCount: 0,
-    clickCount: 0,
+    sentAt: new Date(),
+    sequenceExecutionId: emailData.sequenceExecutionId,
     aiScore: 0,
     aiSuggestions: []
   });
@@ -40,33 +36,42 @@ export async function trackEmailOpened(emailId: string): Promise<void> {
   const email = await storage.getEmail(emailId);
   if (!email) return;
   
-  // Update open count
-  const openCount = (email.openCount || 0) + 1;
+  // Update opened timestamp
+  const isFirstOpen = !email.openedAt;
   await storage.updateEmail(emailId, {
-    openCount,
-    openedAt: email.openedAt || new Date().toISOString()
+    openedAt: email.openedAt || new Date(),
+    status: 'opened'
   });
   
-  // If high open rate (opened multiple times), generate insight
-  if (openCount >= 3 && email.contactId) {
+  // If first open and we have contact, check for engagement
+  if (isFirstOpen && email.contactId) {
     const contact = await storage.getContact(email.contactId);
     if (contact?.companyId) {
-      const company = await storage.getCompany(contact.companyId);
-      if (company) {
-        const contactName = `${contact.firstName} ${contact.lastName}`.trim();
-        await insightsOrchestrator.acceptTrigger({
-          source: 'email',
-          eventType: EventTypes.email.HIGH_OPEN_RATE,
-          companyId: contact.companyId,
-          companyName: company.name,
-          data: {
-            emailId,
-            contactName,
-            subject: email.subject,
-            openCount
-          },
-          timestamp: new Date()
-        });
+      // Count recent opens from this company
+      const emails = await storage.getEmails({ contactId: email.contactId, limit: 10 });
+      const recentOpens = emails.filter(e => e.openedAt && 
+        e.openedAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      ).length;
+      
+      // If high engagement (multiple opens recently), generate insight
+      if (recentOpens >= 3) {
+        const company = await storage.getCompany(contact.companyId);
+        if (company) {
+          const contactName = `${contact.firstName} ${contact.lastName}`.trim();
+          await insightsOrchestrator.acceptTrigger({
+            source: 'email',
+            eventType: EventTypes.email.HIGH_OPEN_RATE,
+            companyId: contact.companyId,
+            companyName: company.name,
+            data: {
+              emailId,
+              contactName,
+              subject: email.subject,
+              recentOpens
+            },
+            timestamp: new Date()
+          });
+        }
       }
     }
   }
@@ -74,6 +79,7 @@ export async function trackEmailOpened(emailId: string): Promise<void> {
 
 /**
  * Track email link clicked and generate insights
+ * Since we don't have a clickedAt field, we'll use status and generate insight immediately
  */
 export async function trackEmailLinkClicked(
   emailId: string,
@@ -82,11 +88,9 @@ export async function trackEmailLinkClicked(
   const email = await storage.getEmail(emailId);
   if (!email) return;
   
-  // Update click count
-  const clickCount = (email.clickCount || 0) + 1;
+  // Update status to reflect engagement
   await storage.updateEmail(emailId, {
-    clickCount,
-    clickedAt: email.clickedAt || new Date().toISOString()
+    status: 'clicked'
   });
   
   // Generate insight for link click
@@ -105,8 +109,7 @@ export async function trackEmailLinkClicked(
             emailId,
             contactName,
             subject: email.subject,
-            linkUrl,
-            clickCount
+            linkUrl
           },
           timestamp: new Date()
         });
@@ -127,8 +130,8 @@ export async function trackEmailReply(
   
   // Update reply status
   await storage.updateEmail(emailId, {
-    repliedAt: new Date().toISOString(),
-    replyContent
+    repliedAt: new Date(),
+    status: 'replied'
   });
   
   // Generate insight for reply
@@ -166,9 +169,14 @@ export async function trackEmailUnsubscribe(emailId: string): Promise<void> {
   const contact = await storage.getContact(email.contactId);
   if (!contact) return;
   
-  // Update contact subscription status
+  // Update contact verification status as a proxy for unsubscribed
   await storage.updateContact(email.contactId, {
-    emailVerified: false // Using this as a proxy for unsubscribed
+    isVerified: false
+  });
+  
+  // Update email status
+  await storage.updateEmail(emailId, {
+    status: 'unsubscribed'
   });
   
   // Generate insight for unsubscribe
@@ -206,16 +214,16 @@ export async function calculateEmailEngagementScore(contactId: string): Promise<
   for (const email of emails) {
     let score = 0;
     
-    // Opened
-    if (email.openedAt) score += 10;
-    if ((email.openCount || 0) > 1) score += 5 * Math.min(email.openCount || 0, 5);
+    // Status-based scoring
+    if (email.status === 'opened') score += 10;
+    if (email.status === 'clicked') score += 30;
+    if (email.status === 'replied') score += 50;
     
-    // Clicked
-    if (email.clickedAt) score += 20;
-    if ((email.clickCount || 0) > 1) score += 10 * Math.min(email.clickCount || 0, 3);
-    
-    // Replied
-    if (email.repliedAt) score += 50;
+    // Time-based scoring (recent emails worth more)
+    const daysSinceSent = email.sentAt ? 
+      (Date.now() - email.sentAt.getTime()) / (1000 * 60 * 60 * 24) : 30;
+    if (daysSinceSent < 7) score *= 1.5;
+    else if (daysSinceSent < 14) score *= 1.2;
     
     totalScore += score;
     emailCount++;
@@ -225,9 +233,9 @@ export async function calculateEmailEngagementScore(contactId: string): Promise<
 }
 
 /**
- * Batch process email metrics for a sequence
+ * Batch process email metrics for a sequence execution
  */
-export async function processSequenceEmailMetrics(sequenceId: string): Promise<{
+export async function processSequenceEmailMetrics(sequenceExecutionId: string): Promise<{
   sent: number;
   opened: number;
   clicked: number;
@@ -237,14 +245,14 @@ export async function processSequenceEmailMetrics(sequenceId: string): Promise<{
   replyRate: number;
 }> {
   const emails = await storage.getEmails({ limit: 1000 });
-  const sequenceEmails = emails.filter(e => e.sequenceId === sequenceId);
+  const sequenceEmails = emails.filter(e => e.sequenceExecutionId === sequenceExecutionId);
   
   const sent = sequenceEmails.length;
-  const opened = sequenceEmails.filter(e => e.openedAt).length;
-  const clicked = sequenceEmails.filter(e => e.clickedAt).length;
-  const replied = sequenceEmails.filter(e => e.repliedAt).length;
+  const opened = sequenceEmails.filter(e => e.status === 'opened' || e.status === 'clicked' || e.status === 'replied').length;
+  const clicked = sequenceEmails.filter(e => e.status === 'clicked' || e.status === 'replied').length;
+  const replied = sequenceEmails.filter(e => e.status === 'replied').length;
   
-  return {
+  const metrics = {
     sent,
     opened,
     clicked,
@@ -255,24 +263,30 @@ export async function processSequenceEmailMetrics(sequenceId: string): Promise<{
   };
   
   // Generate insight for high-performing sequence
-  if (sent >= 10 && ((replied / sent) >= 0.15 || (clicked / opened) >= 0.3)) {
-    const sequence = await storage.getSequence(sequenceId);
-    if (sequence) {
-      await insightsOrchestrator.acceptTrigger({
-        source: 'sequence',
-        eventType: EventTypes.sequence.HIGH_ENGAGEMENT,
-        companyId: '', // Sequences are not company-specific
-        data: {
-          sequenceId,
-          sequenceName: sequence.name,
-          metrics: {
-            sent,
-            replyRate: Math.round((replied / sent) * 100),
-            clickRate: Math.round((clicked / opened) * 100)
-          }
-        },
-        timestamp: new Date()
-      });
+  if (sent >= 10 && (metrics.replyRate >= 15 || metrics.clickRate >= 30)) {
+    const execution = await storage.getSequenceExecution(sequenceExecutionId);
+    if (execution?.sequenceId) {
+      const sequence = await storage.getSequence(execution.sequenceId);
+      if (sequence) {
+        await insightsOrchestrator.acceptTrigger({
+          source: 'sequence',
+          eventType: EventTypes.sequence.HIGH_ENGAGEMENT,
+          companyId: '', // Sequences are not company-specific
+          data: {
+            sequenceId: execution.sequenceId,
+            sequenceName: sequence.name,
+            executionId: sequenceExecutionId,
+            metrics: {
+              sent,
+              replyRate: Math.round(metrics.replyRate),
+              clickRate: Math.round(metrics.clickRate)
+            }
+          },
+          timestamp: new Date()
+        });
+      }
     }
   }
+  
+  return metrics;
 }
