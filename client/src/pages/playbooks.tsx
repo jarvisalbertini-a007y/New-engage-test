@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { api as apiHelpers } from "@/lib/apiHelpers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,258 +14,26 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Play, Target, Mail, Phone, Users, TrendingUp, Clock, CheckCircle,
   Building, Rocket, Calendar, Search, Filter, Sparkles, BookOpen,
-  Trophy, Zap, FileText, MessageSquare, BarChart
+  Trophy, Zap, FileText, MessageSquare, BarChart, Eye, Copy
 } from "lucide-react";
 import type { Playbook } from "@shared/schema";
-
-interface PlaybookTemplate {
-  id: string;
-  name: string;
-  industry: string;
-  description: string;
-  targetAudience: {
-    titles: string[];
-    companySize: string;
-    industries: string[];
-  };
-  sequences: Array<{
-    name: string;
-    steps: number;
-    channels: string[];
-    duration: string;
-  }>;
-  emailTemplates: {
-    [key: string]: {
-      subject: string;
-      preview: string;
-    };
-  };
-  metrics: {
-    avgReplyRate: string;
-    avgMeetingRate: string;
-    timeToFirst: string;
-  };
-}
-
-// Industry-specific playbook templates
-const playbookTemplates: PlaybookTemplate[] = [
-  {
-    id: "saas-enterprise",
-    name: "Enterprise SaaS Outreach",
-    industry: "SaaS",
-    description: "High-touch multi-channel sequence for enterprise software sales",
-    targetAudience: {
-      titles: ["VP Sales", "CRO", "Head of Sales", "Sales Director"],
-      companySize: "500+ employees",
-      industries: ["Technology", "Financial Services", "Healthcare"]
-    },
-    sequences: [
-      {
-        name: "Executive Outreach",
-        steps: 12,
-        channels: ["Email", "LinkedIn", "Phone"],
-        duration: "21 days"
-      },
-      {
-        name: "Champion Building",
-        steps: 8,
-        channels: ["Email", "LinkedIn"],
-        duration: "14 days"
-      }
-    ],
-    emailTemplates: {
-      initial: {
-        subject: "Quick question about [Company]'s sales tech stack",
-        preview: "Personalized opener focusing on recent company trigger..."
-      },
-      followUp1: {
-        subject: "Thoughts on my previous note?",
-        preview: "Value-add follow-up with relevant case study..."
-      },
-      breakup: {
-        subject: "Should I close your file?",
-        preview: "Final attempt with urgency and clear CTA..."
-      }
-    },
-    metrics: {
-      avgReplyRate: "32%",
-      avgMeetingRate: "18%",
-      timeToFirst: "2.3 days"
-    }
-  },
-  {
-    id: "smb-quick",
-    name: "SMB Quick Connect",
-    industry: "SMB",
-    description: "High-velocity outreach for small and medium businesses",
-    targetAudience: {
-      titles: ["Owner", "CEO", "General Manager", "Operations Manager"],
-      companySize: "10-200 employees",
-      industries: ["Retail", "Professional Services", "Local Business"]
-    },
-    sequences: [
-      {
-        name: "Quick Touch",
-        steps: 6,
-        channels: ["Email", "Phone"],
-        duration: "7 days"
-      },
-      {
-        name: "Referral Request",
-        steps: 4,
-        channels: ["Email"],
-        duration: "5 days"
-      }
-    ],
-    emailTemplates: {
-      initial: {
-        subject: "Quick idea for [Company]",
-        preview: "Brief, value-focused opener with clear benefit..."
-      },
-      followUp1: {
-        subject: "5-minute chat?",
-        preview: "Direct ask with calendar link..."
-      }
-    },
-    metrics: {
-      avgReplyRate: "28%",
-      avgMeetingRate: "12%",
-      timeToFirst: "1.8 days"
-    }
-  },
-  {
-    id: "event-followup",
-    name: "Event Follow-Up Accelerator",
-    industry: "Event",
-    description: "Strike while the iron is hot - convert event leads fast",
-    targetAudience: {
-      titles: ["Attendees", "Booth Visitors", "Session Participants"],
-      companySize: "All sizes",
-      industries: ["All industries"]
-    },
-    sequences: [
-      {
-        name: "Hot Lead Follow-Up",
-        steps: 5,
-        channels: ["Email", "Phone", "SMS"],
-        duration: "3 days"
-      },
-      {
-        name: "Warm Lead Nurture",
-        steps: 7,
-        channels: ["Email", "LinkedIn"],
-        duration: "10 days"
-      }
-    ],
-    emailTemplates: {
-      initial: {
-        subject: "Great meeting you at [Event]",
-        preview: "Personal reference to conversation with next steps..."
-      },
-      followUp1: {
-        subject: "Resources from our [Event] chat",
-        preview: "Value delivery with relevant materials..."
-      }
-    },
-    metrics: {
-      avgReplyRate: "45%",
-      avgMeetingRate: "28%",
-      timeToFirst: "0.8 days"
-    }
-  },
-  {
-    id: "product-led",
-    name: "Product-Led Growth",
-    industry: "PLG",
-    description: "Convert free users to paid customers with targeted outreach",
-    targetAudience: {
-      titles: ["Power Users", "Trial Users", "Free Tier"],
-      companySize: "All sizes",
-      industries: ["Technology", "StartUps"]
-    },
-    sequences: [
-      {
-        name: "Trial Conversion",
-        steps: 8,
-        channels: ["Email", "In-app"],
-        duration: "14 days"
-      },
-      {
-        name: "Feature Upsell",
-        steps: 6,
-        channels: ["Email"],
-        duration: "7 days"
-      }
-    ],
-    emailTemplates: {
-      initial: {
-        subject: "You're using [Feature] like a pro!",
-        preview: "Usage-based personalization with upgrade path..."
-      },
-      followUp1: {
-        subject: "Unlock more with [Product] Pro",
-        preview: "Feature comparison with ROI focus..."
-      }
-    },
-    metrics: {
-      avgReplyRate: "38%",
-      avgMeetingRate: "22%",
-      timeToFirst: "1.2 days"
-    }
-  },
-  {
-    id: "account-based",
-    name: "Account-Based Marketing",
-    industry: "ABM",
-    description: "Orchestrated multi-touch campaigns for target accounts",
-    targetAudience: {
-      titles: ["Multiple Stakeholders", "Buying Committee"],
-      companySize: "1000+ employees",
-      industries: ["Enterprise", "Fortune 500"]
-    },
-    sequences: [
-      {
-        name: "Executive Sponsorship",
-        steps: 10,
-        channels: ["Email", "Direct Mail", "LinkedIn"],
-        duration: "30 days"
-      },
-      {
-        name: "Champion Enablement",
-        steps: 12,
-        channels: ["Email", "Phone", "LinkedIn"],
-        duration: "21 days"
-      }
-    ],
-    emailTemplates: {
-      initial: {
-        subject: "[Company] + [YourCompany] partnership opportunity",
-        preview: "Strategic alignment focus with executive positioning..."
-      },
-      followUp1: {
-        subject: "Ideas for [Company]'s Q[X] initiatives",
-        preview: "Timely value prop tied to business priorities..."
-      }
-    },
-    metrics: {
-      avgReplyRate: "42%",
-      avgMeetingRate: "31%",
-      timeToFirst: "3.1 days"
-    }
-  }
-];
 
 export function PlaybooksPage() {
   const { toast } = useToast();
   const [selectedIndustry, setSelectedIndustry] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookTemplate | null>(null);
+  const [selectedPlaybook, setSelectedPlaybook] = useState<Playbook | null>(null);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
 
+  // Fetch playbook templates from the API
+  const { data: templatePlaybooks = [], isLoading: templatesLoading } = useQuery<Playbook[]>({
+    queryKey: ["/api/playbooks", { isTemplate: true }],
+  });
+
   // Fetch user's custom playbooks
-  const { data: customPlaybooks, isLoading } = useQuery<Playbook[]>({
+  const { data: customPlaybooks = [], isLoading: customLoading } = useQuery<Playbook[]>({
     queryKey: ["/api/playbooks", { isTemplate: false }],
   });
 
@@ -276,6 +44,7 @@ export function PlaybooksPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/playbooks"] });
       toast({
         title: "Playbook Applied!",
         description: "Sequences and templates have been created successfully.",
@@ -284,13 +53,48 @@ export function PlaybooksPage() {
       setSelectedPlaybook(null);
       setSelectedSequences([]);
     },
+    onError: (error: any) => {
+      toast({
+        title: "Error applying playbook",
+        description: error.message || "Failed to apply the playbook",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Duplicate template mutation
+  const duplicateTemplate = useMutation({
+    mutationFn: async (templateId: string) => {
+      return apiHelpers.post(`/api/playbooks/${templateId}/duplicate`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/playbooks"] });
+      toast({
+        title: "Template Duplicated!",
+        description: "You can now customize your copy of the template.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error duplicating template",
+        description: error.message || "Failed to duplicate the template",
+        variant: "destructive",
+      });
+    }
   });
 
   // Handle opening apply modal
-  const handleApplyClick = (template: PlaybookTemplate) => {
-    setSelectedPlaybook(template);
-    setSelectedSequences(template.sequences.map(s => s.name)); // Select all by default
+  const handleApplyClick = (playbook: Playbook) => {
+    setSelectedPlaybook(playbook);
+    const sequences = (playbook.sequences as any) || [];
+    setSelectedSequences(sequences.map((s: any) => s.name)); // Select all by default
     setApplyModalOpen(true);
+  };
+
+  // Handle preview
+  const handlePreviewClick = (playbook: Playbook) => {
+    setSelectedPlaybook(playbook);
+    setPreviewModalOpen(true);
   };
 
   // Handle applying the playbook
@@ -304,10 +108,10 @@ export function PlaybooksPage() {
   };
 
   // Filter templates based on search and industry
-  const filteredTemplates = playbookTemplates.filter(template => {
+  const filteredTemplates = templatePlaybooks.filter(template => {
     const matchesSearch = searchQuery === "" || 
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (template.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
     
     const matchesIndustry = selectedIndustry === "all" || 
       template.industry === selectedIndustry;
@@ -315,7 +119,36 @@ export function PlaybooksPage() {
     return matchesSearch && matchesIndustry;
   });
 
-  const industries = ["all", "SaaS", "SMB", "Event", "PLG", "ABM"];
+  // Extract unique industries from templates
+  const industries = ["all", ...Array.from(new Set(templatePlaybooks.map(t => t.industry)))];
+
+  // Calculate average metrics
+  const avgReplyRate = templatePlaybooks.length > 0 
+    ? templatePlaybooks.reduce((acc, t) => {
+        const metrics = (t.successMetrics as any) || {};
+        const rate = parseInt(metrics.avgReplyRate || "0");
+        return acc + rate;
+      }, 0) / templatePlaybooks.length
+    : 0;
+
+  const avgTimeToReply = templatePlaybooks.length > 0
+    ? templatePlaybooks.reduce((acc, t) => {
+        const metrics = (t.successMetrics as any) || {};
+        const time = parseFloat(metrics.timeToFirst || "0");
+        return acc + time;
+      }, 0) / templatePlaybooks.length
+    : 0;
+
+  if (templatesLoading || customLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading playbooks...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -347,7 +180,7 @@ export function PlaybooksPage() {
         </div>
 
         {/* Industry Filters */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Filter className="h-4 w-4 text-muted-foreground" />
           {industries.map((industry) => (
             <Button
@@ -370,7 +203,7 @@ export function PlaybooksPage() {
               <div className="flex items-center gap-3">
                 <BookOpen className="h-8 w-8 text-primary" />
                 <div>
-                  <p className="text-2xl font-semibold">{playbookTemplates.length}</p>
+                  <p className="text-2xl font-semibold">{templatePlaybooks.length}</p>
                   <p className="text-sm text-muted-foreground">Templates</p>
                 </div>
               </div>
@@ -381,7 +214,7 @@ export function PlaybooksPage() {
               <div className="flex items-center gap-3">
                 <Trophy className="h-8 w-8 text-yellow-500" />
                 <div>
-                  <p className="text-2xl font-semibold">32%</p>
+                  <p className="text-2xl font-semibold">{avgReplyRate.toFixed(0)}%</p>
                   <p className="text-sm text-muted-foreground">Avg Reply Rate</p>
                 </div>
               </div>
@@ -392,7 +225,7 @@ export function PlaybooksPage() {
               <div className="flex items-center gap-3">
                 <Clock className="h-8 w-8 text-blue-500" />
                 <div>
-                  <p className="text-2xl font-semibold">1.8 days</p>
+                  <p className="text-2xl font-semibold">{avgTimeToReply.toFixed(1)} days</p>
                   <p className="text-sm text-muted-foreground">Time to Reply</p>
                 </div>
               </div>
@@ -403,237 +236,332 @@ export function PlaybooksPage() {
               <div className="flex items-center gap-3">
                 <Zap className="h-8 w-8 text-green-500" />
                 <div>
-                  <p className="text-2xl font-semibold">{customPlaybooks?.length || 0}</p>
-                  <p className="text-sm text-muted-foreground">Active</p>
+                  <p className="text-2xl font-semibold">{customPlaybooks.length}</p>
+                  <p className="text-sm text-muted-foreground">Custom</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Playbook Templates Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTemplates.map((template) => (
-            <Card key={template.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{template.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      {template.description}
-                    </CardDescription>
-                  </div>
-                  <Badge variant="outline">{template.industry}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Target Audience */}
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">TARGET AUDIENCE</p>
-                  <div className="flex flex-wrap gap-1">
-                    {template.targetAudience.titles.slice(0, 3).map((title) => (
-                      <Badge key={title} variant="secondary" className="text-xs">
-                        {title}
-                      </Badge>
-                    ))}
-                    {template.targetAudience.titles.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{template.targetAudience.titles.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+        {/* Tabs for Templates vs Custom */}
+        <Tabs defaultValue="templates" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="templates">Templates ({templatePlaybooks.length})</TabsTrigger>
+            <TabsTrigger value="custom">My Playbooks ({customPlaybooks.length})</TabsTrigger>
+          </TabsList>
 
-                {/* Sequences */}
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">SEQUENCES</p>
-                  {template.sequences.map((sequence) => (
-                    <div key={sequence.name} className="flex items-center justify-between text-sm mb-1">
-                      <span>{sequence.name}</span>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <span>{sequence.steps} steps</span>
-                        <span>•</span>
-                        <span>{sequence.duration}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {/* Templates Tab */}
+          <TabsContent value="templates" className="space-y-4">
+            {filteredTemplates.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">No templates found matching your criteria.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredTemplates.map((template) => {
+                  const sequences = (template.sequences as any) || [];
+                  const targetAudience = (template.targetAudience as any) || {};
+                  const metrics = (template.successMetrics as any) || {};
+                  
+                  return (
+                    <Card key={template.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{template.name}</CardTitle>
+                            <Badge variant="secondary" className="mt-2">
+                              {template.industry}
+                            </Badge>
+                          </div>
+                          <Building className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <CardDescription className="mt-2">
+                          {template.description || "No description available"}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Target Audience */}
+                        <div>
+                          <p className="text-sm font-medium mb-2">Target Audience</p>
+                          <div className="flex flex-wrap gap-1">
+                            {(targetAudience.titles || []).slice(0, 3).map((title: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {title}
+                              </Badge>
+                            ))}
+                            {targetAudience.titles?.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{targetAudience.titles.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
 
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t">
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">{template.metrics.avgReplyRate}</p>
-                    <p className="text-xs text-muted-foreground">Reply</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">{template.metrics.avgMeetingRate}</p>
-                    <p className="text-xs text-muted-foreground">Meeting</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">{template.metrics.timeToFirst}</p>
-                    <p className="text-xs text-muted-foreground">Response</p>
-                  </div>
-                </div>
+                        {/* Sequences */}
+                        <div>
+                          <p className="text-sm font-medium mb-2">Sequences</p>
+                          <div className="space-y-2">
+                            {sequences.slice(0, 2).map((seq: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">{seq.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {seq.steps} steps
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {seq.duration}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-3">
-                  <Button 
-                    className="flex-1" 
-                    onClick={() => handleApplyClick(template)}
-                    disabled={applyPlaybook.isPending}
-                    data-testid={`button-apply-${template.id}`}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Apply Playbook
-                  </Button>
-                  <Button variant="outline" size="icon" data-testid={`button-preview-${template.id}`}>
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                        {/* Metrics */}
+                        <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                          <div className="text-center">
+                            <p className="text-sm font-semibold">{metrics.avgReplyRate || "0%"}</p>
+                            <p className="text-xs text-muted-foreground">Reply</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold">{metrics.avgMeetingRate || "0%"}</p>
+                            <p className="text-xs text-muted-foreground">Meeting</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold">{metrics.timeToFirst || "0d"}</p>
+                            <p className="text-xs text-muted-foreground">Speed</p>
+                          </div>
+                        </div>
 
-        {/* Custom Playbooks Section */}
-        {customPlaybooks && customPlaybooks.length > 0 && (
-          <div className="mt-8">
-            <h2 className="font-display text-xl mb-4">Your Custom Playbooks</h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {customPlaybooks.map((playbook) => (
-                <Card key={playbook.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{playbook.name}</CardTitle>
-                    <CardDescription>{playbook.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <Badge>{playbook.industry}</Badge>
-                      <Button size="sm" variant="outline" data-testid={`button-edit-${playbook.id}`}>
-                        Edit
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {filteredTemplates.length === 0 && (
-          <Card className="p-12">
-            <div className="text-center space-y-3">
-              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto" />
-              <h3 className="font-semibold">No playbooks found</h3>
-              <p className="text-sm text-muted-foreground">
-                Try adjusting your search or filters
-              </p>
-            </div>
-          </Card>
-        )}
-      </div>
-
-      {/* Apply Playbook Modal */}
-      <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>Apply Playbook: {selectedPlaybook?.name}</DialogTitle>
-            <DialogDescription>
-              Configure how you want to apply this playbook to your outreach campaigns.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedPlaybook && (
-            <div className="space-y-4 py-4">
-              {/* Target Audience Info */}
-              <div>
-                <Label className="text-sm font-medium mb-2">Target Audience</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {selectedPlaybook.targetAudience.titles.map((title) => (
-                    <Badge key={title} variant="outline">
-                      {title}
-                    </Badge>
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {selectedPlaybook.targetAudience.companySize} • {selectedPlaybook.targetAudience.industries.join(", ")}
-                </p>
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={() => handleApplyClick(template)}
+                            data-testid={`button-apply-${template.id}`}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            Apply
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handlePreviewClick(template)}
+                            data-testid={`button-preview-${template.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => duplicateTemplate.mutate(template.id)}
+                            data-testid={`button-duplicate-${template.id}`}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
+            )}
+          </TabsContent>
 
-              {/* Select Sequences */}
+          {/* Custom Playbooks Tab */}
+          <TabsContent value="custom" className="space-y-4">
+            {customPlaybooks.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground mb-4">You haven't created any custom playbooks yet.</p>
+                  <Button variant="outline">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Create Your First Playbook
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {customPlaybooks.map((playbook) => {
+                  const sequences = (playbook.sequences as any) || [];
+                  const metrics = (playbook.successMetrics as any) || {};
+                  
+                  return (
+                    <Card key={playbook.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{playbook.name}</CardTitle>
+                            <Badge className="mt-2">Custom</Badge>
+                          </div>
+                          <Rocket className="h-5 w-5 text-primary" />
+                        </div>
+                        <CardDescription className="mt-2">
+                          {playbook.description || "Custom playbook"}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium mb-2">
+                            {sequences.length} Sequence{sequences.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={() => handleApplyClick(playbook)}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            Apply
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handlePreviewClick(playbook)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Apply Modal */}
+        <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Apply Playbook: {selectedPlaybook?.name}</DialogTitle>
+              <DialogDescription>
+                Select which sequences to create from this playbook
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
               <div>
-                <Label className="text-sm font-medium mb-2">Select Sequences to Create</Label>
+                <Label className="text-sm font-medium">Sequences to Create</Label>
                 <div className="space-y-2 mt-2">
-                  {selectedPlaybook.sequences.map((sequence) => (
-                    <div key={sequence.name} className="flex items-center space-x-2">
+                  {((selectedPlaybook?.sequences as any) || []).map((seq: any) => (
+                    <div key={seq.name} className="flex items-center space-x-2">
                       <Checkbox 
-                        id={sequence.name}
-                        checked={selectedSequences.includes(sequence.name)}
+                        id={seq.name}
+                        checked={selectedSequences.includes(seq.name)}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedSequences([...selectedSequences, sequence.name]);
+                            setSelectedSequences([...selectedSequences, seq.name]);
                           } else {
-                            setSelectedSequences(selectedSequences.filter(s => s !== sequence.name));
+                            setSelectedSequences(selectedSequences.filter(s => s !== seq.name));
                           }
                         }}
-                        data-testid={`checkbox-sequence-${sequence.name.toLowerCase().replace(/\s+/g, '-')}`}
                       />
-                      <label
-                        htmlFor={sequence.name}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
+                      <label 
+                        htmlFor={seq.name}
+                        className="flex-1 flex items-center justify-between cursor-pointer"
                       >
-                        <div className="flex items-center justify-between">
-                          <span>{sequence.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {sequence.steps} steps • {sequence.duration}
-                          </span>
+                        <span className="font-medium">{seq.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{seq.steps} steps</Badge>
+                          <span className="text-sm text-muted-foreground">{seq.duration}</span>
                         </div>
                       </label>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Expected Metrics */}
-              <div>
-                <Label className="text-sm font-medium mb-2">Expected Performance</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <Card className="p-3 text-center">
-                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.avgReplyRate}</p>
-                    <p className="text-xs text-muted-foreground">Reply Rate</p>
-                  </Card>
-                  <Card className="p-3 text-center">
-                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.avgMeetingRate}</p>
-                    <p className="text-xs text-muted-foreground">Meeting Rate</p>
-                  </Card>
-                  <Card className="p-3 text-center">
-                    <p className="text-sm font-semibold">{selectedPlaybook.metrics.timeToFirst}</p>
-                    <p className="text-xs text-muted-foreground">First Response</p>
-                  </Card>
-                </div>
-              </div>
             </div>
-          )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setApplyModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleApplyPlaybook}
+                disabled={selectedSequences.length === 0 || applyPlaybook.isPending}
+              >
+                {applyPlaybook.isPending ? "Applying..." : "Apply Playbook"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setApplyModalOpen(false)}
-              data-testid="button-cancel-apply"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleApplyPlaybook}
-              disabled={applyPlaybook.isPending || selectedSequences.length === 0}
-              data-testid="button-confirm-apply"
-            >
-              {applyPlaybook.isPending ? "Applying..." : "Apply Playbook"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Preview Modal */}
+        <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedPlaybook?.name}</DialogTitle>
+              <DialogDescription>
+                {selectedPlaybook?.description}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedPlaybook && (
+              <div className="space-y-6 py-4">
+                {/* Email Templates */}
+                {selectedPlaybook.emailTemplates && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Email Templates</h3>
+                    <div className="space-y-3">
+                      {Object.entries(selectedPlaybook.emailTemplates as any).map(([key, template]: [string, any]) => (
+                        <Card key={key}>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</CardTitle>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Subject: {template.subject}
+                            </p>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm whitespace-pre-wrap">{template.preview}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Metrics */}
+                {selectedPlaybook.successMetrics && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Expected Performance</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {Object.entries(selectedPlaybook.successMetrics as any).map(([key, value]) => (
+                        <Card key={key}>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-2xl font-bold text-primary">{String(value)}</p>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {key.replace(/([A-Z])/g, ' $1').trim()}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPreviewModalOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={() => {
+                setPreviewModalOpen(false);
+                if (selectedPlaybook) handleApplyClick(selectedPlaybook);
+              }}>
+                Apply This Playbook
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }
