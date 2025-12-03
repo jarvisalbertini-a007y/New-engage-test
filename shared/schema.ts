@@ -28,6 +28,7 @@ export const users = pgTable("users", {
 
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
   name: text("name").notNull(),
   domain: text("domain"),
   industry: text("industry"),
@@ -42,6 +43,7 @@ export const companies = pgTable("companies", {
 
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
   companyId: varchar("company_id").references(() => companies.id),
   email: text("email").notNull(),
   firstName: text("first_name").notNull(),

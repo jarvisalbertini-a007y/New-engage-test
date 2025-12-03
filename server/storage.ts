@@ -95,7 +95,7 @@ export interface IStorage {
 
   // Companies
   getCompany(id: string): Promise<Company | undefined>;
-  getCompanies(limit?: number): Promise<Company[]>;
+  getCompanies(filters?: { userId?: string; limit?: number }): Promise<Company[]>;
   getCompaniesByDomain(domain: string): Promise<Company[]>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, updates: Partial<Company>): Promise<Company | undefined>;
@@ -103,7 +103,7 @@ export interface IStorage {
 
   // Contacts
   getContact(id: string): Promise<Contact | undefined>;
-  getContacts(filters?: { companyId?: string; limit?: number }): Promise<Contact[]>;
+  getContacts(filters?: { userId?: string; companyId?: string; limit?: number }): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, updates: Partial<Contact>): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<boolean>;
@@ -202,7 +202,7 @@ export interface IStorage {
   
   // Playbooks
   getPlaybook(id: string): Promise<Playbook | undefined>;
-  getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]>;
+  getPlaybooks(filters?: { industry?: string; isTemplate?: boolean; createdBy?: string }): Promise<Playbook[]>;
   createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
   updatePlaybook(id: string, updates: Partial<Playbook>): Promise<Playbook | undefined>;
 
@@ -637,8 +637,14 @@ export class MemStorage implements IStorage {
     return this.companies.get(id);
   }
 
-  async getCompanies(limit = 50): Promise<Company[]> {
-    return Array.from(this.companies.values()).slice(0, limit);
+  async getCompanies(filters?: { userId?: string; limit?: number }): Promise<Company[]> {
+    let companies = Array.from(this.companies.values());
+    
+    if (filters?.userId) {
+      companies = companies.filter(c => c.userId === filters.userId);
+    }
+    
+    return companies.slice(0, filters?.limit || 50);
   }
 
   async getCompaniesByDomain(domain: string): Promise<Company[]> {
@@ -650,6 +656,7 @@ export class MemStorage implements IStorage {
     const company: Company = { 
       id, 
       createdAt: new Date(),
+      userId: insertCompany.userId ?? null,
       name: insertCompany.name,
       domain: insertCompany.domain ?? null,
       industry: insertCompany.industry ?? null,
@@ -681,8 +688,12 @@ export class MemStorage implements IStorage {
     return this.contacts.get(id);
   }
 
-  async getContacts(filters?: { companyId?: string; limit?: number }): Promise<Contact[]> {
+  async getContacts(filters?: { userId?: string; companyId?: string; limit?: number }): Promise<Contact[]> {
     let contacts = Array.from(this.contacts.values());
+    
+    if (filters?.userId) {
+      contacts = contacts.filter(c => c.userId === filters.userId);
+    }
     
     if (filters?.companyId) {
       contacts = contacts.filter(c => c.companyId === filters.companyId);
@@ -696,6 +707,7 @@ export class MemStorage implements IStorage {
     const contact: Contact = { 
       id,
       createdAt: new Date(),
+      userId: insertContact.userId ?? null,
       email: insertContact.email,
       firstName: insertContact.firstName,
       lastName: insertContact.lastName,
@@ -1573,7 +1585,7 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]> {
+  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean; createdBy?: string }): Promise<Playbook[]> {
     return [];
   }
 
@@ -3691,8 +3703,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getCompanies(limit = 50): Promise<Company[]> {
-    return await db.select().from(companies).limit(limit);
+  async getCompanies(filters?: { userId?: string; limit?: number }): Promise<Company[]> {
+    let query = db.select().from(companies);
+    
+    if (filters?.userId) {
+      query = query.where(eq(companies.userId, filters.userId)) as any;
+    }
+    
+    return await query.limit(filters?.limit || 50);
   }
 
   async getCompaniesByDomain(domain: string): Promise<Company[]> {
@@ -3722,11 +3740,20 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getContacts(filters?: { companyId?: string; limit?: number }): Promise<Contact[]> {
+  async getContacts(filters?: { userId?: string; companyId?: string; limit?: number }): Promise<Contact[]> {
     let query = db.select().from(contacts);
+    const conditions = [];
+    
+    if (filters?.userId) {
+      conditions.push(eq(contacts.userId, filters.userId));
+    }
     
     if (filters?.companyId) {
-      query = query.where(eq(contacts.companyId, filters.companyId)) as any;
+      conditions.push(eq(contacts.companyId, filters.companyId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
     }
     
     return await query.limit(filters?.limit || 50);
@@ -4376,7 +4403,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean }): Promise<Playbook[]> {
+  async getPlaybooks(filters?: { industry?: string; isTemplate?: boolean; createdBy?: string }): Promise<Playbook[]> {
     // Seed template playbooks if none exist
     if (filters?.isTemplate === true) {
       await this.ensureTemplatePlaybooks();
@@ -4387,6 +4414,7 @@ export class DbStorage implements IStorage {
     const conditions: any[] = [];
     if (filters?.industry) conditions.push(eq(playbooks.industry, filters.industry));
     if (filters?.isTemplate !== undefined) conditions.push(eq(playbooks.isTemplate, filters.isTemplate));
+    if (filters?.createdBy) conditions.push(eq(playbooks.createdBy, filters.createdBy));
     
     if (conditions.length > 0) {
       return await query.where(and(...conditions));

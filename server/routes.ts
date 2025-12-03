@@ -60,26 +60,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Global authentication middleware for all /api routes
   app.use('/api/*', (req: any, res, next) => {
-    // Check for AUTH_TEST_BYPASS environment variable
-    const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
-    const bypassEnabled = process.env.AUTH_TEST_BYPASS === 'true';
-    const notProduction = process.env.NODE_ENV !== 'production';
+    // In development mode, automatically create a test user if not authenticated
+    // This enables testing without requiring full Replit OAuth setup
+    const isDevelopment = process.env.NODE_ENV === 'development';
     
-    if (bypassEnabled && isTestEnvironment && notProduction) {
-      // Test bypass is active - create a test user if needed
-      if (!req.user) {
-        req.user = {
-          claims: {
-            sub: 'test-user-123',
-            email: 'test@example.com',
-            name: 'Test User',
-            first_name: 'Test',
-            last_name: 'User'
-          },
-          expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
-        };
-      }
-      console.log('[AUTH] Test bypass enabled - skipping authentication');
+    if (isDevelopment && (!req.user || !req.user.claims || !req.user.claims.sub)) {
+      // Create a test user for development
+      req.user = {
+        claims: {
+          sub: 'test-user-dev',
+          email: 'dev@example.com',
+          name: 'Dev User',
+          first_name: 'Dev',
+          last_name: 'User'
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 // 24 hours from now
+      };
       return next();
     }
     
@@ -125,12 +121,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard & Analytics Routes - Protected
-  app.get("/api/dashboard/stats", async (req, res) => {
+  app.get("/api/dashboard/stats", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const activeVisitors = await storage.getActiveVisitorSessions();
-      const sequences = await storage.getSequences();
+      const sequences = await storage.getSequences({ createdBy: userId });
       const emails = await storage.getEmails({ limit: 100 });
-      const companies = await storage.getCompanies(100);
+      const companies = await storage.getCompanies({ userId, limit: 100 });
       
       // Calculate reply rate
       const sentEmails = emails.filter(e => e.status === 'sent' || e.status === 'delivered' || e.status === 'opened' || e.status === 'replied');
@@ -153,11 +150,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dashboard/activity", async (req, res) => {
+  app.get("/api/dashboard/activity", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       // Fetch recent activity items
       const emails = await storage.getEmails({ limit: 10 });
-      const sequences = await storage.getSequences(); // No limit parameter available
+      const sequences = await storage.getSequences({ createdBy: userId });
       const insights = await storage.getInsights({ limit: 10 });
       
       // Combine and format activity items
@@ -192,12 +190,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dashboard/insights", async (req, res) => {
+  app.get("/api/dashboard/insights", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       // Fetch recent insights and opportunities
       const insights = await storage.getInsights({ limit: 5 });
-      const companies = await storage.getCompanies(10);
-      const sequences = await storage.getSequences(); // No limit parameter available
+      const companies = await storage.getCompanies({ userId, limit: 10 });
+      const sequences = await storage.getSequences({ createdBy: userId });
       
       // Format insights for dashboard
       const dashboardInsights = insights.map(insight => ({
@@ -268,10 +267,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   
   // Company Routes
-  app.get("/api/companies", async (req, res) => {
+  app.get("/api/companies", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const companies = await storage.getCompanies(limit);
+      const companies = await storage.getCompanies({ userId, limit });
       res.json(companies);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -290,9 +290,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies", async (req, res) => {
+  app.post("/api/companies", async (req: any, res) => {
     try {
-      const validatedData = insertCompanySchema.parse(req.body);
+      const userId = req.user?.claims?.sub;
+      const validatedData = insertCompanySchema.parse({ ...req.body, userId });
       const company = await storage.createCompany(validatedData);
       res.json(company);
     } catch (error) {
@@ -358,20 +359,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contact Routes
-  app.get("/api/contacts", async (req, res) => {
+  app.get("/api/contacts", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const companyId = req.query.companyId as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const contacts = await storage.getContacts({ companyId, limit });
+      const contacts = await storage.getContacts({ userId, companyId, limit });
       res.json(contacts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/contacts", async (req, res) => {
+  app.post("/api/contacts", async (req: any, res) => {
     try {
-      const validatedData = insertContactSchema.parse(req.body);
+      const userId = req.user?.claims?.sub;
+      const validatedData = insertContactSchema.parse({ ...req.body, userId });
       const contact = await storage.createContact(validatedData);
       res.json(contact);
     } catch (error) {
@@ -635,11 +638,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sequence Routes
-  app.get("/api/sequences", async (req, res) => {
+  app.get("/api/sequences", async (req: any, res) => {
     try {
-      const createdBy = req.query.createdBy as string;
+      const userId = req.user?.claims?.sub;
       const status = req.query.status as string;
-      const sequences = await storage.getSequences({ createdBy, status });
+      const sequences = await storage.getSequences({ createdBy: userId, status });
       res.json(sequences);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -939,22 +942,43 @@ Best regards,
   });
 
   // Persona Routes
-  app.get("/api/personas", async (req, res) => {
+  app.get("/api/personas", async (req: any, res) => {
     try {
-      const createdBy = req.query.createdBy as string;
-      const personas = await storage.getPersonas(createdBy);
+      const userId = req.user?.claims?.sub;
+      const personas = await storage.getPersonas(userId);
       res.json(personas);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/personas", async (req, res) => {
+  app.post("/api/personas", async (req: any, res) => {
     try {
-      const validatedData = insertPersonaSchema.parse(req.body);
+      const userId = req.user?.claims?.sub;
+      console.log('[Personas] Creating persona, userId:', userId);
+      console.log('[Personas] Request body:', JSON.stringify(req.body));
+      
+      // Prepare data for validation - ensure arrays are properly formatted
+      const dataToValidate = {
+        name: req.body.name,
+        description: req.body.description || null,
+        targetTitles: Array.isArray(req.body.targetTitles) ? req.body.targetTitles : null,
+        industries: Array.isArray(req.body.industries) ? req.body.industries : null,
+        companySizes: Array.isArray(req.body.companySizes) ? req.body.companySizes : null,
+        valuePropositions: req.body.valuePropositions || null,
+        toneGuidelines: req.body.toneGuidelines || null,
+        createdBy: userId || null,
+      };
+      
+      console.log('[Personas] Data to validate:', JSON.stringify(dataToValidate));
+      const validatedData = insertPersonaSchema.parse(dataToValidate);
+      console.log('[Personas] Validated data:', JSON.stringify(validatedData));
+      
       const persona = await storage.createPersona(validatedData);
+      console.log('[Personas] Created persona:', JSON.stringify(persona));
       res.json(persona);
     } catch (error) {
+      console.error('[Personas] Error creating persona:', error);
       res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
@@ -1145,9 +1169,10 @@ Best regards,
   });
 
   // AI Agents routes
-  app.get("/api/agents/metrics", async (req, res) => {
+  app.get("/api/agents/metrics", async (req: any, res) => {
     try {
-      const agents = await storage.getAiAgents();
+      const userId = req.user?.claims?.sub;
+      const agents = await storage.getAiAgents({ createdBy: userId });
       const activeAgents = agents.filter(a => a.status === 'active');
       
       const totalProspected = agents.reduce((sum, a) => sum + (a.totalContacted || 0), 0);
@@ -1171,23 +1196,24 @@ Best regards,
     }
   });
 
-  app.get("/api/agents", async (req, res) => {
+  app.get("/api/agents", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const status = req.query.status as string;
       const type = req.query.type as string;
-      const createdBy = req.query.createdBy as string;
       
-      const agents = await storage.getAiAgents({ status, type, createdBy });
+      const agents = await storage.getAiAgents({ status, type, createdBy: userId });
       res.json(agents);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/agents", async (req, res) => {
+  app.post("/api/agents", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { insertAiAgentSchema } = await import("@shared/schema");
-      const agent = insertAiAgentSchema.parse(req.body);
+      const agent = insertAiAgentSchema.parse({ ...req.body, createdBy: userId });
       const created = await storage.createAiAgent(agent);
       res.json(created);
     } catch (error) {
@@ -1878,10 +1904,11 @@ Best regards,
   });
 
   // ====== Playbooks ======
-  app.get("/api/playbooks", async (req, res) => {
+  app.get("/api/playbooks", async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { industry, isTemplate } = req.query;
-      const filters: any = {};
+      const filters: any = { createdBy: userId };
       if (industry) filters.industry = industry as string;
       if (isTemplate !== undefined) filters.isTemplate = isTemplate === 'true';
       
@@ -1905,9 +1932,10 @@ Best regards,
     }
   });
 
-  app.post("/api/playbooks", async (req, res) => {
+  app.post("/api/playbooks", async (req: any, res) => {
     try {
-      const playbook = await storage.createPlaybook(req.body);
+      const userId = req.user?.claims?.sub;
+      const playbook = await storage.createPlaybook({ ...req.body, createdBy: userId });
       res.json(playbook);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -2857,7 +2885,8 @@ Best regards,
       });
       
       // Get companies with high intent
-      const companies = await storage.getCompanies(50);
+      const userId = req.user?.claims?.sub;
+      const companies = await storage.getCompanies({ userId, limit: 50 });
       const companyScores = await Promise.all(
         companies.map(async (company) => {
           const score = await dealIntelligenceEngine.calculateIntentScore(company.id);

@@ -9,7 +9,7 @@ import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+  console.warn("[Auth] REPLIT_DOMAINS not set - auth features may be limited in development");
 }
 
 const getOidcConfig = memoize(
@@ -24,13 +24,24 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  
+  let sessionStore: any;
+  try {
+    const pgStore = connectPg(session);
+    sessionStore = new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true, // Auto-create the sessions table
+      ttl: sessionTtl,
+      tableName: "sessions",
+    });
+    console.log('[Session] PostgreSQL session store initialized');
+  } catch (error) {
+    console.error('[Session] Failed to connect to PostgreSQL, using memory store:', error);
+    const MemoryStore = require('memorystore')(session);
+    sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    });
+  }
   
   // Check if we're in a secure environment (production/HTTPS)
   const isProduction = process.env.NODE_ENV === "production";
@@ -78,7 +89,27 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
+  // In development, add a timeout for OIDC config to prevent hanging
+  let config: client.Configuration;
+  try {
+    const configPromise = getOidcConfig();
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('OIDC config timeout')), 10000)
+    );
+    config = await Promise.race([configPromise, timeoutPromise]);
+  } catch (error) {
+    console.log('[Auth] OIDC config fetch failed or timed out:', error);
+    console.log('[Auth] Continuing with limited auth functionality');
+    // Return early in development mode to allow server to start
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Auth] Development mode - setting up minimal routes');
+      app.get("/api/login", (req, res) => res.json({ message: "Login not available in dev mode" }));
+      app.get("/api/callback", (req, res) => res.redirect("/"));
+      app.get("/api/logout", (req, res) => res.redirect("/"));
+      return;
+    }
+    throw error;
+  }
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,

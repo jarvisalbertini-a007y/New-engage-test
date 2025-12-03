@@ -105,6 +105,14 @@ export const api = {
     const response = await apiRequest("POST", "/api/personas", data);
     return response.json();
   },
+  updatePersona: async (id: string, data: any) => {
+    const response = await apiRequest("PUT", `/api/personas/${id}`, data);
+    return response.json();
+  },
+  deletePersona: async (id: string) => {
+    const response = await apiRequest("DELETE", `/api/personas/${id}`, {});
+    return response.json();
+  },
   
   // Tasks
   getTasks: (filters?: { assignedTo?: string; status?: string; priority?: string }) => {

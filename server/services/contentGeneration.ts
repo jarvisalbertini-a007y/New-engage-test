@@ -40,6 +40,16 @@ function formatValuePropositions(props: any): string {
   return 'our AI-powered sales platform';
 }
 
+// Helper function to add variation to content generation
+function getRandomVariation<T>(options: T[]): T {
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+// Generate unique session ID for tracking content variations
+function generateSessionId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+}
+
 // Fetch appropriate template from storage based on type and audience
 async function fetchTemplate(
   type: string,
@@ -204,28 +214,89 @@ Return valid JSON with 'subject' and 'body' fields only.`;
     }
   }
   
-  // Fallback to template-based generation
+  // Fallback to template-based generation with multiple variations for uniqueness
+  const subjectVariations = {
+    professional: [
+      `Quick question about ${context.company}'s growth strategy`,
+      `Idea to accelerate ${context.company}'s results`,
+      `A thought on ${context.company}'s sales approach`,
+      `Strategic opportunity for ${context.company}`,
+      `Helping ${context.industry || 'companies'} like ${context.company} grow faster`
+    ],
+    casual: [
+      `${context.firstName}, quick thought about ${context.company}`,
+      `Hey ${context.firstName} - idea for ${context.company}`,
+      `${context.company} + sales growth = 🚀`,
+      `Saw ${context.company} and had to reach out`,
+      `Quick note for ${context.firstName}`
+    ],
+    friendly: [
+      `Idea for ${context.company}'s sales team`,
+      `Thought you'd find this helpful, ${context.firstName}`,
+      `Something exciting for ${context.company}`,
+      `Hi ${context.firstName} - a friendly suggestion`,
+      `${context.firstName}, would love to share this with you`
+    ],
+    urgent: [
+      `Time-sensitive opportunity for ${context.company}`,
+      `${context.firstName} - quick window for ${context.company}`,
+      `Don't miss this - ${context.company}`,
+      `Urgent: Opportunity for ${context.industry || context.company}`,
+      `${context.company} - let's talk this week`
+    ]
+  };
+
+  const openingPhrases = [
+    `I noticed ${context.company} ${context.insight || 'has been making impressive progress'}`,
+    `I've been following ${context.company}'s journey and ${context.insight || 'am impressed by your growth'}`,
+    `I came across ${context.company} recently and ${context.insight || 'was intrigued by what you\'re building'}`,
+    `Looking at ${context.company}'s recent ${context.insight || 'achievements'}`,
+    `After researching ${context.industry || 'your space'}, I noticed ${context.company} ${context.insight || 'stands out'}`
+  ];
+
+  const ctaPhrases = [
+    'Would you be open to a quick 15-minute call this week',
+    'Could we schedule a brief conversation',
+    'Would a 15-minute chat make sense',
+    'Do you have time for a quick call',
+    'Could we connect for a few minutes'
+  ];
+
+  const resultStats = [
+    'increase reply rates by 40%',
+    'book 3x more qualified meetings',
+    'reduce sales cycle by 25%',
+    'improve conversion rates by 35%',
+    'boost pipeline value by 50%'
+  ];
+
+  const selectedSubjects = subjectVariations[context.tone as keyof typeof subjectVariations] || subjectVariations.professional;
+  const selectedSubject = getRandomVariation(selectedSubjects);
+  const opening = getRandomVariation(openingPhrases);
+  const cta = getRandomVariation(ctaPhrases);
+  const result = getRandomVariation(resultStats);
+
   const templates = {
     professional: {
-      subject: `Quick question about ${context.company}'s growth strategy`,
+      subject: selectedSubject,
       body: `Hi ${context.firstName},
 
-I noticed ${context.company} ${context.insight || 'has been making impressive progress'} and thought you might be interested in how we're helping similar ${context.industry || 'companies'} achieve even better results.
+${opening} and thought you might be interested in how we're helping similar ${context.industry || 'companies'} achieve even better results.
 
-Our ${context.valueProposition} has helped companies in your space increase reply rates by 40% and book 3x more qualified meetings.
+Our ${context.valueProposition} has helped companies in your space ${result}.
 
-Would you be open to a quick 15-minute call this week to explore if we could help ${context.company} achieve similar results?
+${cta} to explore if we could help ${context.company} achieve similar results?
 
 Best regards,
 {{senderName}}`
     },
     casual: {
-      subject: `${context.firstName}, quick thought about ${context.company}`,
+      subject: selectedSubject,
       body: `Hey ${context.firstName},
 
-Just came across ${context.company} and ${context.insight || "love what you're doing"}!
+${opening}!
 
-We've been working with a lot of ${context.industry || 'companies like yours'} on ${context.valueProposition}, and the results have been pretty amazing - talking 40% better engagement rates.
+We've been working with a lot of ${context.industry || 'companies like yours'} on ${context.valueProposition}, and the results have been pretty amazing - we've helped them ${result}.
 
 Worth a quick chat to see if we could help you too?
 
@@ -233,27 +304,27 @@ Cheers,
 {{senderName}}`
     },
     friendly: {
-      subject: `Idea for ${context.company}'s sales team`,
+      subject: selectedSubject,
       body: `Hi ${context.firstName}!
 
-Hope this finds you well! I've been following ${context.company}'s journey and ${context.insight || "I'm really impressed by your growth"}.
+Hope this finds you well! ${opening}.
 
-I'd love to share how we're helping ${context.industry || 'teams like yours'} with ${context.valueProposition}. Our clients typically see 40% improvement in their outreach effectiveness.
+I'd love to share how we're helping ${context.industry || 'teams like yours'} with ${context.valueProposition}. Our clients typically ${result}.
 
-Do you have 15 minutes this week for a friendly chat about how we might be able to help ${context.company}?
+${cta} about how we might be able to help ${context.company}?
 
 Looking forward to connecting!
 {{senderName}}`
     },
     urgent: {
-      subject: `Time-sensitive opportunity for ${context.company}`,
+      subject: selectedSubject,
       body: `${context.firstName},
 
 I'll keep this brief - ${context.company} ${context.insight || 'is at a critical growth stage'} and I believe we can help you capitalize on this momentum.
 
-Our ${context.valueProposition} is designed specifically for ${context.industry || 'fast-growing companies'} like yours. We've helped similar companies increase their pipeline by 3x in just 60 days.
+Our ${context.valueProposition} is designed specifically for ${context.industry || 'fast-growing companies'} like yours. We've helped similar companies ${result} in just 60 days.
 
-Can we schedule a 15-minute call tomorrow or Thursday to discuss?
+${cta}?
 
 Best,
 {{senderName}}`
@@ -385,6 +456,15 @@ async function generateLinkedInContent(
   // Generate LinkedIn-specific content with AI if available
   let linkedInBody: string;
   
+  // Multiple LinkedIn message variations for uniqueness
+  const linkedInTemplates = [
+    `Hi ${context.firstName}, noticed ${context.company} ${context.insight || 'is doing great things'}. We're helping ${context.industry || 'companies like yours'} with ${context.valueProposition}. Would love to connect and share some insights!`,
+    `Hey ${context.firstName}! Came across ${context.company} and ${context.insight || 'was impressed by your work'}. I've been working with ${context.industry || 'similar teams'} on ${context.valueProposition} - thought we might have some mutual interests. Let's connect!`,
+    `${context.firstName}, I've been following ${context.company}'s journey and ${context.insight || 'love the direction you\'re heading'}. We specialize in ${context.valueProposition} for ${context.industry || 'companies like yours'}. Would be great to connect and exchange ideas.`,
+    `Hi ${context.firstName}, your work at ${context.company} caught my attention - ${context.insight || 'impressive stuff'}! I help ${context.industry || 'teams'} with ${context.valueProposition}. Always enjoy connecting with fellow professionals. 🤝`,
+    `${context.firstName} - noticed we're both in the ${context.industry || 'sales'} space. ${context.company} ${context.insight || 'seems to be doing well'}. I focus on ${context.valueProposition} and thought it might be relevant to connect!`
+  ];
+
   if (openAIClient.isAvailable()) {
     const prompt = `Generate a brief LinkedIn message for sales outreach:
 - Recipient: ${context.firstName} at ${context.company}
@@ -393,15 +473,15 @@ async function generateLinkedInContent(
 - Insight: ${context.insight || 'No specific insight'}
 - Value: ${context.valueProposition}
 
-Create a natural, conversational LinkedIn message (2-3 sentences max). Be casual and focus on connection, not selling.`;
+Create a natural, conversational LinkedIn message (2-3 sentences max). Be casual and focus on connection, not selling. Be creative and unique.`;
 
     const response = await openAIClient.generateText(
       prompt,
-      'You are a B2B sales professional writing casual LinkedIn messages. Keep it brief and conversational.',
+      'You are a B2B sales professional writing casual LinkedIn messages. Keep it brief and conversational. Each message should feel unique and personal.',
       {
         feature: 'linkedin-generation',
         model: 'gpt-3.5-turbo',
-        temperature: 0.7,
+        temperature: 0.9,
         maxTokens: 200,
         fallback: null
       }
@@ -410,12 +490,12 @@ Create a natural, conversational LinkedIn message (2-3 sentences max). Be casual
     if (response.success && response.data) {
       linkedInBody = response.data;
     } else {
-      // Fallback to template
-      linkedInBody = `Hi ${context.firstName}, noticed ${context.company} ${context.insight || 'is doing great things'}. We're helping ${context.industry || 'companies like yours'} with ${context.valueProposition}. Would love to connect and share some insights!`;
+      // Fallback to random template variation
+      linkedInBody = getRandomVariation(linkedInTemplates);
     }
   } else {
-    // No AI available, use template
-    linkedInBody = `Hi ${context.firstName}, noticed ${context.company} ${context.insight || 'is doing great things'}. We're helping ${context.industry || 'companies like yours'} with ${context.valueProposition}. Would love to connect and share some insights!`;
+    // No AI available, use random template variation
+    linkedInBody = getRandomVariation(linkedInTemplates);
   }
   
   const personalizationElements = [];

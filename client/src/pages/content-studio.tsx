@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { api as oldApi } from "@/lib/api";
 import { api } from "@/lib/apiHelpers";
-import { Wand2, Copy, Save, Send, User, Building, Lightbulb, Target, Brain, Zap } from "lucide-react";
+import { Wand2, Copy, Save, Send, User, Building, Lightbulb, Target, Brain, Zap, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +36,9 @@ export default function ContentStudio() {
   });
   const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
   const [templateTags, setTemplateTags] = useState<string[]>([]);
+  const [isSequenceDialogOpen, setIsSequenceDialogOpen] = useState(false);
+  const [selectedSequence, setSelectedSequence] = useState<string>("new");
+  const [newSequenceName, setNewSequenceName] = useState("");
   
   const { toast } = useToast();
 
@@ -86,6 +89,14 @@ export default function ContentStudio() {
     }
   });
 
+  const { data: sequences = [] } = useQuery({
+    queryKey: ["/api/sequences"],
+    queryFn: async () => {
+      const response = await oldApi.getSequences();
+      return Array.isArray(response) ? response : [];
+    }
+  });
+
   const generateContentMutation = useMutation({
     mutationFn: oldApi.generateContent,
     onSuccess: (data) => {
@@ -123,8 +134,9 @@ export default function ContentStudio() {
         subject: data.subject,
         body: data.body,
         tone: tone,
-        authorId: 'user',
-        metadata: {
+        versionNumber: 1,
+        source: 'manual',
+        promptContext: {
           targetingFilters: data.targetingFilters
         }
       });
@@ -149,6 +161,65 @@ export default function ContentStudio() {
       toast({
         title: "Error",
         description: "Failed to save template. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addToSequenceMutation = useMutation({
+    mutationFn: async (data: { sequenceId?: string; sequenceName?: string }) => {
+      if (!generatedContent) {
+        throw new Error("No content to add");
+      }
+      
+      let sequence;
+      if (data.sequenceId && data.sequenceId !== "new") {
+        sequence = sequences.find((s: any) => s.id === data.sequenceId);
+        if (sequence) {
+          const currentSteps = Array.isArray(sequence.steps) ? sequence.steps : [];
+          const newStep = {
+            stepNumber: currentSteps.length + 1,
+            type: contentType === 'email' ? 'email' : contentType === 'linkedin' ? 'linkedin' : 'email',
+            delay: currentSteps.length === 0 ? 0 : 3,
+            subject: generatedContent.subject || '',
+            template: generatedContent.body
+          };
+          
+          const response = await api.patch(`/api/sequences/${sequence.id}`, {
+            steps: [...currentSteps, newStep]
+          });
+          return response;
+        }
+      }
+      
+      const newSequence = await oldApi.createSequence({
+        name: data.sequenceName || `Generated Sequence - ${new Date().toLocaleDateString()}`,
+        description: `Sequence created from Content Studio with ${contentType} content`,
+        status: 'draft',
+        steps: [{
+          stepNumber: 1,
+          type: contentType === 'email' ? 'email' : contentType === 'linkedin' ? 'linkedin' : 'email',
+          delay: 0,
+          subject: generatedContent.subject || '',
+          template: generatedContent.body
+        }]
+      });
+      return newSequence;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sequences"] });
+      setIsSequenceDialogOpen(false);
+      setSelectedSequence("new");
+      setNewSequenceName("");
+      toast({
+        title: "Added to Sequence",
+        description: "Content has been added to the sequence successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add to sequence. Please try again.",
         variant: "destructive",
       });
     },
@@ -462,7 +533,10 @@ export default function ContentStudio() {
                           <Save className="h-4 w-4 mr-2" />
                           Save Template
                         </Button>
-                        <Button data-testid="button-add-to-sequence">
+                        <Button 
+                          onClick={() => setIsSequenceDialogOpen(true)}
+                          data-testid="button-add-to-sequence"
+                        >
                           <Send className="h-4 w-4 mr-2" />
                           Add to Sequence
                         </Button>
@@ -723,6 +797,82 @@ export default function ContentStudio() {
                 disabled={!templateName || saveTemplateMutation.isPending}
               >
                 {saveTemplateMutation.isPending ? "Saving..." : "Save Template"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add to Sequence Dialog */}
+      <Dialog open={isSequenceDialogOpen} onOpenChange={setIsSequenceDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add to Sequence</DialogTitle>
+            <DialogDescription>
+              Add this content as a step in an existing sequence or create a new one
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Select Sequence</Label>
+              <Select value={selectedSequence} onValueChange={setSelectedSequence}>
+                <SelectTrigger className="mt-1" data-testid="select-sequence">
+                  <SelectValue placeholder="Select a sequence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">
+                    <div className="flex items-center">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Sequence
+                    </div>
+                  </SelectItem>
+                  {sequences.map((sequence: any) => (
+                    <SelectItem key={sequence.id} value={sequence.id}>
+                      {sequence.name} ({Array.isArray(sequence.steps) ? sequence.steps.length : 0} steps)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedSequence === "new" && (
+              <div>
+                <Label htmlFor="new-sequence-name">Sequence Name</Label>
+                <Input
+                  id="new-sequence-name"
+                  value={newSequenceName}
+                  onChange={(e) => setNewSequenceName(e.target.value)}
+                  placeholder="e.g., Q4 Outreach Campaign"
+                  className="mt-1"
+                  data-testid="input-new-sequence-name"
+                />
+              </div>
+            )}
+            
+            <div className="bg-muted p-3 rounded-md">
+              <p className="text-sm text-muted-foreground mb-1">Content Preview</p>
+              <p className="text-sm font-medium">{generatedContent?.subject || 'No subject'}</p>
+              <p className="text-xs text-muted-foreground mt-1 truncate">
+                {generatedContent?.body?.substring(0, 100)}...
+              </p>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <Button variant="outline" onClick={() => setIsSequenceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  addToSequenceMutation.mutate({
+                    sequenceId: selectedSequence !== "new" ? selectedSequence : undefined,
+                    sequenceName: newSequenceName || undefined
+                  });
+                }}
+                disabled={addToSequenceMutation.isPending || (selectedSequence === "new" && !newSequenceName)}
+                data-testid="button-confirm-add-to-sequence"
+              >
+                {addToSequenceMutation.isPending ? "Adding..." : "Add to Sequence"}
               </Button>
             </div>
           </div>
