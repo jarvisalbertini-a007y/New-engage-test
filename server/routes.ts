@@ -704,17 +704,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = (req.user as any)?.claims?.sub || null;
+      const { contactIds } = req.body || {};
       
-      const sequence = await storage.updateSequence(id, {
-        status: "active"
-      });
-      
+      // Get the sequence
+      const sequence = await storage.getSequence(id);
       if (!sequence) {
         return res.status(404).json({ error: "Sequence not found" });
       }
       
-      res.json(sequence);
+      // Get target contacts - either specified or all contacts for the user
+      let contacts;
+      if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
+        contacts = await Promise.all(contactIds.map(cId => storage.getContact(cId)));
+        contacts = contacts.filter(Boolean);
+      } else {
+        contacts = await storage.getContacts({ userId, limit: 100 });
+      }
+      
+      // Create sequence executions for each contact
+      const executions = [];
+      const steps = Array.isArray(sequence.steps) ? sequence.steps : [];
+      
+      for (const contact of contacts) {
+        if (!contact) continue;
+        
+        // Check if an execution already exists for this contact and sequence
+        const existingExecutions = await storage.getSequenceExecutions({ 
+          sequenceId: id, 
+          contactId: contact.id 
+        });
+        
+        if (existingExecutions.length > 0) {
+          // Skip if already enrolled
+          continue;
+        }
+        
+        // Create sequence execution
+        const execution = await storage.createSequenceExecution({
+          sequenceId: id,
+          contactId: contact.id,
+          currentStep: 0,
+          status: "active"
+        });
+        executions.push(execution);
+        
+        // Create the first email if the first step is an email
+        const firstStep = steps[0] as any;
+        if (firstStep && firstStep.type === 'email') {
+          const subject = (firstStep.subject || 'Introduction')
+            .replace(/\{\{firstName\}\}/g, contact.firstName)
+            .replace(/\{\{lastName\}\}/g, contact.lastName)
+            .replace(/\{\{company\}\}/g, contact.companyId || 'your company');
+          
+          const body = (firstStep.body || firstStep.template || '')
+            .replace(/\{\{firstName\}\}/g, contact.firstName)
+            .replace(/\{\{lastName\}\}/g, contact.lastName)
+            .replace(/\{\{company\}\}/g, contact.companyId || 'your company');
+          
+          await storage.createEmail({
+            sequenceExecutionId: execution.id,
+            contactId: contact.id,
+            subject,
+            body,
+            status: 'draft'
+          });
+        }
+      }
+      
+      // Update sequence status to active
+      const updatedSequence = await storage.updateSequence(id, {
+        status: "active"
+      });
+      
+      res.json({
+        sequence: updatedSequence,
+        executionsCreated: executions.length,
+        message: executions.length > 0 
+          ? `Started sequence for ${executions.length} contact(s)`
+          : 'Sequence activated (no new contacts enrolled)'
+      });
     } catch (error) {
+      console.error("Error starting sequence:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });

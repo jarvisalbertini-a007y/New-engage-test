@@ -367,7 +367,14 @@ export default function MarketplacePage() {
             ) : filteredAgents.length === 0 ? (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No agents found matching your criteria</p>
+                <h3 className="text-lg font-semibold mb-2">No Agents Available Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Be the first to share your AI agent with the community!
+                </p>
+                <Button onClick={() => setIsPublishOpen(true)} data-testid="button-publish-first-agent">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Publish an Agent
+                </Button>
               </div>
             ) : (
               <div className={cn(

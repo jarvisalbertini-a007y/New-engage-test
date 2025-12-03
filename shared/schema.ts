@@ -1047,6 +1047,11 @@ export const insertSequenceSchema = createInsertSchema(sequences).omit({
   createdAt: true,
 });
 
+export const insertSequenceExecutionSchema = createInsertSchema(sequenceExecutions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertEmailSchema = createInsertSchema(emails).omit({
   id: true,
   createdAt: true,
@@ -1650,6 +1655,9 @@ export type InsertVisitorSession = z.infer<typeof insertVisitorSessionSchema>;
 
 export type Sequence = typeof sequences.$inferSelect;
 export type InsertSequence = z.infer<typeof insertSequenceSchema>;
+
+export type SequenceExecution = typeof sequenceExecutions.$inferSelect;
+export type InsertSequenceExecution = z.infer<typeof insertSequenceExecutionSchema>;
 
 export type Email = typeof emails.$inferSelect;
 export type InsertEmail = z.infer<typeof insertEmailSchema>;

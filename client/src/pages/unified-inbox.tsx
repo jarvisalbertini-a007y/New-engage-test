@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Inbox, Search, Filter, Reply, Archive, Star, MoreHorizontal, CheckCircle, Clock, X } from "lucide-react";
+import { Inbox, Search, Filter, Reply, Archive, Star, MoreHorizontal, CheckCircle, Clock, X, Wand2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,6 +144,14 @@ export default function UnifiedInbox() {
     }
   };
 
+  const markAsRead = (messageId: string) => {
+    markAsReadMutation.mutate(messageId);
+  };
+
+  const toggleStar = (messageId: string) => {
+    toggleStarMutation.mutate(messageId);
+  };
+
   const handleReply = () => {
     if (replyText.trim() && selectedEmail) {
       sendReplyMutation.mutate({ 
@@ -239,7 +247,11 @@ export default function UnifiedInbox() {
 
             {/* Email List */}
             <div className="flex-1 overflow-auto">
-              {filteredEmails.length > 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredEmails.length > 0 ? (
                 filteredEmails.map((email) => {
                   const CategoryIcon = getCategoryIcon(email.category);
                   return (

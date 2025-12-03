@@ -4,6 +4,7 @@ import {
   type Contact, type InsertContact,
   type VisitorSession, type InsertVisitorSession,
   type Sequence, type InsertSequence,
+  type SequenceExecution, type InsertSequenceExecution,
   type Email, type InsertEmail,
   type Insight, type InsertInsight,
   type Persona, type InsertPersona,
@@ -71,7 +72,7 @@ import {
   type AudienceSegment, type InsertAudienceSegment,
   type TemplateMetrics, type InsertTemplateMetrics,
   type InboxMessage, type InsertInboxMessage,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
+  users, companies, contacts, visitorSessions, sequences, sequenceExecutions, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -121,6 +122,13 @@ export interface IStorage {
   createSequence(sequence: InsertSequence): Promise<Sequence>;
   updateSequence(id: string, updates: Partial<Sequence>): Promise<Sequence | undefined>;
   deleteSequence(id: string): Promise<boolean>;
+
+  // Sequence Executions
+  getSequenceExecution(id: string): Promise<SequenceExecution | undefined>;
+  getSequenceExecutions(filters?: { sequenceId?: string; contactId?: string; status?: string }): Promise<SequenceExecution[]>;
+  createSequenceExecution(execution: InsertSequenceExecution): Promise<SequenceExecution>;
+  updateSequenceExecution(id: string, updates: Partial<SequenceExecution>): Promise<SequenceExecution | undefined>;
+  deleteSequenceExecution(id: string): Promise<boolean>;
 
   // Emails
   getEmail(id: string): Promise<Email | undefined>;
@@ -560,6 +568,7 @@ export class MemStorage implements IStorage {
   private contacts: Map<string, Contact> = new Map();
   private visitorSessions: Map<string, VisitorSession> = new Map();
   private sequences: Map<string, Sequence> = new Map();
+  private sequenceExecutions: Map<string, SequenceExecution> = new Map();
   private emails: Map<string, Email> = new Map();
   private insights: Map<string, Insight> = new Map();
   private personas: Map<string, Persona> = new Map();
@@ -817,6 +826,56 @@ export class MemStorage implements IStorage {
 
   async deleteSequence(id: string): Promise<boolean> {
     return this.sequences.delete(id);
+  }
+
+  // Sequence Execution methods
+  async getSequenceExecution(id: string): Promise<SequenceExecution | undefined> {
+    return this.sequenceExecutions.get(id);
+  }
+
+  async getSequenceExecutions(filters?: { sequenceId?: string; contactId?: string; status?: string }): Promise<SequenceExecution[]> {
+    let executions = Array.from(this.sequenceExecutions.values());
+    
+    if (filters?.sequenceId) {
+      executions = executions.filter(e => e.sequenceId === filters.sequenceId);
+    }
+    
+    if (filters?.contactId) {
+      executions = executions.filter(e => e.contactId === filters.contactId);
+    }
+    
+    if (filters?.status) {
+      executions = executions.filter(e => e.status === filters.status);
+    }
+    
+    return executions;
+  }
+
+  async createSequenceExecution(insertExecution: InsertSequenceExecution): Promise<SequenceExecution> {
+    const id = randomUUID();
+    const execution: SequenceExecution = {
+      id,
+      createdAt: new Date(),
+      sequenceId: insertExecution.sequenceId ?? null,
+      contactId: insertExecution.contactId ?? null,
+      currentStep: insertExecution.currentStep ?? 0,
+      status: insertExecution.status ?? "active",
+      lastExecuted: insertExecution.lastExecuted ?? null
+    };
+    this.sequenceExecutions.set(id, execution);
+    return execution;
+  }
+
+  async updateSequenceExecution(id: string, updates: Partial<SequenceExecution>): Promise<SequenceExecution | undefined> {
+    const execution = this.sequenceExecutions.get(id);
+    if (!execution) return undefined;
+    const updated = { ...execution, ...updates };
+    this.sequenceExecutions.set(id, updated);
+    return updated;
+  }
+
+  async deleteSequenceExecution(id: string): Promise<boolean> {
+    return this.sequenceExecutions.delete(id);
   }
 
   // Email methods
@@ -4428,23 +4487,37 @@ export class DbStorage implements IStorage {
     const existing = await db.select().from(playbooks).where(eq(playbooks.isTemplate, true)).limit(1);
     if (existing.length > 0) return;
 
-    // Create template playbooks
+    // Create template playbooks with correct structure for UI
     const templates = [
       {
         name: "SaaS Sales Acceleration",
         description: "Complete outreach playbook for B2B SaaS companies targeting mid-market",
         industry: "SaaS",
-        targetICP: "VP Sales, CRO at 50-500 employee companies",
+        targetAudience: {
+          titles: ["VP Sales", "CRO", "Sales Director", "Head of Sales"],
+          industries: ["SaaS", "Technology"],
+          companySize: "50-500"
+        },
         sequences: [
           { name: "Initial Outreach", channels: ["email", "linkedin"], duration: "14 days", steps: 5 },
           { name: "Follow-up Nurture", channels: ["email"], duration: "30 days", steps: 3 }
         ],
-        emailTemplates: [
-          { subject: "Quick question about [Company]'s sales process", type: "initial" },
-          { subject: "Following up - sales efficiency", type: "followup" }
-        ],
-        bestPractices: ["Personalize first line", "Reference recent company news", "Keep emails under 150 words"],
-        expectedResults: { replyRate: 15, meetingRate: 5 },
+        emailTemplates: {
+          initial: {
+            subject: "Quick question about [Company]'s sales process",
+            preview: "Hi {{firstName}},\n\nI noticed that {{company}} is growing rapidly in the SaaS space. I wanted to reach out because we've helped similar companies increase their sales efficiency by 40%.\n\nWould you be open to a quick 15-minute call this week?"
+          },
+          followUp: {
+            subject: "Following up - sales efficiency",
+            preview: "Hi {{firstName}},\n\nI wanted to follow up on my previous note. I understand you're busy, but I believe our solution could significantly impact your team's productivity.\n\nHappy to share a quick case study if helpful."
+          }
+        },
+        successMetrics: {
+          avgReplyRate: "15%",
+          avgMeetingRate: "5%",
+          timeToFirst: "3d",
+          timeToResponse: "2.5"
+        },
         isTemplate: true,
         createdBy: "system"
       },
@@ -4452,17 +4525,31 @@ export class DbStorage implements IStorage {
         name: "Enterprise Account Penetration",
         description: "Multi-threaded approach for enterprise accounts with long sales cycles",
         industry: "Enterprise",
-        targetICP: "Director/VP at Fortune 500 companies",
+        targetAudience: {
+          titles: ["Director", "VP", "C-Level", "SVP"],
+          industries: ["Fortune 500", "Enterprise"],
+          companySize: "1000+"
+        },
         sequences: [
           { name: "Executive Outreach", channels: ["email", "phone"], duration: "45 days", steps: 7 },
           { name: "Champion Building", channels: ["email", "linkedin"], duration: "60 days", steps: 10 }
         ],
-        emailTemplates: [
-          { subject: "Strategic initiative alignment", type: "executive" },
-          { subject: "Quick win opportunity for Q[X]", type: "champion" }
-        ],
-        bestPractices: ["Multi-thread across departments", "Lead with ROI", "Leverage mutual connections"],
-        expectedResults: { replyRate: 8, meetingRate: 3 },
+        emailTemplates: {
+          executive: {
+            subject: "Strategic initiative alignment",
+            preview: "Hi {{firstName}},\n\nI've been following {{company}}'s strategic initiatives this quarter. Based on your Q3 priorities, I believe there's strong alignment with how we've helped other Fortune 500 companies.\n\nWould it make sense to connect briefly?"
+          },
+          champion: {
+            subject: "Quick win opportunity for Q[X]",
+            preview: "Hi {{firstName}},\n\nI wanted to share a quick win opportunity that could help your team demonstrate immediate value this quarter.\n\nWe've seen similar results with your peers at [comparable company]."
+          }
+        },
+        successMetrics: {
+          avgReplyRate: "8%",
+          avgMeetingRate: "3%",
+          timeToFirst: "7d",
+          timeToResponse: "4.5"
+        },
         isTemplate: true,
         createdBy: "system"
       },
@@ -4470,17 +4557,63 @@ export class DbStorage implements IStorage {
         name: "Startup Fast Track",
         description: "Rapid outreach for startups and fast-growing companies",
         industry: "Startup",
-        targetICP: "Founders, CEO at seed to Series B startups",
+        targetAudience: {
+          titles: ["Founder", "CEO", "CTO", "Head of Growth"],
+          industries: ["Startup", "Tech"],
+          companySize: "10-100"
+        },
         sequences: [
           { name: "Founder Direct", channels: ["email", "linkedin"], duration: "7 days", steps: 3 },
           { name: "Growth Team", channels: ["email"], duration: "14 days", steps: 4 }
         ],
-        emailTemplates: [
-          { subject: "Congrats on [recent milestone]", type: "initial" },
-          { subject: "How [competitor] achieved [result]", type: "case_study" }
+        emailTemplates: {
+          initial: {
+            subject: "Congrats on [recent milestone]",
+            preview: "Hey {{firstName}},\n\nCongrats on the recent milestone at {{company}}! Saw the news and had to reach out.\n\nWe've helped other fast-growing startups like yours scale their outreach 3x. Quick call?"
+          },
+          caseStudy: {
+            subject: "How [competitor] achieved [result]",
+            preview: "Hey {{firstName}},\n\nWanted to share a quick case study that might be relevant - we helped a company similar to {{company}} achieve 40% faster sales cycles.\n\nHappy to share more details if useful!"
+          }
+        },
+        successMetrics: {
+          avgReplyRate: "20%",
+          avgMeetingRate: "8%",
+          timeToFirst: "2d",
+          timeToResponse: "1.5"
+        },
+        isTemplate: true,
+        createdBy: "system"
+      },
+      {
+        name: "Fintech Sales Motion",
+        description: "Compliance-focused outreach for financial services and fintech companies",
+        industry: "Fintech",
+        targetAudience: {
+          titles: ["VP Operations", "Head of Compliance", "CFO", "COO"],
+          industries: ["Fintech", "Banking", "Financial Services"],
+          companySize: "100-1000"
+        },
+        sequences: [
+          { name: "Compliance First", channels: ["email"], duration: "21 days", steps: 5 },
+          { name: "ROI Focus", channels: ["email", "phone"], duration: "30 days", steps: 6 }
         ],
-        bestPractices: ["Reference recent funding", "Keep it informal", "Focus on growth metrics"],
-        expectedResults: { replyRate: 20, meetingRate: 8 },
+        emailTemplates: {
+          compliance: {
+            subject: "Compliance-first approach to [pain point]",
+            preview: "Hi {{firstName}},\n\nI understand that in fintech, compliance isn't just a checkbox - it's foundational. That's why we built our solution with SOC 2, GDPR, and PCI-DSS compliance from day one.\n\nWould you be open to a brief compliance-focused demo?"
+          },
+          roi: {
+            subject: "How [similar company] reduced [metric] by 30%",
+            preview: "Hi {{firstName}},\n\nI wanted to share how we helped a similar fintech company reduce their operational costs by 30% while maintaining full compliance.\n\nHappy to walk through the numbers if helpful."
+          }
+        },
+        successMetrics: {
+          avgReplyRate: "12%",
+          avgMeetingRate: "4%",
+          timeToFirst: "5d",
+          timeToResponse: "3.0"
+        },
         isTemplate: true,
         createdBy: "system"
       }
@@ -4867,77 +5000,9 @@ export class DbStorage implements IStorage {
   }
 
   async ensureSampleMarketplaceAgents(): Promise<void> {
-    // Check if marketplace agents already exist
-    const existing = await db.select().from(marketplaceAgents).limit(1);
-    if (existing.length > 0) return;
-
-    // Create sample marketplace agents
-    const sampleAgents = [
-      {
-        name: "Email Outreach Optimizer",
-        description: "AI agent that automatically optimizes cold email campaigns for maximum response rates.",
-        category: "outreach",
-        author: "marketplace-system",
-        price: "29.99",
-        currency: "USD",
-        systemPrompt: "You are an expert email outreach specialist...",
-        configTemplate: { emailProvider: "gmail", dailyLimit: 50 },
-        inputSchema: { type: "object", properties: { targetAudience: { type: "string" } } },
-        outputSchema: { type: "object", properties: { optimizedSubjects: { type: "array" } } },
-        tags: ["email", "outreach", "optimization"],
-        version: "1.2.0",
-        downloads: 1250,
-        rating: "4.8",
-        isPublic: true,
-        isFeatured: true,
-        documentation: "## How to use\n\nThis agent helps optimize cold email campaigns.",
-        changeLog: { "1.2.0": "Added sentiment analysis", "1.0.0": "Initial release" }
-      },
-      {
-        name: "Lead Qualification Bot",
-        description: "Automatically qualifies leads using BANT and MEDDIC frameworks.",
-        category: "qualification",
-        author: "marketplace-system",
-        price: "0",
-        currency: "USD",
-        systemPrompt: "You are an expert sales qualifier...",
-        configTemplate: { frameworks: ["BANT", "MEDDIC"] },
-        inputSchema: { type: "object", properties: { leadData: { type: "object" } } },
-        outputSchema: { type: "object", properties: { score: { type: "number" } } },
-        tags: ["qualification", "BANT", "MEDDIC", "free"],
-        version: "2.0.1",
-        downloads: 3420,
-        rating: "4.9",
-        isPublic: true,
-        isFeatured: true,
-        documentation: "## Overview\n\nLead qualification using multiple frameworks.",
-        changeLog: { "2.0.0": "Added MEDDIC", "1.0.0": "Initial BANT release" }
-      },
-      {
-        name: "LinkedIn Engagement Assistant",
-        description: "Automates LinkedIn outreach with personalized messages.",
-        category: "social",
-        author: "marketplace-system",
-        price: "49.99",
-        currency: "USD",
-        systemPrompt: "You are a LinkedIn specialist...",
-        configTemplate: { connectionsPerDay: 20, personalizationLevel: "high" },
-        inputSchema: { type: "object", properties: { profile: { type: "object" } } },
-        outputSchema: { type: "object", properties: { message: { type: "string" } } },
-        tags: ["linkedin", "social", "automation"],
-        version: "1.5.2",
-        downloads: 890,
-        rating: "4.6",
-        isPublic: true,
-        isFeatured: false,
-        documentation: "## Setup\n\nConfigure LinkedIn credentials...",
-        changeLog: { "1.5.0": "Added multi-language", "1.0.0": "Initial release" }
-      }
-    ];
-
-    for (const agent of sampleAgents) {
-      await db.insert(marketplaceAgents).values(agent as any).onConflictDoNothing();
-    }
+    // Skip seeding - sample agents require valid user IDs due to FK constraint
+    // The marketplace works without sample data and users can publish their own agents
+    return;
   }
 
   async getMarketplaceAgentsByUser(userId: string): Promise<MarketplaceAgent[]> {

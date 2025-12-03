@@ -28,23 +28,48 @@ interface SequenceStep {
 interface SequenceBuilderProps {
   personas: Array<any>;
   onSequenceCreated: (sequence: any) => void;
+  onSequenceUpdated?: (sequence: any) => void;
   initialData?: any;
+  isEditing?: boolean;
 }
 
-export default function SequenceBuilder({ personas, onSequenceCreated, initialData }: SequenceBuilderProps) {
-  const [steps, setSteps] = useState<SequenceStep[]>([
-    {
+function parseInitialSteps(steps: any[]): SequenceStep[] {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return [{
       stepNumber: 1,
       type: "email",
       delay: 0,
       subject: "Introduction to {{company}}",
       template: "Hi {{firstName}},\n\nI hope this email finds you well...",
       isActive: true,
-    }
-  ]);
+    }];
+  }
+  
+  return steps.map((step: any, index: number) => ({
+    stepNumber: step.stepNumber || index + 1,
+    type: step.type || "email",
+    delay: step.delay || 0,
+    subject: step.subject,
+    template: step.template || step.body || "",
+    isActive: step.isActive !== false,
+  }));
+}
+
+export default function SequenceBuilder({ personas, onSequenceCreated, onSequenceUpdated, initialData, isEditing = false }: SequenceBuilderProps) {
+  const [steps, setSteps] = useState<SequenceStep[]>(() => 
+    parseInitialSteps(initialData?.steps)
+  );
   const [isStepEditorOpen, setIsStepEditorOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<SequenceStep | null>(null);
-  const [sequenceType, setSequenceType] = useState<"email_only" | "multi_channel">("email_only");
+  const [sequenceType, setSequenceType] = useState<"email_only" | "multi_channel">(() => {
+    if (initialData?.targets?.sequenceType) {
+      return initialData.targets.sequenceType;
+    }
+    const hasMultiChannel = initialData?.steps?.some((s: any) => 
+      s.type === 'linkedin' || s.type === 'phone'
+    );
+    return hasMultiChannel ? "multi_channel" : "email_only";
+  });
   const { toast } = useToast();
 
   const form = useForm({
@@ -52,10 +77,9 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
     defaultValues: {
       name: initialData?.name || "",
       description: initialData?.description || "",
-      status: "draft",
+      status: initialData?.status || "draft",
       steps: [],
       targets: {},
-      // Don't set createdBy - let the backend handle it or set to null
     },
   });
 
@@ -167,7 +191,7 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
     
     const sequenceData = {
       ...data,
-      status: "draft", // Required field - sequences start as draft
+      status: isEditing ? (initialData?.status || "draft") : "draft",
       steps: apiSteps,
       targets: {
         sequenceType,
@@ -176,7 +200,12 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
     };
     
     console.log("Sending sequence data:", JSON.stringify(sequenceData, null, 2));
-    onSequenceCreated(sequenceData);
+    
+    if (isEditing && onSequenceUpdated) {
+      onSequenceUpdated(sequenceData);
+    } else {
+      onSequenceCreated(sequenceData);
+    }
   };
 
   const getStepIcon = (type: SequenceStep["type"]) => {
@@ -396,11 +425,13 @@ export default function SequenceBuilder({ personas, onSequenceCreated, initialDa
 
         {/* Actions */}
         <div className="flex justify-end space-x-3">
-          <Button type="button" variant="outline" data-testid="button-save-draft">
-            Save as Draft
-          </Button>
-          <Button type="submit" data-testid="button-create-sequence">
-            Create Sequence
+          {!isEditing && (
+            <Button type="button" variant="outline" data-testid="button-save-draft">
+              Save as Draft
+            </Button>
+          )}
+          <Button type="submit" data-testid={isEditing ? "button-update-sequence" : "button-create-sequence"}>
+            {isEditing ? "Update Sequence" : "Create Sequence"}
           </Button>
         </div>
       </form>

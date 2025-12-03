@@ -8,10 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import SequenceBuilder from "@/components/sequence-builder";
 import { useToast } from "@/hooks/use-toast";
 
@@ -400,58 +397,28 @@ export default function Sequences() {
         
         {/* Edit Sequence Modal */}
         <Dialog open={!!editingSequence} onOpenChange={(open) => !open && setEditingSequence(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Sequence</DialogTitle>
-              <DialogDescription>
-                Update your sequence name, description, and steps
-              </DialogDescription>
             </DialogHeader>
             {editingSequence && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Name</Label>
-                  <Input
-                    id="edit-name"
-                    value={editingSequence.name}
-                    onChange={(e) => setEditingSequence({...editingSequence, name: e.target.value})}
-                    placeholder="Sequence name"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={editingSequence.description || ""}
-                    onChange={(e) => setEditingSequence({...editingSequence, description: e.target.value})}
-                    placeholder="Describe your sequence..."
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditingSequence(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      updateSequenceMutation.mutate({
-                        id: editingSequence.id,
-                        data: {
-                          name: editingSequence.name,
-                          description: editingSequence.description,
-                        }
-                      });
-                    }}
-                  >
-                    Save Changes
-                  </Button>
-                </div>
-              </div>
+              <SequenceBuilder 
+                personas={personas || []}
+                onSequenceCreated={() => {}}
+                onSequenceUpdated={(data) => {
+                  updateSequenceMutation.mutate({
+                    id: editingSequence.id,
+                    data: {
+                      name: data.name,
+                      description: data.description,
+                      steps: data.steps,
+                      targets: data.targets,
+                    }
+                  });
+                }}
+                initialData={editingSequence}
+                isEditing={true}
+              />
             )}
           </DialogContent>
         </Dialog>
