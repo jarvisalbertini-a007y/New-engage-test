@@ -94,6 +94,5 @@ args = "npm run dev"
 [userenv]
 
 [userenv.development]
-AUTH_TEST_BYPASS = "true"
 NODE_ENV = "development"
 DEV_AUTH_ENABLED = "true"
