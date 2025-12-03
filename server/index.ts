@@ -187,7 +187,8 @@ async function startListening(httpServer: Server) {
 export const serverReady = initializeServer();
 
 // Start listening if not in test mode
-if (!process.env.SKIP_SERVER_LISTEN && process.env.AUTH_TEST_BYPASS !== 'true') {
+// Note: AUTH_TEST_BYPASS only controls authentication bypass, not server startup
+if (!process.env.SKIP_SERVER_LISTEN) {
   serverReady.then(startListening).catch(err => {
     console.error('Failed to start server:', err);
     process.exit(1);

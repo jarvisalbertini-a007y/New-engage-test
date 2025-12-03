@@ -3610,16 +3610,17 @@ Best regards,
       }
       
       // Add required fields and defaults
+      // Note: Only include fields that exist in the voiceCampaigns schema
       const campaignData = {
-        ...req.body,
+        name: req.body.name,
+        description: req.body.description || null,
+        script: req.body.script || null,
+        targetList: req.body.targetList || null,
+        callSchedule: req.body.callSchedule || null,
+        voiceSettings: req.body.voiceSettings || null,
+        complianceSettings: req.body.complianceSettings || null,
         createdBy: userId,
-        status: req.body.status || 'draft',
-        totalCallsCompleted: 0,
-        totalCallsScheduled: 0,
-        totalConversations: 0,
-        avgCallDuration: 0,
-        totalCallbacksScheduled: 0,
-        totalPositiveOutcomes: 0
+        status: req.body.status || 'draft'
       };
       
       const validatedData = insertVoiceCampaignSchema.parse(campaignData);

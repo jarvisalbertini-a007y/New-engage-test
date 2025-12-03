@@ -120,7 +120,7 @@ export default function MarketplacePage() {
   });
 
   // Fetch user's published agents
-  const { data: myAgents = [] } = useQuery({
+  const { data: myAgents = [] } = useQuery<any[]>({
     queryKey: ["/api/marketplace/my-agents"],
   });
 
@@ -133,16 +133,16 @@ export default function MarketplacePage() {
 
   // Publish agent mutation
   const publishMutation = useMutation({
-    mutationFn: (data: PublishAgentFormData) => 
-      apiRequest("/api/marketplace/agents", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          configTemplate: data.configTemplate ? JSON.parse(data.configTemplate) : {},
-          inputSchema: data.inputSchema ? JSON.parse(data.inputSchema) : {},
-          outputSchema: data.outputSchema ? JSON.parse(data.outputSchema) : {},
-        }),
-      }),
+    mutationFn: async (data: PublishAgentFormData) => {
+      const payload = {
+        ...data,
+        configTemplate: data.configTemplate ? JSON.parse(data.configTemplate) : {},
+        inputSchema: data.inputSchema ? JSON.parse(data.inputSchema) : {},
+        outputSchema: data.outputSchema ? JSON.parse(data.outputSchema) : {},
+      };
+      const res = await apiRequest("POST", "/api/marketplace/agents", payload);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/agents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/my-agents"] });
@@ -164,15 +164,15 @@ export default function MarketplacePage() {
 
   // Download agent mutation
   const downloadMutation = useMutation({
-    mutationFn: (agentId: string) => 
-      apiRequest(`/api/marketplace/agents/${agentId}/download`, {
-        method: "POST",
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marketplace/agents", data.agent.id] });
+    mutationFn: async (agentId: string) => {
+      const res = await apiRequest("POST", `/api/marketplace/agents/${agentId}/download`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketplace/agents", data?.agent?.id] });
       toast({
         title: "Agent downloaded",
-        description: `${data.agent.name} has been added to your workspace`,
+        description: `${data?.agent?.name || 'Agent'} has been added to your workspace`,
       });
     },
     onError: (error: any) => {
@@ -186,11 +186,10 @@ export default function MarketplacePage() {
 
   // Rate agent mutation
   const rateMutation = useMutation({
-    mutationFn: ({ agentId, rating, review }: { agentId: string; rating: number; review: string }) =>
-      apiRequest(`/api/marketplace/agents/${agentId}/rate`, {
-        method: "POST",
-        body: JSON.stringify({ rating, review }),
-      }),
+    mutationFn: async ({ agentId, rating, review }: { agentId: string; rating: number; review: string }) => {
+      const res = await apiRequest("POST", `/api/marketplace/agents/${agentId}/rate`, { rating, review });
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/agents", selectedAgent?.id] });
       toast({
@@ -211,11 +210,10 @@ export default function MarketplacePage() {
 
   // Update agent mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) =>
-      apiRequest(`/api/marketplace/agents/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
+    mutationFn: async ({ id, ...data }: any) => {
+      const res = await apiRequest("PATCH", `/api/marketplace/agents/${id}`, data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/my-agents"] });
       toast({
@@ -227,10 +225,10 @@ export default function MarketplacePage() {
 
   // Delete agent mutation
   const deleteMutation = useMutation({
-    mutationFn: (agentId: string) =>
-      apiRequest(`/api/marketplace/agents/${agentId}`, {
-        method: "DELETE",
-      }),
+    mutationFn: async (agentId: string) => {
+      const res = await apiRequest("DELETE", `/api/marketplace/agents/${agentId}`);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/my-agents"] });
       toast({
@@ -240,13 +238,13 @@ export default function MarketplacePage() {
     },
   });
 
-  // Form for publishing agent
-  const form = useForm<PublishAgentFormData>({
+  // Form for publishing agent - use string for tags since Zod transforms it
+  const form = useForm({
     resolver: zodResolver(publishAgentSchema),
     defaultValues: {
       name: "",
       description: "",
-      category: "research",
+      category: "research" as const,
       price: "0",
       tags: "",
       systemPrompt: "",

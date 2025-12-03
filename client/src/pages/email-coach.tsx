@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Wand2, CheckCircle, AlertTriangle, TrendingUp, Copy, Save } from "lucide-react";
+import { Wand2, CheckCircle, AlertTriangle, TrendingUp, Copy, Save, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,27 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+
+interface EmailAnalysis {
+  score: number;
+  suggestions: string[];
+  improvements: { type: string; message: string }[];
+  readabilityScore: number;
+  spamScore: number;
+  personalizedElements: string[];
+}
+
+interface SpamAnalysis {
+  score: number;
+  flaggedWords: string[];
+  suggestions: string[];
+}
+
+interface SubjectAnalysis {
+  optimized: string;
+  score: number;
+  suggestions: string[];
+}
 
 export default function EmailCoach() {
   const [subject, setSubject] = useState("Quick question about {{company}}'s sales process");
@@ -24,26 +45,60 @@ Best regards,
 {{senderName}}`);
   
   const [improvedContent, setImprovedContent] = useState<{ subject: string; body: string } | null>(null);
+  const [analysis, setAnalysis] = useState<EmailAnalysis | null>(null);
+  const [spamCheck, setSpamCheck] = useState<SpamAnalysis | null>(null);
+  const [subjectAnalysis, setSubjectAnalysis] = useState<SubjectAnalysis | null>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: analysis, isLoading: analyzing } = useQuery({
-    queryKey: ["/api/emails/analyze", emailBody],
-    enabled: emailBody.length > 10,
-    staleTime: 1000 * 60 * 5,
+  const analyzeMutation = useMutation({
+    mutationFn: (content: string) => api.analyzeEmail(content),
+    onSuccess: (data) => {
+      setAnalysis(data);
+    },
+    onError: (error) => {
+      console.error("Analysis error:", error);
+    },
   });
 
-  const { data: subjectAnalysis } = useQuery({
-    queryKey: ["/api/emails/optimize-subject", subject],
-    enabled: subject.length > 0,
-    staleTime: 1000 * 60 * 5,
+  const spamMutation = useMutation({
+    mutationFn: (content: string) => api.checkSpam(content),
+    onSuccess: (data) => {
+      setSpamCheck(data);
+    },
+    onError: (error) => {
+      console.error("Spam check error:", error);
+    },
   });
 
-  const { data: spamCheck } = useQuery({
-    queryKey: ["/api/emails/spam-check", emailBody],
-    enabled: emailBody.length > 10,
-    staleTime: 1000 * 60 * 5,
+  const subjectMutation = useMutation({
+    mutationFn: (subjectLine: string) => api.optimizeSubject(subjectLine),
+    onSuccess: (data) => {
+      setSubjectAnalysis(data);
+    },
+    onError: (error) => {
+      console.error("Subject analysis error:", error);
+    },
   });
+
+  const runAnalysis = useCallback(() => {
+    if (emailBody.length > 10) {
+      analyzeMutation.mutate(emailBody);
+      spamMutation.mutate(emailBody);
+    }
+    if (subject.length > 0) {
+      subjectMutation.mutate(subject);
+    }
+  }, [emailBody, subject]);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      runAnalysis();
+    }, 800);
+
+    return () => clearTimeout(debounceTimer);
+  }, [emailBody, subject]);
+
+  const analyzing = analyzeMutation.isPending || spamMutation.isPending || subjectMutation.isPending;
 
   const improveMutation = useMutation({
     mutationFn: () => api.improveEmail(emailBody),

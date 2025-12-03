@@ -466,35 +466,153 @@ export async function analyzeEmail(emailContent: string): Promise<EmailAnalysis>
   };
 }
 
+// Helper to apply rule-based improvements when AI is unavailable
+function applyDeterministicImprovements(emailContent: string): { subject: string; body: string } {
+  let improved = emailContent;
+  
+  const improvementRules = [
+    { pattern: /\bI think\b/gi, replacement: 'I believe' },
+    { pattern: /\bvery\b/gi, replacement: '' },
+    { pattern: /\bjust\b/gi, replacement: '' },
+    { pattern: /\bbasically\b/gi, replacement: '' },
+    { pattern: /\bactually\b/gi, replacement: '' },
+    { pattern: /\breally\b/gi, replacement: '' },
+    { pattern: /\bquick\b/gi, replacement: 'brief' },
+    { pattern: /\bhelp\b/gi, replacement: 'support' },
+    { pattern: /\bWould you be interested\b/gi, replacement: 'Would it be worth exploring' },
+    { pattern: /\bI wanted to\b/gi, replacement: 'I\'d like to' },
+    { pattern: /\bI was wondering\b/gi, replacement: 'I\'m curious' },
+    { pattern: /\bLet me know\b/gi, replacement: 'Share your thoughts' },
+    { pattern: /\bfeel free to\b/gi, replacement: 'please' },
+    { pattern: /\btouch base\b/gi, replacement: 'connect' },
+    { pattern: /\bCircling back\b/gi, replacement: 'Following up' },
+    { pattern: /\bPer my last email\b/gi, replacement: 'As mentioned' },
+    { pattern: /\bAs per our discussion\b/gi, replacement: 'As we discussed' },
+  ];
+  
+  for (const rule of improvementRules) {
+    improved = improved.replace(rule.pattern, rule.replacement);
+  }
+  
+  improved = improved.replace(/\s{2,}/g, ' ').trim();
+  
+  const lines = improved.split('\n');
+  const improvedLines = lines.map(line => {
+    if (line.startsWith('Hi ') || line.startsWith('Hello ') || line.startsWith('Dear ')) {
+      return line;
+    }
+    if (line.length > 100) {
+      const midPoint = line.lastIndexOf(' ', 80);
+      if (midPoint > 40) {
+        return line;
+      }
+    }
+    return line;
+  });
+  improved = improvedLines.join('\n');
+  
+  const callToActions = [
+    "Would a 15-minute call this week work for you?",
+    "Can we schedule a brief conversation to explore this?",
+    "What does your calendar look like for a quick chat?",
+    "Shall I send over some times that work for a call?",
+    "Would you be open to a short discovery call?"
+  ];
+  
+  const ctaIndex = Math.floor(Date.now() / 1000) % callToActions.length;
+  const selectedCTA = callToActions[ctaIndex];
+  
+  if (!improved.toLowerCase().includes('schedule') && 
+      !improved.toLowerCase().includes('call') &&
+      !improved.toLowerCase().includes('chat')) {
+    const signOffPatterns = [/Best regards,?/i, /Best,?/i, /Thanks,?/i, /Regards,?/i];
+    let inserted = false;
+    for (const pattern of signOffPatterns) {
+      if (pattern.test(improved)) {
+        improved = improved.replace(pattern, `\n${selectedCTA}\n\n$&`);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      improved += `\n\n${selectedCTA}`;
+    }
+  }
+  
+  const subjectPrefixes = [
+    "Quick insight:",
+    "Thought for",
+    "Idea for",
+    "Question about",
+    "Opportunity:"
+  ];
+  const prefixIndex = Math.floor(Date.now() / 1000) % subjectPrefixes.length;
+  const generatedSubject = `${subjectPrefixes[prefixIndex]} {{company}}'s growth`;
+  
+  return {
+    subject: generatedSubject,
+    body: improved
+  };
+}
+
 // Legacy improve email function
 export async function improveEmail(emailContent: string): Promise<{
   improved: { subject: string; body: string; };
   improvements: string[];
 }> {
-  const result = await analyzeEmailWithRubrics(emailContent);
-  const { improvedVersion, suggestions } = result.result;
+  const analysis = await analyzeEmailWithRubrics(emailContent);
+  const { suggestions, rubric } = analysis.result;
   
-  // Extract subject from improved version if available
-  let improvedSubject = 'Re: Follow-up';
-  let improvedBody = improvedVersion || emailContent;
-  
-  if (improvedVersion && improvedVersion.includes('Subject:')) {
-    const lines = improvedVersion.split('\n');
-    const subjectLine = lines.find(l => l.startsWith('Subject:'));
-    if (subjectLine) {
-      improvedSubject = subjectLine.replace('Subject:', '').trim();
-      improvedBody = lines.filter(l => !l.startsWith('Subject:')).join('\n').trim();
+  if (openAIClient.isAvailable()) {
+    const systemPrompt = `You are an expert sales email copywriter. Your task is to completely rewrite emails to make them:
+- More concise (under 150 words)
+- More personalized and prospect-focused
+- Following MEDDIC principles (address pain, value proposition)
+- Mobile-friendly with short paragraphs
+- Using "you" more than "I/we"
+
+IMPORTANT: Generate a COMPLETELY DIFFERENT version - not just minor edits. The rewritten email should feel fresh and new.`;
+
+    const userPrompt = `Rewrite this email to be significantly better. Make substantial changes, not just minor tweaks.
+
+Original email:
+${emailContent}
+
+Current issues (score: ${rubric.overallScore}/100):
+${suggestions.slice(0, 3).map(s => `- ${s.issue}: ${s.suggestion}`).join('\n')}
+
+Respond ONLY with a valid JSON object in this exact format:
+{
+  "subject": "New compelling subject line",
+  "body": "Completely rewritten email body that is substantially different from the original"
+}`;
+
+    const response = await openAIClient.generateJSON<{ subject: string; body: string }>(
+      userPrompt,
+      systemPrompt,
+      {
+        feature: 'email-improve',
+        temperature: 0.9,
+        maxTokens: 1000
+      }
+    );
+
+    if (response.success && response.data && response.data.body && response.data.body !== emailContent) {
+      return {
+        improved: {
+          subject: response.data.subject || 'Follow-up: Quick question',
+          body: response.data.body
+        },
+        improvements: suggestions.map(s => s.suggestion)
+      };
     }
   }
   
-  const improvements = suggestions.map(s => s.suggestion);
+  const deterministicResult = applyDeterministicImprovements(emailContent);
   
   return {
-    improved: {
-      subject: improvedSubject,
-      body: improvedBody
-    },
-    improvements
+    improved: deterministicResult,
+    improvements: suggestions.map(s => s.suggestion)
   };
 }
 
