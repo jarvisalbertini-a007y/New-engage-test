@@ -71,7 +71,7 @@ import {
   type AudienceSegment, type InsertAudienceSegment,
   type TemplateMetrics, type InsertTemplateMetrics,
   type InboxMessage, type InsertInboxMessage,
-  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
+  users, companies, contacts, visitorSessions, sequences, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -603,6 +603,15 @@ export class MemStorage implements IStorage {
   private marketplaceAgents: Map<string, MarketplaceAgent> = new Map();
   private agentRatings: Map<string, AgentRating> = new Map();
   private agentPurchases: Map<string, AgentPurchase> = new Map();
+  private agentDownloads: Map<string, AgentDownload> = new Map();
+  // Inbox messages
+  private inboxMessages: Map<string, InboxMessage> = new Map();
+  // Content Templates
+  private contentTemplates: Map<string, ContentTemplate> = new Map();
+  private templateVersions: Map<string, TemplateVersion> = new Map();
+  private audienceSegments: Map<string, AudienceSegment> = new Map();
+  private templateMetrics: Map<string, TemplateMetrics> = new Map();
+  private templateSegmentAssociations: Map<string, Set<string>> = new Map(); // templateId -> Set<segmentId>
 
   constructor() {
     // No mock data - user explicitly requested NO mock data without permission
@@ -708,6 +717,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteContact(id: string): Promise<boolean> {
+    return this.contacts.delete(id);
+  }
+
   // Visitor session methods
   async getVisitorSession(id: string): Promise<VisitorSession | undefined> {
     return this.visitorSessions.get(id);
@@ -788,6 +801,10 @@ export class MemStorage implements IStorage {
     const updated = { ...sequence, ...updates };
     this.sequences.set(id, updated);
     return updated;
+  }
+
+  async deleteSequence(id: string): Promise<boolean> {
+    return this.sequences.delete(id);
   }
 
   // Email methods
@@ -1295,14 +1312,16 @@ export class MemStorage implements IStorage {
     if (filters?.author) {
       agents = agents.filter(a => a.author === filters.author);
     }
-    if (filters?.minRating) {
+    if (filters?.minRating !== undefined) {
+      const minRating = filters.minRating;
       agents = agents.filter(a => 
-        a.rating ? parseFloat(a.rating) >= filters.minRating : false
+        a.rating ? parseFloat(a.rating) >= minRating : false
       );
     }
-    if (filters?.maxPrice) {
+    if (filters?.maxPrice !== undefined) {
+      const maxPrice = filters.maxPrice;
       agents = agents.filter(a => 
-        parseFloat(a.price) <= filters.maxPrice
+        parseFloat(a.price) <= maxPrice
       );
     }
     if (filters?.tags && filters.tags.length > 0) {
@@ -1322,12 +1341,24 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newAgent: MarketplaceAgent = {
       id,
-      ...agent,
+      name: agent.name,
+      description: agent.description,
+      category: agent.category,
+      agentTypeId: agent.agentTypeId || null,
+      author: agent.author,
+      price: agent.price || "0",
       downloads: 0,
       rating: null,
-      reviewCount: 0,
-      lastUpdated: new Date(),
-      createdAt: new Date()
+      isPublic: agent.isPublic !== false,
+      tags: agent.tags || null,
+      configTemplate: agent.configTemplate || null,
+      systemPrompt: agent.systemPrompt || null,
+      inputSchema: agent.inputSchema || null,
+      outputSchema: agent.outputSchema || null,
+      version: agent.version || "1.0.0",
+      changeLog: agent.changeLog || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     this.marketplaceAgents.set(id, newAgent);
     return newAgent;
@@ -1337,7 +1368,7 @@ export class MemStorage implements IStorage {
     const agent = this.marketplaceAgents.get(id);
     if (!agent) return undefined;
     
-    const updated = { ...agent, ...updates, lastUpdated: new Date() };
+    const updated = { ...agent, ...updates, updatedAt: new Date() };
     this.marketplaceAgents.set(id, updated);
     return updated;
   }
@@ -1373,7 +1404,12 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newRating: AgentRating = {
       id,
-      ...rating,
+      agentId: rating.agentId,
+      userId: rating.userId,
+      rating: rating.rating,
+      review: rating.review || null,
+      helpfulCount: 0,
+      unhelpfulCount: 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1405,7 +1441,6 @@ export class MemStorage implements IStorage {
     if (agent && ratings.length > 0) {
       const avgRating = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
       agent.rating = avgRating.toFixed(1);
-      agent.reviewCount = ratings.length;
       this.marketplaceAgents.set(agentId, agent);
     }
   }
@@ -1442,6 +1477,47 @@ export class MemStorage implements IStorage {
   async hasUserPurchasedAgent(agentId: string, userId: string): Promise<boolean> {
     return Array.from(this.agentPurchases.values()).some(p => 
       p.agentId === agentId && p.userId === userId
+    );
+  }
+
+  // Agent Download methods
+  async getAgentDownload(id: string): Promise<AgentDownload | undefined> {
+    return this.agentDownloads.get(id);
+  }
+
+  async getAgentDownloads(filters?: { agentId?: string; userId?: string }): Promise<AgentDownload[]> {
+    let downloads = Array.from(this.agentDownloads.values());
+    
+    if (filters?.agentId) {
+      downloads = downloads.filter(d => d.agentId === filters.agentId);
+    }
+    if (filters?.userId) {
+      downloads = downloads.filter(d => d.userId === filters.userId);
+    }
+    
+    return downloads;
+  }
+
+  async createAgentDownload(download: InsertAgentDownload): Promise<AgentDownload> {
+    const id = randomUUID();
+    const newDownload: AgentDownload = {
+      id,
+      agentId: download.agentId,
+      userId: download.userId,
+      version: download.version || "1.0.0",
+      downloadedAt: new Date()
+    };
+    this.agentDownloads.set(id, newDownload);
+    
+    // Increment download count
+    await this.incrementAgentDownloads(download.agentId);
+    
+    return newDownload;
+  }
+
+  async hasUserDownloadedAgent(agentId: string, userId: string): Promise<boolean> {
+    return Array.from(this.agentDownloads.values()).some(d => 
+      d.agentId === agentId && d.userId === userId
     );
   }
   
@@ -1538,20 +1614,24 @@ export class MemStorage implements IStorage {
       status: campaign.status || 'paused',
       targetPersona: campaign.targetPersona || null,
       sequence: campaign.sequence || null,
-      dailyTargetLeads: campaign.dailyTargetLeads || 50,
-      dailySendLimit: campaign.dailySendLimit || 100,
+      dailyTargetLeads: campaign.dailyTargetLeads ?? 50,
+      dailySendLimit: campaign.dailySendLimit ?? 100,
       workingHours: campaign.workingHours || null,
       workingDays: campaign.workingDays || null,
       autoProspect: campaign.autoProspect !== false,
       autoFollowUp: campaign.autoFollowUp !== false,
       autoQualify: campaign.autoQualify || false,
       autoBookMeetings: campaign.autoBookMeetings || false,
-      creativityLevel: campaign.creativityLevel || 5,
+      creativityLevel: campaign.creativityLevel ?? 5,
       personalizationDepth: campaign.personalizationDepth || 'moderate',
       toneOfVoice: campaign.toneOfVoice || 'professional',
+      totalLeadsProcessed: 0,
+      totalEmailsSent: 0,
+      totalReplies: 0,
+      totalMeetingsBooked: 0,
       startDate: campaign.startDate || null,
       endDate: campaign.endDate || null,
-      lastRunAt: null, // This is only set when a run completes
+      lastRunAt: null,
       createdBy: campaign.createdBy || null,
       createdAt: new Date()
     };
@@ -1636,17 +1716,11 @@ export class MemStorage implements IStorage {
       name: campaign.name,
       status: campaign.status || 'draft',
       description: campaign.description || null,
-      script: campaign.script || null, // Use script not scriptId
+      script: campaign.script || null,
       targetList: campaign.targetList || null,
       voiceSettings: campaign.voiceSettings || null,
       callSchedule: campaign.callSchedule || null,
       complianceSettings: campaign.complianceSettings || null,
-      totalCallsScheduled: 0,
-      totalCallsCompleted: 0,
-      totalConversations: 0,
-      avgCallDuration: 0,
-      totalCallbacksScheduled: 0,
-      totalPositiveOutcomes: 0,
       createdBy: campaign.createdBy || null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -1697,20 +1771,16 @@ export class MemStorage implements IStorage {
       campaignId: call.campaignId || null,
       contactId: call.contactId || null,
       phoneNumber: call.phoneNumber,
-      callStatus: call.callStatus || 'pending',
-      direction: call.direction || 'outbound',
+      callStatus: call.callStatus || 'initiated',
       duration: call.duration || null,
+      startTime: null,
+      endTime: null,
       recordingUrl: call.recordingUrl || null,
       transcript: call.transcript || null,
-      aiAnalysis: call.aiAnalysis || null,
       sentiment: call.sentiment || null,
-      keyMoments: call.keyMoments || null,
-      nextSteps: call.nextSteps || null,
-      scheduledAt: call.scheduledAt || null,
-      startedAt: call.startedAt || null,
-      completedAt: call.completedAt || null,
-      consentObtained: call.consentObtained || false,
-      doNotCallStatus: call.doNotCallStatus || false,
+      outcome: call.outcome || null,
+      consentObtained: call.consentObtained ?? false,
+      doNotCallStatus: call.doNotCallStatus ?? false,
       createdAt: new Date()
     };
     
@@ -1790,24 +1860,24 @@ export class MemStorage implements IStorage {
   }
   
   async getCallAnalyticsByCampaign(campaignId: string): Promise<CallAnalytics[]> {
-    return Array.from(this.callAnalyticsMap.values()).filter(a => a.campaignId === campaignId);
+    return [];
   }
   
   async createCallAnalytics(analytics: InsertCallAnalytics): Promise<CallAnalytics> {
     const id = randomUUID();
     const newAnalytics: CallAnalytics = {
       id,
-      callId: analytics.callId,
-      campaignId: analytics.campaignId || null,
-      talkTimeRatio: analytics.talkTimeRatio || 0,
-      interruptionCount: analytics.interruptionCount || 0,
-      sentimentScore: analytics.sentimentScore || 0,
-      objectionCount: analytics.objectionCount || 0,
-      questionCount: analytics.questionCount || 0,
-      competitorMentions: analytics.competitorMentions || null,
-      keywordsDetected: analytics.keywordsDetected || null,
-      complianceIssues: analytics.complianceIssues || null,
-      coachingNotes: analytics.coachingNotes || null,
+      callId: analytics.callId || null,
+      keyMoments: analytics.keyMoments || null,
+      speakingRatio: analytics.speakingRatio || null,
+      interruptionCount: analytics.interruptionCount ?? 0,
+      talkSpeed: analytics.talkSpeed || null,
+      emotionalTone: analytics.emotionalTone || null,
+      conversionPoints: analytics.conversionPoints || null,
+      objectionCount: analytics.objectionCount ?? 0,
+      positiveSignals: analytics.positiveSignals ?? 0,
+      negativeSignals: analytics.negativeSignals ?? 0,
+      nextBestAction: analytics.nextBestAction || null,
       createdAt: new Date()
     };
     
@@ -1821,6 +1891,167 @@ export class MemStorage implements IStorage {
     
     const updated = { ...analytics, ...updates };
     this.callAnalyticsMap.set(id, updated);
+    return updated;
+  }
+
+  // Channel Config stub methods
+  async getChannelConfig(id: string): Promise<ChannelConfig | undefined> {
+    return this.channelConfigs.get(id);
+  }
+
+  async getChannelConfigs(userId: string): Promise<ChannelConfig[]> {
+    return Array.from(this.channelConfigs.values()).filter(c => c.userId === userId);
+  }
+
+  async getChannelConfigByUserAndChannel(userId: string, channel: string): Promise<ChannelConfig | undefined> {
+    return Array.from(this.channelConfigs.values()).find(c => c.userId === userId && c.channel === channel);
+  }
+
+  async createChannelConfig(config: InsertChannelConfig): Promise<ChannelConfig> {
+    const id = randomUUID();
+    const newConfig: ChannelConfig = {
+      id,
+      userId: config.userId,
+      channel: config.channel,
+      credentials: config.credentials || null,
+      settings: config.settings || null,
+      isActive: config.isActive !== false,
+      dailyLimits: config.dailyLimits || null,
+      currentUsage: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.channelConfigs.set(id, newConfig);
+    return newConfig;
+  }
+
+  async updateChannelConfig(id: string, updates: Partial<ChannelConfig>): Promise<ChannelConfig | undefined> {
+    const config = this.channelConfigs.get(id);
+    if (!config) return undefined;
+    const updated = { ...config, ...cleanPartial(updates), updatedAt: new Date() };
+    this.channelConfigs.set(id, updated);
+    return updated;
+  }
+
+  async deleteChannelConfig(id: string): Promise<boolean> {
+    return this.channelConfigs.delete(id);
+  }
+
+  // Multi-Channel Campaign stub methods
+  async getMultiChannelCampaign(id: string): Promise<MultiChannelCampaign | undefined> {
+    return this.multiChannelCampaigns.get(id);
+  }
+
+  async getMultiChannelCampaigns(filters?: { status?: string; createdBy?: string }): Promise<MultiChannelCampaign[]> {
+    let campaigns = Array.from(this.multiChannelCampaigns.values());
+    if (filters?.status) campaigns = campaigns.filter(c => c.status === filters.status);
+    if (filters?.createdBy) campaigns = campaigns.filter(c => c.createdBy === filters.createdBy);
+    return campaigns;
+  }
+
+  async createMultiChannelCampaign(campaign: InsertMultiChannelCampaign): Promise<MultiChannelCampaign> {
+    const id = randomUUID();
+    const newCampaign: MultiChannelCampaign = {
+      id,
+      name: campaign.name,
+      description: campaign.description || null,
+      status: campaign.status || "draft",
+      channels: campaign.channels,
+      sequenceSteps: campaign.sequenceSteps,
+      audience: campaign.audience || null,
+      startDate: campaign.startDate || null,
+      endDate: campaign.endDate || null,
+      metrics: null,
+      createdBy: campaign.createdBy || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.multiChannelCampaigns.set(id, newCampaign);
+    return newCampaign;
+  }
+
+  async updateMultiChannelCampaign(id: string, updates: Partial<MultiChannelCampaign>): Promise<MultiChannelCampaign | undefined> {
+    const campaign = this.multiChannelCampaigns.get(id);
+    if (!campaign) return undefined;
+    const updated = { ...campaign, ...cleanPartial(updates), updatedAt: new Date() };
+    this.multiChannelCampaigns.set(id, updated);
+    return updated;
+  }
+
+  async deleteMultiChannelCampaign(id: string): Promise<boolean> {
+    return this.multiChannelCampaigns.delete(id);
+  }
+
+  // Channel Message stub methods
+  async getChannelMessage(id: string): Promise<ChannelMessage | undefined> {
+    return this.channelMessagesMap.get(id);
+  }
+
+  async getChannelMessages(filters?: { campaignId?: string; channel?: string; recipientId?: string; status?: string }): Promise<ChannelMessage[]> {
+    let messages = Array.from(this.channelMessagesMap.values());
+    if (filters?.campaignId) messages = messages.filter(m => m.campaignId === filters.campaignId);
+    if (filters?.channel) messages = messages.filter(m => m.channel === filters.channel);
+    if (filters?.recipientId) messages = messages.filter(m => m.recipientId === filters.recipientId);
+    if (filters?.status) messages = messages.filter(m => m.status === filters.status);
+    return messages;
+  }
+
+  async createChannelMessage(message: InsertChannelMessage): Promise<ChannelMessage> {
+    const id = randomUUID();
+    const newMessage: ChannelMessage = {
+      id,
+      campaignId: message.campaignId || null,
+      channel: message.channel,
+      recipientId: message.recipientId || null,
+      content: message.content,
+      scheduledAt: message.scheduledAt || null,
+      sentAt: null,
+      status: message.status || "pending",
+      response: null,
+      engagement: null,
+      createdAt: new Date()
+    };
+    this.channelMessagesMap.set(id, newMessage);
+    return newMessage;
+  }
+
+  async updateChannelMessage(id: string, updates: Partial<ChannelMessage>): Promise<ChannelMessage | undefined> {
+    const message = this.channelMessagesMap.get(id);
+    if (!message) return undefined;
+    const updated = { ...message, ...cleanPartial(updates) };
+    this.channelMessagesMap.set(id, updated);
+    return updated;
+  }
+
+  // Channel Orchestration stub methods
+  async getChannelOrchestration(id: string): Promise<ChannelOrchestration | undefined> {
+    return this.channelOrchestrations.get(id);
+  }
+
+  async getChannelOrchestrationByCampaign(campaignId: string): Promise<ChannelOrchestration | undefined> {
+    return Array.from(this.channelOrchestrations.values()).find(o => o.campaignId === campaignId);
+  }
+
+  async createChannelOrchestration(orchestration: InsertChannelOrchestration): Promise<ChannelOrchestration> {
+    const id = randomUUID();
+    const newOrchestration: ChannelOrchestration = {
+      id,
+      campaignId: orchestration.campaignId,
+      rules: orchestration.rules,
+      priorityOrder: orchestration.priorityOrder,
+      switchConditions: orchestration.switchConditions || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.channelOrchestrations.set(id, newOrchestration);
+    return newOrchestration;
+  }
+
+  async updateChannelOrchestration(id: string, updates: Partial<ChannelOrchestration>): Promise<ChannelOrchestration | undefined> {
+    const orchestration = this.channelOrchestrations.get(id);
+    if (!orchestration) return undefined;
+    const updated = { ...orchestration, ...cleanPartial(updates), updatedAt: new Date() };
+    this.channelOrchestrations.set(id, updated);
     return updated;
   }
 
@@ -2010,18 +2241,19 @@ export class MemStorage implements IStorage {
       id,
       contactId: twin.contactId,
       companyId: twin.companyId || null,
-      communicationStyle: twin.communicationStyle || "professional",
+      communicationStyle: twin.communicationStyle || null,
       personalityTraits: twin.personalityTraits || {},
       interests: twin.interests || [],
-      values: twin.values || [],
+      values: twin.values || null,
       painPoints: twin.painPoints || [],
-      preferredChannels: twin.preferredChannels || [],
+      preferredChannels: twin.preferredChannels || null,
       bestEngagementTime: twin.bestEngagementTime || null,
       contentPreferences: twin.contentPreferences || [],
       buyingStageIndicators: twin.buyingStageIndicators || {},
       objectionsHistory: twin.objectionsHistory || {},
       lastModelUpdate: new Date(),
-      modelConfidence: twin.modelConfidence || 50
+      modelConfidence: twin.modelConfidence || 50,
+      createdAt: new Date()
     };
     this.digitalTwins.set(id, newTwin);
     return newTwin;
@@ -2351,7 +2583,7 @@ export class MemStorage implements IStorage {
       contactId: signal.contactId ?? null,
       companyId: signal.companyId ?? null,
       signalType: signal.signalType,
-      signalStrength: signal.signalStrength,
+      signalStrength: signal.signalStrength ?? 0,
       source: signal.source ?? null,
       metadata: signal.metadata ?? null
     };
@@ -2383,7 +2615,7 @@ export class MemStorage implements IStorage {
       id,
       lastUpdated: new Date(),
       companyId: intelligence.companyId,
-      intentScore: intelligence.intentScore,
+      intentScore: intelligence.intentScore ?? 0,
       buyingStage: intelligence.buyingStage ?? null,
       competitorMentions: intelligence.competitorMentions ?? null,
       budgetIndicators: intelligence.budgetIndicators ?? null,
@@ -2509,13 +2741,13 @@ export class MemStorage implements IStorage {
     const pipelineHealth: PipelineHealth = {
       id,
       snapshotDate: new Date(),
-      totalDeals: health.totalDeals,
-      totalValue: health.totalValue.toString(),
+      totalDeals: health.totalDeals ?? 0,
+      totalValue: (health.totalValue ?? 0).toString(),
       byStage: health.byStage,
       velocity: health.velocity,
       conversion: health.conversion,
       riskIndicators: health.riskIndicators,
-      healthScore: health.healthScore,
+      healthScore: health.healthScore ?? 0,
       createdAt: new Date()
     };
     this.pipelineHealthSnapshots.set(id, pipelineHealth);
@@ -2804,6 +3036,631 @@ export class MemStorage implements IStorage {
     this.quickActions.set(id, quickAction);
     return quickAction;
   }
+
+  // Inbox Messages
+  async getInboxMessage(id: string): Promise<InboxMessage | undefined> {
+    return this.inboxMessages.get(id);
+  }
+
+  async getInboxMessages(filters?: { userId?: string; channel?: string; category?: string; isRead?: boolean; isArchived?: boolean }): Promise<InboxMessage[]> {
+    let messages = Array.from(this.inboxMessages.values());
+    if (filters?.userId) messages = messages.filter(m => m.userId === filters.userId);
+    if (filters?.channel) messages = messages.filter(m => m.channel === filters.channel);
+    if (filters?.category) messages = messages.filter(m => m.category === filters.category);
+    if (filters?.isRead !== undefined) messages = messages.filter(m => m.isRead === filters.isRead);
+    if (filters?.isArchived !== undefined) messages = messages.filter(m => m.isArchived === filters.isArchived);
+    return messages;
+  }
+
+  async createInboxMessage(message: InsertInboxMessage): Promise<InboxMessage> {
+    const id = randomUUID();
+    const inboxMessage: InboxMessage = {
+      id,
+      userId: message.userId || null,
+      contactId: message.contactId || null,
+      companyId: message.companyId || null,
+      channel: message.channel || 'email',
+      direction: message.direction || 'inbound',
+      fromEmail: message.fromEmail || null,
+      fromName: message.fromName || null,
+      toEmail: message.toEmail || null,
+      subject: message.subject || null,
+      content: message.content,
+      preview: message.preview || null,
+      category: message.category || null,
+      aiScore: message.aiScore ?? null,
+      sentiment: message.sentiment || null,
+      urgency: message.urgency || null,
+      isRead: message.isRead ?? false,
+      isStarred: message.isStarred ?? false,
+      isArchived: message.isArchived ?? false,
+      threadId: message.threadId || null,
+      metadata: message.metadata || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.inboxMessages.set(id, inboxMessage);
+    return inboxMessage;
+  }
+
+  async updateInboxMessage(id: string, updates: Partial<InboxMessage>): Promise<InboxMessage | undefined> {
+    const message = this.inboxMessages.get(id);
+    if (!message) return undefined;
+    const updated = { ...message, ...cleanPartial(updates) };
+    this.inboxMessages.set(id, updated);
+    return updated;
+  }
+
+  async markInboxMessageAsRead(id: string): Promise<InboxMessage | undefined> {
+    return this.updateInboxMessage(id, { isRead: true });
+  }
+
+  async toggleInboxMessageStar(id: string): Promise<InboxMessage | undefined> {
+    const message = await this.getInboxMessage(id);
+    if (!message) return undefined;
+    return this.updateInboxMessage(id, { isStarred: !message.isStarred });
+  }
+
+  async archiveInboxMessage(id: string): Promise<InboxMessage | undefined> {
+    return this.updateInboxMessage(id, { isArchived: true });
+  }
+
+  // Shared Intel
+  async getSharedIntel(id: string): Promise<SharedIntel | undefined> {
+    return this.sharedIntel.get(id);
+  }
+
+  async getSharedIntelList(filters?: { category?: string; industry?: string; companySize?: string; tags?: string[]; limit?: number }): Promise<SharedIntel[]> {
+    let intel = Array.from(this.sharedIntel.values());
+    if (filters?.category) intel = intel.filter(i => i.category === filters.category);
+    if (filters?.industry) intel = intel.filter(i => i.industry === filters.industry);
+    if (filters?.limit) intel = intel.slice(0, filters.limit);
+    return intel;
+  }
+
+  async createSharedIntel(intel: InsertSharedIntel): Promise<SharedIntel> {
+    const id = randomUUID();
+    const newIntel: SharedIntel = {
+      id,
+      category: intel.category,
+      content: intel.content,
+      effectiveness: intel.effectiveness || null,
+      industry: intel.industry || null,
+      companySize: intel.companySize || null,
+      useCount: 0,
+      successRate: intel.successRate || null,
+      tags: intel.tags || null,
+      contributorCount: 1,
+      lastUpdated: new Date(),
+      createdAt: new Date()
+    };
+    this.sharedIntel.set(id, newIntel);
+    return newIntel;
+  }
+
+  async updateSharedIntel(id: string, updates: Partial<SharedIntel>): Promise<SharedIntel | undefined> {
+    const intel = this.sharedIntel.get(id);
+    if (!intel) return undefined;
+    const updated = { ...intel, ...cleanPartial(updates), updatedAt: new Date() };
+    this.sharedIntel.set(id, updated);
+    return updated;
+  }
+
+  // Intel Contributions
+  async getIntelContribution(id: string): Promise<IntelContribution | undefined> {
+    return this.intelContributions.get(id);
+  }
+
+  async getIntelContributions(filters?: { intelId?: string; userId?: string; contributionType?: string; limit?: number }): Promise<IntelContribution[]> {
+    let contributions = Array.from(this.intelContributions.values());
+    if (filters?.intelId) contributions = contributions.filter(c => c.intelId === filters.intelId);
+    if (filters?.userId) contributions = contributions.filter(c => c.userId === filters.userId);
+    if (filters?.contributionType) contributions = contributions.filter(c => c.contributionType === filters.contributionType);
+    if (filters?.limit) contributions = contributions.slice(0, filters.limit);
+    return contributions;
+  }
+
+  async createIntelContribution(contribution: InsertIntelContribution): Promise<IntelContribution> {
+    const id = randomUUID();
+    const newContribution: IntelContribution = {
+      id,
+      intelId: contribution.intelId,
+      userId: contribution.userId,
+      contributionType: contribution.contributionType,
+      performanceData: contribution.performanceData || null,
+      timestamp: new Date()
+    };
+    this.intelContributions.set(id, newContribution);
+    return newContribution;
+  }
+
+  // Intel Ratings
+  async getIntelRating(id: string): Promise<IntelRating | undefined> {
+    return this.intelRatings.get(id);
+  }
+
+  async getIntelRatings(filters?: { intelId?: string; userId?: string; minRating?: number; limit?: number }): Promise<IntelRating[]> {
+    let ratings = Array.from(this.intelRatings.values());
+    if (filters?.intelId) ratings = ratings.filter(r => r.intelId === filters.intelId);
+    if (filters?.userId) ratings = ratings.filter(r => r.userId === filters.userId);
+    if (filters?.limit) ratings = ratings.slice(0, filters.limit);
+    return ratings;
+  }
+
+  async createIntelRating(rating: InsertIntelRating): Promise<IntelRating> {
+    const id = randomUUID();
+    const newRating: IntelRating = {
+      id,
+      intelId: rating.intelId,
+      userId: rating.userId,
+      rating: rating.rating,
+      feedback: rating.feedback || null,
+      usefulnessScore: rating.usefulnessScore ?? null,
+      createdAt: new Date()
+    };
+    this.intelRatings.set(id, newRating);
+    return newRating;
+  }
+
+  async updateIntelRating(id: string, updates: Partial<IntelRating>): Promise<IntelRating | undefined> {
+    const rating = this.intelRatings.get(id);
+    if (!rating) return undefined;
+    const updated = { ...rating, ...cleanPartial(updates) };
+    this.intelRatings.set(id, updated);
+    return updated;
+  }
+
+  // Benchmark Data
+  async getBenchmarkData(id: string): Promise<BenchmarkData | undefined> {
+    return this.benchmarkDataMap.get(id);
+  }
+
+  async getBenchmarkDataList(filters?: { metric?: string; industry?: string; companySize?: string; channel?: string; limit?: number }): Promise<BenchmarkData[]> {
+    let data = Array.from(this.benchmarkDataMap.values());
+    if (filters?.metric) data = data.filter(d => d.metric === filters.metric);
+    if (filters?.industry) data = data.filter(d => d.industry === filters.industry);
+    if (filters?.limit) data = data.slice(0, filters.limit);
+    return data;
+  }
+
+  async createBenchmarkData(benchmark: InsertBenchmarkData): Promise<BenchmarkData> {
+    const id = randomUUID();
+    const newBenchmark: BenchmarkData = {
+      id,
+      metric: benchmark.metric,
+      industry: benchmark.industry || null,
+      companySize: benchmark.companySize || null,
+      channel: benchmark.channel || null,
+      value: benchmark.value,
+      sampleSize: benchmark.sampleSize,
+      lastCalculated: new Date(),
+      createdAt: new Date()
+    };
+    this.benchmarkDataMap.set(id, newBenchmark);
+    return newBenchmark;
+  }
+
+  async updateBenchmarkData(id: string, updates: Partial<BenchmarkData>): Promise<BenchmarkData | undefined> {
+    const data = this.benchmarkDataMap.get(id);
+    if (!data) return undefined;
+    const updated = { ...data, ...cleanPartial(updates) };
+    this.benchmarkDataMap.set(id, updated);
+    return updated;
+  }
+
+  // White Labels
+  async getWhiteLabel(organizationId: string): Promise<WhiteLabel | undefined> {
+    return Array.from(this.whiteLabels.values()).find(w => w.organizationId === organizationId);
+  }
+
+  async getWhiteLabels(): Promise<WhiteLabel[]> {
+    return Array.from(this.whiteLabels.values());
+  }
+
+  async createWhiteLabel(whiteLabel: InsertWhiteLabel): Promise<WhiteLabel> {
+    const id = randomUUID();
+    const newWhiteLabel: WhiteLabel = {
+      id,
+      organizationId: whiteLabel.organizationId,
+      brandName: whiteLabel.brandName,
+      logoUrl: whiteLabel.logoUrl || null,
+      primaryColor: whiteLabel.primaryColor || '#0066FF',
+      secondaryColor: whiteLabel.secondaryColor || '#00D4FF',
+      customDomain: whiteLabel.customDomain || null,
+      customCSS: whiteLabel.customCSS || null,
+      features: whiteLabel.features || {},
+      isActive: whiteLabel.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.whiteLabels.set(id, newWhiteLabel);
+    return newWhiteLabel;
+  }
+
+  async updateWhiteLabel(organizationId: string, updates: Partial<WhiteLabel>): Promise<WhiteLabel | undefined> {
+    const whiteLabel = await this.getWhiteLabel(organizationId);
+    if (!whiteLabel) return undefined;
+    const updated = { ...whiteLabel, ...cleanPartial(updates), updatedAt: new Date() };
+    this.whiteLabels.set(whiteLabel.id, updated);
+    return updated;
+  }
+
+  async deleteWhiteLabel(organizationId: string): Promise<boolean> {
+    const whiteLabel = await this.getWhiteLabel(organizationId);
+    if (!whiteLabel) return false;
+    return this.whiteLabels.delete(whiteLabel.id);
+  }
+
+  // Enterprise Security
+  async getEnterpriseSecurity(organizationId: string): Promise<EnterpriseSecurity | undefined> {
+    return Array.from(this.enterpriseSecurity.values()).find(e => e.organizationId === organizationId);
+  }
+
+  async getEnterpriseSecuritySettings(): Promise<EnterpriseSecurity[]> {
+    return Array.from(this.enterpriseSecurity.values());
+  }
+
+  async createEnterpriseSecurity(security: InsertEnterpriseSecurity): Promise<EnterpriseSecurity> {
+    const id = randomUUID();
+    const newSecurity: EnterpriseSecurity = {
+      id,
+      organizationId: security.organizationId,
+      ssoEnabled: security.ssoEnabled ?? false,
+      ssoProvider: security.ssoProvider || null,
+      ssoConfig: security.ssoConfig || null,
+      ipWhitelist: security.ipWhitelist || null,
+      mfaRequired: security.mfaRequired ?? false,
+      mfaMethod: security.mfaMethod || null,
+      dataResidency: security.dataResidency || 'us',
+      encryptionKey: security.encryptionKey || null,
+      auditLogRetention: security.auditLogRetention ?? 90,
+      complianceMode: security.complianceMode || null,
+      passwordPolicy: security.passwordPolicy || null,
+      sessionTimeout: security.sessionTimeout ?? 1440,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.enterpriseSecurity.set(id, newSecurity);
+    return newSecurity;
+  }
+
+  async updateEnterpriseSecurity(organizationId: string, updates: Partial<EnterpriseSecurity>): Promise<EnterpriseSecurity | undefined> {
+    const security = await this.getEnterpriseSecurity(organizationId);
+    if (!security) return undefined;
+    const updated = { ...security, ...cleanPartial(updates), updatedAt: new Date() };
+    this.enterpriseSecurity.set(security.id, updated);
+    return updated;
+  }
+
+  async deleteEnterpriseSecurity(organizationId: string): Promise<boolean> {
+    const security = await this.getEnterpriseSecurity(organizationId);
+    if (!security) return false;
+    return this.enterpriseSecurity.delete(security.id);
+  }
+
+  // Audit Logs
+  async getAuditLog(id: string): Promise<AuditLog | undefined> {
+    return this.auditLogs.get(id);
+  }
+
+  async getAuditLogs(filters?: { organizationId?: string; userId?: string; resource?: string; action?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<AuditLog[]> {
+    let logs = Array.from(this.auditLogs.values());
+    if (filters?.organizationId) logs = logs.filter(l => l.organizationId === filters.organizationId);
+    if (filters?.userId) logs = logs.filter(l => l.userId === filters.userId);
+    if (filters?.resource) logs = logs.filter(l => l.resource === filters.resource);
+    if (filters?.action) logs = logs.filter(l => l.action === filters.action);
+    if (filters?.limit) logs = logs.slice(0, filters.limit);
+    return logs;
+  }
+
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    const id = randomUUID();
+    const newLog: AuditLog = {
+      id,
+      userId: auditLog.userId || null,
+      organizationId: auditLog.organizationId || null,
+      action: auditLog.action,
+      resource: auditLog.resource,
+      resourceId: auditLog.resourceId || null,
+      ipAddress: auditLog.ipAddress || null,
+      userAgent: auditLog.userAgent || null,
+      timestamp: new Date(),
+      metadata: auditLog.metadata || null,
+      severity: auditLog.severity || 'info',
+      outcome: auditLog.outcome || 'success'
+    };
+    this.auditLogs.set(id, newLog);
+    return newLog;
+  }
+
+  async deleteOldAuditLogs(retentionDays: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+    let deleted = 0;
+    const entries = Array.from(this.auditLogs.entries());
+    for (const [id, log] of entries) {
+      if (log.timestamp < cutoffDate) {
+        this.auditLogs.delete(id);
+        deleted++;
+      }
+    }
+    return deleted;
+  }
+
+  // Access Controls
+  async getAccessControl(id: string): Promise<AccessControl | undefined> {
+    return this.accessControls.get(id);
+  }
+
+  async getAccessControls(organizationId: string): Promise<AccessControl[]> {
+    return Array.from(this.accessControls.values()).filter(a => a.organizationId === organizationId);
+  }
+
+  async getAccessControlByRole(organizationId: string, roleName: string): Promise<AccessControl | undefined> {
+    return Array.from(this.accessControls.values()).find(a => a.organizationId === organizationId && a.roleName === roleName);
+  }
+
+  async getUserAccessControls(organizationId: string, userId: string): Promise<AccessControl[]> {
+    return Array.from(this.accessControls.values()).filter(a => a.organizationId === organizationId);
+  }
+
+  async createAccessControl(accessControl: InsertAccessControl): Promise<AccessControl> {
+    const id = randomUUID();
+    const newAccessControl: AccessControl = {
+      id,
+      organizationId: accessControl.organizationId,
+      roleName: accessControl.roleName,
+      description: accessControl.description || null,
+      permissions: accessControl.permissions || [],
+      userIds: accessControl.userIds || null,
+      isSystemRole: accessControl.isSystemRole ?? false,
+      priority: accessControl.priority ?? 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.accessControls.set(id, newAccessControl);
+    return newAccessControl;
+  }
+
+  async updateAccessControl(id: string, updates: Partial<AccessControl>): Promise<AccessControl | undefined> {
+    const accessControl = this.accessControls.get(id);
+    if (!accessControl) return undefined;
+    const updated = { ...accessControl, ...cleanPartial(updates), updatedAt: new Date() };
+    this.accessControls.set(id, updated);
+    return updated;
+  }
+
+  async deleteAccessControl(id: string): Promise<boolean> {
+    return this.accessControls.delete(id);
+  }
+
+  // Content Templates
+  async listTemplates(params?: { status?: string; personaId?: string; includeArchived?: boolean }): Promise<ContentTemplate[]> {
+    let templates = Array.from(this.contentTemplates.values());
+    if (params?.status) templates = templates.filter(t => t.status === params.status);
+    if (params?.personaId) templates = templates.filter(t => t.personaId === params.personaId);
+    if (!params?.includeArchived) templates = templates.filter(t => t.status !== 'archived');
+    return templates;
+  }
+
+  async getTemplateWithRelations(id: string): Promise<{ template: ContentTemplate; versions: TemplateVersion[]; segments: AudienceSegment[]; metrics?: TemplateMetrics[] } | undefined> {
+    const template = this.contentTemplates.get(id);
+    if (!template) return undefined;
+    const versions = Array.from(this.templateVersions.values()).filter(v => v.templateId === id);
+    const segmentIds = this.templateSegmentAssociations.get(id) || new Set();
+    const segments = Array.from(this.audienceSegments.values()).filter(s => segmentIds.has(s.id));
+    const metrics = Array.from(this.templateMetrics.values()).filter(m => versions.some(v => v.id === m.templateVersionId));
+    return { template, versions, segments, metrics };
+  }
+
+  async createTemplate(input: InsertContentTemplate & { segmentIds?: string[] }): Promise<ContentTemplate> {
+    const id = randomUUID();
+    const template: ContentTemplate = {
+      id,
+      name: input.name,
+      description: input.description || null,
+      contentType: input.contentType,
+      status: input.status || 'draft',
+      personaId: input.personaId || null,
+      defaultTone: input.defaultTone || 'professional',
+      tags: input.tags || [],
+      createdBy: input.createdBy || null,
+      currentVersionId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null
+    };
+    this.contentTemplates.set(id, template);
+    if (input.segmentIds && input.segmentIds.length > 0) {
+      this.templateSegmentAssociations.set(id, new Set(input.segmentIds));
+    }
+    return template;
+  }
+
+  async updateTemplate(id: string, updates: Partial<ContentTemplate>): Promise<ContentTemplate | undefined> {
+    const template = this.contentTemplates.get(id);
+    if (!template) return undefined;
+    const updated = { ...template, ...cleanPartial(updates), updatedAt: new Date() };
+    this.contentTemplates.set(id, updated);
+    return updated;
+  }
+
+  async archiveTemplate(id: string): Promise<boolean> {
+    const template = this.contentTemplates.get(id);
+    if (!template) return false;
+    template.status = 'archived';
+    template.updatedAt = new Date();
+    this.contentTemplates.set(id, template);
+    return true;
+  }
+
+  async attachSegments(templateId: string, segmentIds: string[]): Promise<void> {
+    const existing = this.templateSegmentAssociations.get(templateId) || new Set();
+    segmentIds.forEach(id => existing.add(id));
+    this.templateSegmentAssociations.set(templateId, existing);
+  }
+
+  async detachSegment(templateId: string, segmentId: string): Promise<boolean> {
+    const existing = this.templateSegmentAssociations.get(templateId);
+    if (!existing) return false;
+    return existing.delete(segmentId);
+  }
+
+  // Template Versions
+  async createTemplateVersion(input: InsertTemplateVersion & { segmentSnapshotIds?: string[] }): Promise<TemplateVersion> {
+    const id = randomUUID();
+    const version: TemplateVersion = {
+      id,
+      templateId: input.templateId,
+      versionNumber: input.versionNumber,
+      subject: input.subject || null,
+      body: input.body,
+      content: input.content || null,
+      tone: input.tone || null,
+      lengthHint: input.lengthHint || null,
+      authorId: input.authorId || null,
+      source: input.source,
+      aiModel: input.aiModel || null,
+      personaSnapshot: input.personaSnapshot || null,
+      audienceSnapshot: input.audienceSnapshot || null,
+      promptContext: input.promptContext || null,
+      createdAt: new Date(),
+      publishedAt: null
+    };
+    this.templateVersions.set(id, version);
+    return version;
+  }
+
+  async listTemplateVersions(templateId: string, opts?: { includeDrafts?: boolean }): Promise<TemplateVersion[]> {
+    let versions = Array.from(this.templateVersions.values()).filter(v => v.templateId === templateId);
+    if (!opts?.includeDrafts) versions = versions.filter(v => v.publishedAt !== null);
+    return versions.sort((a, b) => b.versionNumber - a.versionNumber);
+  }
+
+  async getTemplateVersion(versionId: string): Promise<TemplateVersion | undefined> {
+    return this.templateVersions.get(versionId);
+  }
+
+  async publishTemplateVersion(templateId: string, versionId: string): Promise<TemplateVersion | undefined> {
+    const version = this.templateVersions.get(versionId);
+    if (!version || version.templateId !== templateId) return undefined;
+    version.publishedAt = new Date();
+    this.templateVersions.set(versionId, version);
+    return version;
+  }
+
+  // Audience Segments
+  async listAudienceSegments(filter?: { createdBy?: string; q?: string; includeGlobal?: boolean }): Promise<AudienceSegment[]> {
+    let segments = Array.from(this.audienceSegments.values());
+    if (filter?.createdBy) segments = segments.filter(s => s.createdBy === filter.createdBy);
+    if (filter?.q) segments = segments.filter(s => s.name.toLowerCase().includes(filter.q!.toLowerCase()));
+    return segments;
+  }
+
+  async getAudienceSegment(id: string): Promise<AudienceSegment | undefined> {
+    return this.audienceSegments.get(id);
+  }
+
+  async createAudienceSegment(input: InsertAudienceSegment): Promise<AudienceSegment> {
+    const id = randomUUID();
+    const segment: AudienceSegment = {
+      id,
+      name: input.name,
+      description: input.description || null,
+      industries: input.industries || [],
+      titles: input.titles || [],
+      companySizes: input.companySizes || [],
+      locations: input.locations || [],
+      rules: input.rules || null,
+      createdBy: input.createdBy || null,
+      isGlobal: input.isGlobal ?? false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.audienceSegments.set(id, segment);
+    return segment;
+  }
+
+  async updateAudienceSegment(id: string, updates: Partial<AudienceSegment>): Promise<AudienceSegment | undefined> {
+    const segment = this.audienceSegments.get(id);
+    if (!segment) return undefined;
+    const updated = { ...segment, ...cleanPartial(updates), updatedAt: new Date() };
+    this.audienceSegments.set(id, updated);
+    return updated;
+  }
+
+  async deleteAudienceSegment(id: string): Promise<boolean> {
+    return this.audienceSegments.delete(id);
+  }
+
+  // Template Metrics
+  async recordTemplateMetricEvent(event: { templateVersionId: string; channel: string; eventType: string; value?: number; occurredAt?: Date }): Promise<void> {
+    const version = this.templateVersions.get(event.templateVersionId);
+    if (!version) return;
+    const today = new Date().toISOString().split('T')[0];
+    const key = `${event.templateVersionId}-${event.channel}-${today}`;
+    let metrics = this.templateMetrics.get(key);
+    if (!metrics) {
+      metrics = {
+        id: randomUUID(),
+        templateVersionId: event.templateVersionId,
+        channel: event.channel,
+        windowStart: today,
+        windowEnd: today,
+        sends: 0,
+        deliveries: 0,
+        opens: 0,
+        clicks: 0,
+        replies: 0,
+        meetings: 0,
+        revenue: null,
+        lastUpdated: new Date()
+      };
+    }
+    if (event.eventType === 'send') metrics.sends++;
+    else if (event.eventType === 'delivery') metrics.deliveries++;
+    else if (event.eventType === 'open') metrics.opens++;
+    else if (event.eventType === 'click') metrics.clicks++;
+    else if (event.eventType === 'reply') metrics.replies++;
+    else if (event.eventType === 'meeting') metrics.meetings++;
+    metrics.lastUpdated = new Date();
+    this.templateMetrics.set(key, metrics);
+  }
+
+  async upsertTemplateMetricsWindow(metrics: InsertTemplateMetrics): Promise<TemplateMetrics> {
+    const key = `${metrics.templateVersionId}-${metrics.channel}-${metrics.windowStart}`;
+    const existing = this.templateMetrics.get(key);
+    const newMetrics: TemplateMetrics = {
+      id: existing?.id || randomUUID(),
+      templateVersionId: metrics.templateVersionId,
+      channel: metrics.channel,
+      windowStart: metrics.windowStart,
+      windowEnd: metrics.windowEnd,
+      sends: metrics.sends ?? existing?.sends ?? 0,
+      deliveries: metrics.deliveries ?? existing?.deliveries ?? 0,
+      opens: metrics.opens ?? existing?.opens ?? 0,
+      clicks: metrics.clicks ?? existing?.clicks ?? 0,
+      replies: metrics.replies ?? existing?.replies ?? 0,
+      meetings: metrics.meetings ?? existing?.meetings ?? 0,
+      revenue: metrics.revenue ?? existing?.revenue ?? null,
+      lastUpdated: new Date()
+    };
+    this.templateMetrics.set(key, newMetrics);
+    return newMetrics;
+  }
+
+  async getTemplateMetrics(templateId: string, startDate?: string, endDate?: string): Promise<TemplateMetrics[]> {
+    const versions = Array.from(this.templateVersions.values()).filter(v => v.templateId === templateId);
+    const versionIds = new Set(versions.map(v => v.id));
+    let metrics = Array.from(this.templateMetrics.values()).filter(m => versionIds.has(m.templateVersionId));
+    if (startDate) {
+      metrics = metrics.filter(m => m.windowStart >= startDate);
+    }
+    if (endDate) {
+      metrics = metrics.filter(m => m.windowEnd <= endDate);
+    }
+    return metrics;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -2854,6 +3711,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async deleteCompany(id: string): Promise<boolean> {
+    const result = await db.delete(companies).where(eq(companies.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Contact methods
   async getContact(id: string): Promise<Contact | undefined> {
     const result = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1);
@@ -2880,6 +3742,11 @@ export class DbStorage implements IStorage {
     if (Object.keys(cleaned).length === 0) return this.getContact(id);
     const result = await db.update(contacts).set(cleaned).where(eq(contacts.id, id)).returning();
     return result[0];
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    const result = await db.delete(contacts).where(eq(contacts.id, id)).returning();
+    return result.length > 0;
   }
 
   // Visitor session methods
@@ -2943,6 +3810,11 @@ export class DbStorage implements IStorage {
     if (Object.keys(cleaned).length === 0) return this.getSequence(id);
     const result = await db.update(sequences).set(cleaned).where(eq(sequences.id, id)).returning();
     return result[0];
+  }
+
+  async deleteSequence(id: string): Promise<boolean> {
+    const result = await db.delete(sequences).where(eq(sequences.id, id)).returning();
+    return result.length > 0;
   }
 
   // Email methods
@@ -3382,18 +4254,20 @@ export class DbStorage implements IStorage {
 
   // Agent Metrics methods
   async getAgentMetrics(agentId: string, date?: string): Promise<AgentMetric | undefined> {
-    const query = db.select().from(agentMetrics).where(eq(agentMetrics.agentId, agentId));
-    
     if (date) {
-      const results = await query.where(and(
-        eq(agentMetrics.agentId, agentId),
-        eq(agentMetrics.date, date)
-      )).limit(1);
+      const results = await db.select().from(agentMetrics)
+        .where(and(
+          eq(agentMetrics.agentId, agentId),
+          eq(agentMetrics.date, date)
+        ))
+        .limit(1);
       return results[0];
     }
     
     // Get most recent metric if no date specified
-    const results = await query.limit(1);
+    const results = await db.select().from(agentMetrics)
+      .where(eq(agentMetrics.agentId, agentId))
+      .limit(1);
     return results[0];
   }
 
@@ -3590,7 +4464,7 @@ export class DbStorage implements IStorage {
   }
 
   async createPlaybook(playbook: InsertPlaybook): Promise<Playbook> {
-    const result = await db.insert(playbooks).values(playbook).returning();
+    const result = await db.insert(playbooks).values(playbook as any).returning();
     return result[0];
   }
 
@@ -3943,14 +4817,16 @@ export class DbStorage implements IStorage {
         ? query.where(and(...conditions))
         : query);
     
-    if (filters?.minRating) {
+    if (filters?.minRating !== undefined) {
+      const minRating = filters.minRating;
       result = result.filter(agent => 
-        agent.rating ? parseFloat(agent.rating) >= filters.minRating : false
+        agent.rating ? parseFloat(agent.rating) >= minRating : false
       );
     }
-    if (filters?.maxPrice) {
+    if (filters?.maxPrice !== undefined) {
+      const maxPrice = filters.maxPrice;
       result = result.filter(agent => 
-        parseFloat(agent.price) <= filters.maxPrice
+        parseFloat(agent.price) <= maxPrice
       );
     }
     if (filters?.tags && filters.tags.length > 0) {
@@ -4222,17 +5098,17 @@ export class DbStorage implements IStorage {
   }
 
   async getDigitalTwins(filters?: { companyId?: string; limit?: number }): Promise<DigitalTwin[]> {
-    let query = db.select().from(digitalTwins);
-    
     if (filters?.companyId) {
-      query = query.where(eq(digitalTwins.companyId, filters.companyId));
+      const result = filters?.limit 
+        ? await db.select().from(digitalTwins).where(eq(digitalTwins.companyId, filters.companyId)).limit(filters.limit)
+        : await db.select().from(digitalTwins).where(eq(digitalTwins.companyId, filters.companyId));
+      return result;
     }
     
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-    
-    return await query;
+    const result = filters?.limit
+      ? await db.select().from(digitalTwins).limit(filters.limit)
+      : await db.select().from(digitalTwins);
+    return result;
   }
 
   async createDigitalTwin(twin: InsertDigitalTwin): Promise<DigitalTwin> {
@@ -4261,15 +5137,15 @@ export class DbStorage implements IStorage {
   }
 
   async getTwinInteractions(twinId: string, limit?: number): Promise<TwinInteraction[]> {
-    let query = db.select().from(twinInteractions)
+    if (limit) {
+      return await db.select().from(twinInteractions)
+        .where(eq(twinInteractions.twinId, twinId))
+        .orderBy(twinInteractions.timestamp)
+        .limit(limit);
+    }
+    return await db.select().from(twinInteractions)
       .where(eq(twinInteractions.twinId, twinId))
       .orderBy(twinInteractions.timestamp);
-    
-    if (limit) {
-      query = query.limit(limit);
-    }
-    
-    return await query;
   }
 
   async createTwinInteraction(interaction: InsertTwinInteraction): Promise<TwinInteraction> {
@@ -4284,14 +5160,15 @@ export class DbStorage implements IStorage {
   }
 
   async getTwinPredictions(twinId: string, type?: string): Promise<TwinPrediction[]> {
-    let query = db.select().from(twinPredictions)
-      .where(eq(twinPredictions.twinId, twinId));
-    
     if (type) {
-      query = query.where(eq(twinPredictions.predictionType, type));
+      return await db.select().from(twinPredictions)
+        .where(and(
+          eq(twinPredictions.twinId, twinId),
+          eq(twinPredictions.predictionType, type)
+        ));
     }
-    
-    return await query;
+    return await db.select().from(twinPredictions)
+      .where(eq(twinPredictions.twinId, twinId));
   }
 
   async createTwinPrediction(prediction: InsertTwinPrediction): Promise<TwinPrediction> {
@@ -4305,6 +5182,133 @@ export class DbStorage implements IStorage {
       .set(cleanPartial(updates))
       .where(eq(twinPredictions.id, id))
       .returning();
+    return result[0];
+  }
+
+  // SDR Team methods
+  async getSdrTeam(id: string): Promise<SdrTeam | undefined> {
+    const result = await db.select().from(sdrTeams).where(eq(sdrTeams.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSdrTeams(filters?: { teamType?: string; isActive?: boolean; createdBy?: string }): Promise<SdrTeam[]> {
+    let query = db.select().from(sdrTeams);
+    const conditions: any[] = [];
+    
+    if (filters?.teamType) conditions.push(eq(sdrTeams.teamType, filters.teamType));
+    if (filters?.isActive !== undefined) conditions.push(eq(sdrTeams.isActive, filters.isActive));
+    if (filters?.createdBy) conditions.push(eq(sdrTeams.createdBy, filters.createdBy));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createSdrTeam(team: InsertSdrTeam): Promise<SdrTeam> {
+    const result = await db.insert(sdrTeams).values(team).returning();
+    return result[0];
+  }
+
+  async updateSdrTeam(id: string, updates: Partial<SdrTeam>): Promise<SdrTeam | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getSdrTeam(id);
+    const result = await db.update(sdrTeams).set({ ...cleaned, updatedAt: new Date() }).where(eq(sdrTeams.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSdrTeam(id: string): Promise<boolean> {
+    const result = await db.delete(sdrTeams).where(eq(sdrTeams.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // SDR Team Member methods
+  async getSdrTeamMember(id: string): Promise<SdrTeamMember | undefined> {
+    const result = await db.select().from(sdrTeamMembers).where(eq(sdrTeamMembers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSdrTeamMembersByTeam(teamId: string): Promise<SdrTeamMember[]> {
+    return await db.select().from(sdrTeamMembers).where(eq(sdrTeamMembers.teamId, teamId));
+  }
+
+  async getSdrTeamMembersByRole(role: string): Promise<SdrTeamMember[]> {
+    return await db.select().from(sdrTeamMembers).where(eq(sdrTeamMembers.role, role));
+  }
+
+  async createSdrTeamMember(member: InsertSdrTeamMember): Promise<SdrTeamMember> {
+    const result = await db.insert(sdrTeamMembers).values(member).returning();
+    return result[0];
+  }
+
+  async updateSdrTeamMember(id: string, updates: Partial<SdrTeamMember>): Promise<SdrTeamMember | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getSdrTeamMember(id);
+    const result = await db.update(sdrTeamMembers).set({ ...cleaned, updatedAt: new Date() }).where(eq(sdrTeamMembers.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSdrTeamMember(id: string): Promise<boolean> {
+    const result = await db.delete(sdrTeamMembers).where(eq(sdrTeamMembers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Team Collaboration methods
+  async getTeamCollaboration(id: string): Promise<TeamCollaboration | undefined> {
+    const result = await db.select().from(teamCollaborations).where(eq(teamCollaborations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTeamCollaborations(filters?: { teamId?: string; dealId?: string; contactId?: string; outcome?: string }): Promise<TeamCollaboration[]> {
+    let query = db.select().from(teamCollaborations);
+    const conditions: any[] = [];
+    
+    if (filters?.teamId) conditions.push(eq(teamCollaborations.teamId, filters.teamId));
+    if (filters?.dealId) conditions.push(eq(teamCollaborations.dealId, filters.dealId));
+    if (filters?.contactId) conditions.push(eq(teamCollaborations.contactId, filters.contactId));
+    if (filters?.outcome) conditions.push(eq(teamCollaborations.outcome, filters.outcome));
+    
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+    return await query;
+  }
+
+  async createTeamCollaboration(collaboration: InsertTeamCollaboration): Promise<TeamCollaboration> {
+    const result = await db.insert(teamCollaborations).values(collaboration).returning();
+    return result[0];
+  }
+
+  async updateTeamCollaboration(id: string, updates: Partial<TeamCollaboration>): Promise<TeamCollaboration | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getTeamCollaboration(id);
+    const result = await db.update(teamCollaborations).set(cleaned).where(eq(teamCollaborations.id, id)).returning();
+    return result[0];
+  }
+
+  // Team Performance methods
+  async getTeamPerformance(id: string): Promise<TeamPerformance | undefined> {
+    const result = await db.select().from(teamPerformance).where(eq(teamPerformance.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTeamPerformanceByTeam(teamId: string, period?: string): Promise<TeamPerformance[]> {
+    if (period) {
+      return await db.select().from(teamPerformance)
+        .where(and(eq(teamPerformance.teamId, teamId), eq(teamPerformance.period, period)));
+    }
+    return await db.select().from(teamPerformance).where(eq(teamPerformance.teamId, teamId));
+  }
+
+  async createTeamPerformance(performance: InsertTeamPerformance): Promise<TeamPerformance> {
+    const result = await db.insert(teamPerformance).values(performance).returning();
+    return result[0];
+  }
+
+  async updateTeamPerformance(id: string, updates: Partial<TeamPerformance>): Promise<TeamPerformance | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getTeamPerformance(id);
+    const result = await db.update(teamPerformance).set(cleaned).where(eq(teamPerformance.id, id)).returning();
     return result[0];
   }
 
@@ -5357,11 +6361,11 @@ Mike`,
     const { segmentSnapshotIds, ...versionData } = input;
     
     // Calculate version number
-    const existing = await db.select({ maxVersion: sql`MAX(${templateVersions.versionNumber})` })
+    const existing = await db.select({ maxVersion: sql<number>`COALESCE(MAX(${templateVersions.versionNumber}), 0)` })
       .from(templateVersions)
       .where(eq(templateVersions.templateId, versionData.templateId));
     
-    versionData.versionNumber = (existing[0]?.maxVersion || 0) + 1;
+    versionData.versionNumber = (existing[0]?.maxVersion ?? 0) + 1;
     
     // Capture audience snapshot if segment IDs provided
     if (segmentSnapshotIds && segmentSnapshotIds.length > 0) {
@@ -5387,13 +6391,15 @@ Mike`,
   }
 
   async listTemplateVersions(templateId: string, opts?: { includeDrafts?: boolean }): Promise<TemplateVersion[]> {
-    let query = db.select().from(templateVersions).where(eq(templateVersions.templateId, templateId));
-    
     if (!opts?.includeDrafts) {
-      query = query.where(sql`${templateVersions.publishedAt} IS NOT NULL`);
+      return await db.select().from(templateVersions)
+        .where(and(
+          eq(templateVersions.templateId, templateId),
+          sql`${templateVersions.publishedAt} IS NOT NULL`
+        ));
     }
-    
-    return await query;
+    return await db.select().from(templateVersions)
+      .where(eq(templateVersions.templateId, templateId));
   }
 
   async getTemplateVersion(versionId: string): Promise<TemplateVersion | undefined> {
@@ -5539,18 +6545,161 @@ Mike`,
     
     if (versionIds.length === 0) return [];
     
-    let query = db.select()
-      .from(templateMetrics)
-      .where(sql`${templateMetrics.templateVersionId} = ANY(${versionIds.map(v => v.id)})`);
+    const conditions: any[] = [
+      sql`${templateMetrics.templateVersionId} = ANY(${versionIds.map(v => v.id)})`
+    ];
     
     if (startDate) {
-      query = query.where(sql`${templateMetrics.windowStart} >= ${startDate}`);
+      conditions.push(sql`${templateMetrics.windowStart} >= ${startDate}`);
     }
     if (endDate) {
-      query = query.where(sql`${templateMetrics.windowEnd} <= ${endDate}`);
+      conditions.push(sql`${templateMetrics.windowEnd} <= ${endDate}`);
     }
     
-    return await query;
+    return await db.select()
+      .from(templateMetrics)
+      .where(and(...conditions));
+  }
+
+  // Timing Optimization
+  async getTimingOptimization(id: string): Promise<TimingOptimization | undefined> {
+    const result = await db.select().from(timingOptimization).where(eq(timingOptimization.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTimingOptimizationByContact(contactId: string): Promise<TimingOptimization | undefined> {
+    const result = await db.select().from(timingOptimization).where(eq(timingOptimization.contactId, contactId)).limit(1);
+    return result[0];
+  }
+
+  async createTimingOptimization(timing: InsertTimingOptimization): Promise<TimingOptimization> {
+    const result = await db.insert(timingOptimization).values(timing).returning();
+    return result[0];
+  }
+
+  async updateTimingOptimization(id: string, updates: Partial<TimingOptimization>): Promise<TimingOptimization | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getTimingOptimization(id);
+    const result = await db.update(timingOptimization).set({ ...cleaned, updatedAt: new Date() }).where(eq(timingOptimization.id, id)).returning();
+    return result[0];
+  }
+
+  // Predictive Models
+  async getPredictiveModel(id: string): Promise<PredictiveModel | undefined> {
+    const result = await db.select().from(predictiveModels).where(eq(predictiveModels.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPredictiveModels(modelType?: string): Promise<PredictiveModel[]> {
+    if (modelType) {
+      return await db.select().from(predictiveModels).where(eq(predictiveModels.modelType, modelType));
+    }
+    return await db.select().from(predictiveModels);
+  }
+
+  async createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel> {
+    const result = await db.insert(predictiveModels).values(model).returning();
+    return result[0];
+  }
+
+  async updatePredictiveModel(id: string, updates: Partial<PredictiveModel>): Promise<PredictiveModel | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getPredictiveModel(id);
+    const result = await db.update(predictiveModels).set(cleaned).where(eq(predictiveModels.id, id)).returning();
+    return result[0];
+  }
+
+  // Pipeline Health
+  async getPipelineHealth(id: string): Promise<PipelineHealth | undefined> {
+    const result = await db.select().from(pipelineHealth).where(eq(pipelineHealth.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getLatestPipelineHealth(): Promise<PipelineHealth | undefined> {
+    const result = await db.select().from(pipelineHealth).orderBy(desc(pipelineHealth.snapshotDate)).limit(1);
+    return result[0];
+  }
+
+  async getPipelineHealthHistory(limit: number = 10): Promise<PipelineHealth[]> {
+    return await db.select().from(pipelineHealth).orderBy(desc(pipelineHealth.snapshotDate)).limit(limit);
+  }
+
+  async createPipelineHealth(health: InsertPipelineHealth): Promise<PipelineHealth> {
+    const result = await db.insert(pipelineHealth).values(health).returning();
+    return result[0];
+  }
+
+  // Deal Forensics
+  async getDealForensics(id: string): Promise<DealForensics | undefined> {
+    const result = await db.select().from(dealForensics).where(eq(dealForensics.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDealForensicsByDealId(dealId: string): Promise<DealForensics[]> {
+    return await db.select().from(dealForensics).where(eq(dealForensics.dealId, dealId));
+  }
+
+  async getDealForensicsByType(analysisType: string): Promise<DealForensics[]> {
+    return await db.select().from(dealForensics).where(eq(dealForensics.analysisType, analysisType));
+  }
+
+  async createDealForensics(forensics: InsertDealForensics): Promise<DealForensics> {
+    const result = await db.insert(dealForensics).values(forensics).returning();
+    return result[0];
+  }
+
+  // Revenue Forecasts
+  async getRevenueForecast(id: string): Promise<RevenueForecast | undefined> {
+    const result = await db.select().from(revenueForecasts).where(eq(revenueForecasts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getRevenueForecasts(period?: string): Promise<RevenueForecast[]> {
+    if (period) {
+      return await db.select().from(revenueForecasts).where(eq(revenueForecasts.forecastPeriod, period)).orderBy(desc(revenueForecasts.createdAt));
+    }
+    return await db.select().from(revenueForecasts).orderBy(desc(revenueForecasts.createdAt));
+  }
+
+  async getLatestForecast(): Promise<RevenueForecast | undefined> {
+    const result = await db.select().from(revenueForecasts).orderBy(desc(revenueForecasts.createdAt)).limit(1);
+    return result[0];
+  }
+
+  async createRevenueForecast(forecast: InsertRevenueForecast): Promise<RevenueForecast> {
+    const result = await db.insert(revenueForecasts).values(forecast).returning();
+    return result[0];
+  }
+
+  // Coaching Insights
+  async getCoachingInsight(id: string): Promise<CoachingInsight | undefined> {
+    const result = await db.select().from(coachingInsights).where(eq(coachingInsights.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCoachingInsights(filters?: { userId?: string; insightType?: string; priority?: string; status?: string }): Promise<CoachingInsight[]> {
+    const conditions: any[] = [];
+    if (filters?.userId) conditions.push(eq(coachingInsights.userId, filters.userId));
+    if (filters?.insightType) conditions.push(eq(coachingInsights.insightType, filters.insightType));
+    if (filters?.priority) conditions.push(eq(coachingInsights.priority, filters.priority));
+    if (filters?.status) conditions.push(eq(coachingInsights.status, filters.status));
+    
+    if (conditions.length > 0) {
+      return await db.select().from(coachingInsights).where(and(...conditions));
+    }
+    return await db.select().from(coachingInsights);
+  }
+
+  async createCoachingInsight(insight: InsertCoachingInsight): Promise<CoachingInsight> {
+    const result = await db.insert(coachingInsights).values(insight).returning();
+    return result[0];
+  }
+
+  async updateCoachingInsight(id: string, updates: Partial<CoachingInsight>): Promise<CoachingInsight | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getCoachingInsight(id);
+    const result = await db.update(coachingInsights).set(cleaned).where(eq(coachingInsights.id, id)).returning();
+    return result[0];
   }
 }
 

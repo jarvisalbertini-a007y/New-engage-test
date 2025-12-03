@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Update contact with enriched data
           await storage.updateContact(id, {
-            verificationStatus: enrichedData.verificationStatus as any,
+            isVerified: enrichedData.verificationStatus === 'verified',
             linkedinUrl: enrichedData.additionalInfo.linkedinUrl
           });
           
@@ -759,7 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: 'email',
             delay: i === 1 ? 0 : (i - 1) * 3, // 0, 3, 6, 9 days
             subject: i === 1 ? `Introduction - ${name}` : `Follow up ${i} - ${name}`,
-            template: generateEmailTemplate(i, stepCount, name, description),
+            template: generateSequenceEmailTemplate(i, stepCount, name, description),
             isActive: true
           });
         } else {
@@ -787,8 +787,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Helper function to generate email templates
-  function generateEmailTemplate(stepNumber: number, totalSteps: number, sequenceName: string, description: string): string {
+  // Helper function to generate email templates for sequences
+  function generateSequenceEmailTemplate(stepNumber: number, totalSteps: number, sequenceName: string, description: string): string {
     const isFirst = stepNumber === 1;
     const isLast = stepNumber === totalSteps;
     
@@ -832,7 +832,7 @@ Best regards,
   function generateStepContent(stepNumber: number, totalSteps: number, type: string, sequenceName: string, description: string): string {
     switch (type) {
       case 'email':
-        return generateEmailTemplate(stepNumber, totalSteps, sequenceName, description);
+        return generateSequenceEmailTemplate(stepNumber, totalSteps, sequenceName, description);
       case 'linkedin':
         return `Hi {{firstName}}, I noticed we're both connected to the {{industry}} space. ${description ? description : `I'd love to connect and share insights about ${sequenceName}.`} Would you be open to connecting?`;
       case 'phone':
@@ -1227,11 +1227,11 @@ Best regards,
   });
 
   // Agent Execution routes
-  app.post("/api/agents/:id/execute", async (req, res) => {
+  app.post("/api/agents/:id/execute", async (req: any, res) => {
     try {
       const { id } = req.params;
       const { taskType, context, targetId } = req.body;
-      const userId = req.user?.id || 'system';
+      const userId = req.user?.claims?.sub || 'system';
       
       // Verify agent exists and is active
       const agent = await storage.getAiAgent(id);
@@ -1948,13 +1948,12 @@ Best regards,
       }
       
       // Create a copy with a new name and mark it as not a template
+      const { id: _id, createdAt: _createdAt, ...originalWithoutId } = original;
       const duplicate = await storage.createPlaybook({
-        ...original,
-        id: undefined as any,
+        ...originalWithoutId,
         name: `Copy of ${original.name}`,
         isTemplate: false,
-        createdBy: userId,
-        createdAt: new Date()
+        createdBy: userId
       });
       
       res.json(duplicate);
@@ -4105,7 +4104,7 @@ Best regards,
         return res.status(401).json({ error: "User not authenticated" });
       }
       
-      const status = req.query.status as string;
+      const status = req.query.status as "draft" | "active" | "archived" | undefined;
       const personaId = req.query.personaId as string;
       const includeArchived = req.query.includeArchived === 'true';
       
@@ -4931,20 +4930,13 @@ function generateMeetingTemplate(industry: string) {
 
 function generateMagicSetupSequenceSteps(industry: string) {
   return [
-    { day: 0, type: "email", template: "coldEmail" },
-    { day: 3, type: "linkedin", action: "connect" },
-    { day: 5, type: "email", template: "followUp" },
-    { day: 10, type: "call", script: "discovery" },
-    { day: 14, type: "email", template: "finalFollowUp" }
+    { name: "Cold Outreach", steps: 5, channels: ["email", "linkedin", "phone"], duration: "14 days" }
   ];
 }
 
 function generateNurtureSteps(industry: string) {
   return [
-    { day: 0, type: "email", template: "valueContent" },
-    { day: 7, type: "linkedin", action: "share_content" },
-    { day: 14, type: "email", template: "caseStudy" },
-    { day: 30, type: "email", template: "checkIn" }
+    { name: "Nurture Sequence", steps: 4, channels: ["email", "linkedin"], duration: "30 days" }
   ];
 }
 
@@ -4972,26 +4964,31 @@ async function createDefaultPlaybooks(industry: string) {
       name: `${industry} Cold Outreach`,
       industry,
       description: `Proven cold outreach playbook for ${industry} companies`,
-      targetAudience: { titles: ["VP Sales", "CRO", "Head of Sales"], companySize: ["50-200", "200-500"] },
+      targetAudience: { titles: ["VP Sales", "CRO", "Head of Sales"], companySize: "50-500", industries: [industry] },
       sequences: generateMagicSetupSequenceSteps(industry),
-      emailTemplates: { cold: generateEmailTemplate(industry), followUp: generateFollowUpTemplate(industry) },
-      successMetrics: { openRate: 35, replyRate: 8, meetingRate: 3 },
+      emailTemplates: { 
+        cold: { subject: `${industry} Growth Strategy`, preview: generateEmailTemplate(industry) }, 
+        followUp: { subject: `Following Up - ${industry}`, preview: generateFollowUpTemplate(industry) }
+      },
+      successMetrics: { avgReplyRate: "8%", avgMeetingRate: "3%", timeToFirst: "2 days" },
       isTemplate: true
     },
     {
       name: `${industry} Nurture Campaign`,
       industry,
       description: `Long-term nurture sequence for ${industry} prospects`,
-      targetAudience: { titles: ["Director", "Manager"], companySize: ["10-50", "50-200"] },
+      targetAudience: { titles: ["Director", "Manager"], companySize: "10-200", industries: [industry] },
       sequences: generateNurtureSteps(industry),
-      emailTemplates: { nurture: generateFollowUpTemplate(industry) },
-      successMetrics: { openRate: 45, clickRate: 12, conversionRate: 2 },
+      emailTemplates: { 
+        nurture: { subject: `Valuable Insights for ${industry}`, preview: generateFollowUpTemplate(industry) }
+      },
+      successMetrics: { avgReplyRate: "12%", avgMeetingRate: "2%", timeToFirst: "5 days" },
       isTemplate: true
     }
   ];
 
   for (const playbook of playbooks) {
-    await storage.createPlaybook(playbook);
+    await storage.createPlaybook(playbook as any);
   }
 }
 
@@ -5129,22 +5126,11 @@ async function applyPlaybook(playbook: any, userId: string, selectedSequenceName
           await storage.createTemplateVersion({
             templateId: contentTemplate.id,
             versionNumber: 1,
-            status: 'published',
             subject: (template as any).subject || `Template: ${key}`,
-            previewText: ((template as any).preview || '').substring(0, 100),
-            contentText: (template as any).preview || '',
-            contentHtml: null,
+            body: (template as any).preview || '',
+            source: 'imported',
             personaSnapshot: null,
-            audienceSnapshot: null,
-            aiMetadata: {
-              model: 'playbook-import',
-              prompt: null
-            },
-            testResults: null,
-            approvedBy: null,
-            approvedAt: null,
-            publishedAt: new Date(),
-            notes: `Imported from ${playbook.name} playbook`
+            audienceSnapshot: null
           });
           
           results.templatesCreated.push({
