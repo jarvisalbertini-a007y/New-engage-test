@@ -72,7 +72,12 @@ import {
   type AudienceSegment, type InsertAudienceSegment,
   type TemplateMetrics, type InsertTemplateMetrics,
   type InboxMessage, type InsertInboxMessage,
-  users, companies, contacts, visitorSessions, sequences, sequenceExecutions, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls
+  type Organization, type InsertOrganization,
+  type Team, type InsertTeam,
+  type Role, type InsertRole,
+  type RoleAssignment, type InsertRoleAssignment,
+  type CustomerProfile, type InsertCustomerProfile,
+  users, companies, contacts, visitorSessions, sequences, sequenceExecutions, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls, organizations, teams, roles, roleAssignments, customerProfiles
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -87,6 +92,15 @@ function cleanPartial<T extends Record<string, any>>(obj: Partial<T>): Partial<T
     }
   }
   return cleaned;
+}
+
+// User context interface for RBAC
+export interface UserContext {
+  userId: string;
+  orgId: string;
+  role: string;
+  teamIds: string[];
+  permissions: Record<string, boolean>;
 }
 
 export interface IStorage {
@@ -560,6 +574,44 @@ export interface IStorage {
   recordTemplateMetricEvent(event: { templateVersionId: string; channel: string; eventType: string; value?: number; occurredAt?: Date }): Promise<void>;
   upsertTemplateMetricsWindow(metrics: InsertTemplateMetrics): Promise<TemplateMetrics>;
   getTemplateMetrics(templateId: string, startDate?: string, endDate?: string): Promise<TemplateMetrics[]>;
+
+  // Organizations
+  getOrganization(id: string): Promise<Organization | undefined>;
+  getOrganizationByDomain(domain: string): Promise<Organization | undefined>;
+  createOrganization(org: InsertOrganization): Promise<Organization>;
+  updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
+
+  // Teams
+  getTeam(id: string): Promise<Team | undefined>;
+  getTeamsByOrg(orgId: string): Promise<Team[]>;
+  createTeam(team: InsertTeam): Promise<Team>;
+  updateTeam(id: string, updates: Partial<Team>): Promise<Team | undefined>;
+  deleteTeam(id: string): Promise<boolean>;
+
+  // Roles
+  getRole(id: string): Promise<Role | undefined>;
+  getRoleByName(name: string): Promise<Role | undefined>;
+  getAllRoles(): Promise<Role[]>;
+  createRole(role: InsertRole): Promise<Role>;
+
+  // Role Assignments
+  getRoleAssignment(userId: string, orgId: string): Promise<RoleAssignment | undefined>;
+  getRoleAssignmentsByUser(userId: string): Promise<RoleAssignment[]>;
+  getRoleAssignmentsByOrg(orgId: string): Promise<RoleAssignment[]>;
+  createRoleAssignment(assignment: InsertRoleAssignment): Promise<RoleAssignment>;
+  updateRoleAssignment(id: string, updates: Partial<RoleAssignment>): Promise<RoleAssignment | undefined>;
+  deleteRoleAssignment(id: string): Promise<boolean>;
+
+  // Customer Profiles (AI caching)
+  getCustomerProfile(orgId: string): Promise<CustomerProfile | undefined>;
+  createCustomerProfile(profile: InsertCustomerProfile): Promise<CustomerProfile>;
+  updateCustomerProfile(orgId: string, updates: Partial<CustomerProfile>): Promise<CustomerProfile | undefined>;
+
+  // User Context helper
+  getUserContext(userId: string): Promise<UserContext | null>;
+
+  // Seed default roles
+  seedDefaultRoles(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -621,6 +673,12 @@ export class MemStorage implements IStorage {
   private audienceSegments: Map<string, AudienceSegment> = new Map();
   private templateMetrics: Map<string, TemplateMetrics> = new Map();
   private templateSegmentAssociations: Map<string, Set<string>> = new Map(); // templateId -> Set<segmentId>
+  // RBAC tables
+  private organizationsMap: Map<string, Organization> = new Map();
+  private teamsMap: Map<string, Team> = new Map();
+  private rolesMap: Map<string, Role> = new Map();
+  private roleAssignmentsMap: Map<string, RoleAssignment> = new Map();
+  private customerProfilesMap: Map<string, CustomerProfile> = new Map();
 
   constructor() {
     // No mock data - user explicitly requested NO mock data without permission
@@ -3732,6 +3790,294 @@ export class MemStorage implements IStorage {
     }
     return metrics;
   }
+
+  // Organization methods
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    return this.organizationsMap.get(id);
+  }
+
+  async getOrganizationByDomain(domain: string): Promise<Organization | undefined> {
+    return Array.from(this.organizationsMap.values()).find(org => org.domain === domain);
+  }
+
+  async createOrganization(org: InsertOrganization): Promise<Organization> {
+    const id = randomUUID();
+    const newOrg: Organization = {
+      id,
+      name: org.name,
+      domain: org.domain ?? null,
+      website: org.website ?? null,
+      industry: org.industry ?? null,
+      size: org.size ?? null,
+      description: org.description ?? null,
+      valueProposition: org.valueProposition ?? null,
+      differentiators: org.differentiators ?? null,
+      competitors: org.competitors ?? null,
+      aiProfile: org.aiProfile ?? null,
+      aiProfileLastUpdated: org.aiProfileLastUpdated ?? null,
+      settings: org.settings ?? null,
+      createdBy: org.createdBy ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.organizationsMap.set(id, newOrg);
+    return newOrg;
+  }
+
+  async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined> {
+    const org = this.organizationsMap.get(id);
+    if (!org) return undefined;
+    const updated = { ...org, ...updates, updatedAt: new Date() };
+    this.organizationsMap.set(id, updated);
+    return updated;
+  }
+
+  // Team methods
+  async getTeam(id: string): Promise<Team | undefined> {
+    return this.teamsMap.get(id);
+  }
+
+  async getTeamsByOrg(orgId: string): Promise<Team[]> {
+    return Array.from(this.teamsMap.values()).filter(team => team.orgId === orgId);
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const id = randomUUID();
+    const newTeam: Team = {
+      id,
+      orgId: team.orgId,
+      name: team.name,
+      description: team.description ?? null,
+      leadId: team.leadId ?? null,
+      createdAt: new Date(),
+    };
+    this.teamsMap.set(id, newTeam);
+    return newTeam;
+  }
+
+  async updateTeam(id: string, updates: Partial<Team>): Promise<Team | undefined> {
+    const team = this.teamsMap.get(id);
+    if (!team) return undefined;
+    const updated = { ...team, ...updates };
+    this.teamsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    return this.teamsMap.delete(id);
+  }
+
+  // Role methods
+  async getRole(id: string): Promise<Role | undefined> {
+    return this.rolesMap.get(id);
+  }
+
+  async getRoleByName(name: string): Promise<Role | undefined> {
+    return Array.from(this.rolesMap.values()).find(role => role.name === name);
+  }
+
+  async getAllRoles(): Promise<Role[]> {
+    return Array.from(this.rolesMap.values());
+  }
+
+  async createRole(role: InsertRole): Promise<Role> {
+    const id = randomUUID();
+    const newRole: Role = {
+      id,
+      name: role.name,
+      description: role.description ?? null,
+      permissions: role.permissions ?? null,
+      createdAt: new Date(),
+    };
+    this.rolesMap.set(id, newRole);
+    return newRole;
+  }
+
+  // Role Assignment methods
+  async getRoleAssignment(userId: string, orgId: string): Promise<RoleAssignment | undefined> {
+    return Array.from(this.roleAssignmentsMap.values()).find(
+      ra => ra.userId === userId && ra.orgId === orgId
+    );
+  }
+
+  async getRoleAssignmentsByUser(userId: string): Promise<RoleAssignment[]> {
+    return Array.from(this.roleAssignmentsMap.values()).filter(ra => ra.userId === userId);
+  }
+
+  async getRoleAssignmentsByOrg(orgId: string): Promise<RoleAssignment[]> {
+    return Array.from(this.roleAssignmentsMap.values()).filter(ra => ra.orgId === orgId);
+  }
+
+  async createRoleAssignment(assignment: InsertRoleAssignment): Promise<RoleAssignment> {
+    const id = randomUUID();
+    const newAssignment: RoleAssignment = {
+      id,
+      userId: assignment.userId,
+      orgId: assignment.orgId,
+      roleId: assignment.roleId,
+      teamId: assignment.teamId ?? null,
+      createdAt: new Date(),
+    };
+    this.roleAssignmentsMap.set(id, newAssignment);
+    return newAssignment;
+  }
+
+  async updateRoleAssignment(id: string, updates: Partial<RoleAssignment>): Promise<RoleAssignment | undefined> {
+    const assignment = this.roleAssignmentsMap.get(id);
+    if (!assignment) return undefined;
+    const updated = { ...assignment, ...updates };
+    this.roleAssignmentsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteRoleAssignment(id: string): Promise<boolean> {
+    return this.roleAssignmentsMap.delete(id);
+  }
+
+  // Customer Profile methods
+  async getCustomerProfile(orgId: string): Promise<CustomerProfile | undefined> {
+    return Array.from(this.customerProfilesMap.values()).find(cp => cp.orgId === orgId);
+  }
+
+  async createCustomerProfile(profile: InsertCustomerProfile): Promise<CustomerProfile> {
+    const id = randomUUID();
+    const newProfile: CustomerProfile = {
+      id,
+      orgId: profile.orgId,
+      icpData: profile.icpData ?? null,
+      personaData: profile.personaData ?? null,
+      companyResearch: profile.companyResearch ?? null,
+      valueProps: profile.valueProps ?? null,
+      messagingFramework: profile.messagingFramework ?? null,
+      tokensSaved: profile.tokensSaved ?? 0,
+      lastAiCallAt: profile.lastAiCallAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.customerProfilesMap.set(id, newProfile);
+    return newProfile;
+  }
+
+  async updateCustomerProfile(orgId: string, updates: Partial<CustomerProfile>): Promise<CustomerProfile | undefined> {
+    const profile = await this.getCustomerProfile(orgId);
+    if (!profile) return undefined;
+    const updated = { ...profile, ...updates, updatedAt: new Date() };
+    this.customerProfilesMap.set(profile.id, updated);
+    return updated;
+  }
+
+  // User Context helper
+  async getUserContext(userId: string): Promise<UserContext | null> {
+    const user = await this.getUser(userId);
+    if (!user || !user.currentOrgId) return null;
+
+    const roleAssignment = await this.getRoleAssignment(userId, user.currentOrgId);
+    if (!roleAssignment) return null;
+
+    const role = await this.getRole(roleAssignment.roleId);
+    if (!role) return null;
+
+    const allAssignments = await this.getRoleAssignmentsByUser(userId);
+    const teamIds = allAssignments
+      .filter(ra => ra.orgId === user.currentOrgId && ra.teamId)
+      .map(ra => ra.teamId as string);
+
+    return {
+      userId,
+      orgId: user.currentOrgId,
+      role: role.name,
+      teamIds,
+      permissions: (role.permissions as Record<string, boolean>) || {},
+    };
+  }
+
+  // Seed default roles
+  async seedDefaultRoles(): Promise<void> {
+    const defaultRoles = [
+      {
+        name: 'Owner',
+        description: 'Full access to all organization settings and data',
+        permissions: {
+          manage_org: true,
+          manage_users: true,
+          manage_roles: true,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: true,
+          manage_billing: true,
+          export_data: true,
+        },
+      },
+      {
+        name: 'Admin',
+        description: 'Administrative access to manage users and teams',
+        permissions: {
+          manage_org: false,
+          manage_users: true,
+          manage_roles: true,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: true,
+          manage_billing: false,
+          export_data: true,
+        },
+      },
+      {
+        name: 'Manager',
+        description: 'Team management and oversight capabilities',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: false,
+          manage_billing: false,
+          export_data: true,
+        },
+      },
+      {
+        name: 'SDR',
+        description: 'Sales Development Representative - standard user access',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: false,
+          view_all_data: false,
+          edit_all_data: false,
+          delete_data: false,
+          manage_billing: false,
+          export_data: false,
+        },
+      },
+      {
+        name: 'ReadOnly',
+        description: 'View-only access to data',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: false,
+          view_all_data: true,
+          edit_all_data: false,
+          delete_data: false,
+          manage_billing: false,
+          export_data: false,
+        },
+      },
+    ];
+
+    for (const roleData of defaultRoles) {
+      const existing = await this.getRoleByName(roleData.name);
+      if (!existing) {
+        await this.createRole(roleData);
+      }
+    }
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -6793,6 +7139,241 @@ Mike`,
     if (Object.keys(cleaned).length === 0) return this.getCoachingInsight(id);
     const result = await db.update(coachingInsights).set(cleaned).where(eq(coachingInsights.id, id)).returning();
     return result[0];
+  }
+
+  // Organization methods
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const result = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getOrganizationByDomain(domain: string): Promise<Organization | undefined> {
+    const result = await db.select().from(organizations).where(eq(organizations.domain, domain)).limit(1);
+    return result[0];
+  }
+
+  async createOrganization(org: InsertOrganization): Promise<Organization> {
+    const result = await db.insert(organizations).values(org).returning();
+    return result[0];
+  }
+
+  async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getOrganization(id);
+    const result = await db.update(organizations).set({ ...cleaned, updatedAt: new Date() }).where(eq(organizations.id, id)).returning();
+    return result[0];
+  }
+
+  // Team methods
+  async getTeam(id: string): Promise<Team | undefined> {
+    const result = await db.select().from(teams).where(eq(teams.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTeamsByOrg(orgId: string): Promise<Team[]> {
+    return await db.select().from(teams).where(eq(teams.orgId, orgId));
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const result = await db.insert(teams).values(team).returning();
+    return result[0];
+  }
+
+  async updateTeam(id: string, updates: Partial<Team>): Promise<Team | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getTeam(id);
+    const result = await db.update(teams).set(cleaned).where(eq(teams.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    const result = await db.delete(teams).where(eq(teams.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Role methods
+  async getRole(id: string): Promise<Role | undefined> {
+    const result = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getRoleByName(name: string): Promise<Role | undefined> {
+    const result = await db.select().from(roles).where(eq(roles.name, name)).limit(1);
+    return result[0];
+  }
+
+  async getAllRoles(): Promise<Role[]> {
+    return await db.select().from(roles);
+  }
+
+  async createRole(role: InsertRole): Promise<Role> {
+    const result = await db.insert(roles).values(role).returning();
+    return result[0];
+  }
+
+  // Role Assignment methods
+  async getRoleAssignment(userId: string, orgId: string): Promise<RoleAssignment | undefined> {
+    const result = await db.select().from(roleAssignments).where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.orgId, orgId))).limit(1);
+    return result[0];
+  }
+
+  async getRoleAssignmentsByUser(userId: string): Promise<RoleAssignment[]> {
+    return await db.select().from(roleAssignments).where(eq(roleAssignments.userId, userId));
+  }
+
+  async getRoleAssignmentsByOrg(orgId: string): Promise<RoleAssignment[]> {
+    return await db.select().from(roleAssignments).where(eq(roleAssignments.orgId, orgId));
+  }
+
+  async createRoleAssignment(assignment: InsertRoleAssignment): Promise<RoleAssignment> {
+    const result = await db.insert(roleAssignments).values(assignment).returning();
+    return result[0];
+  }
+
+  async updateRoleAssignment(id: string, updates: Partial<RoleAssignment>): Promise<RoleAssignment | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) {
+      const existing = await db.select().from(roleAssignments).where(eq(roleAssignments.id, id)).limit(1);
+      return existing[0];
+    }
+    const result = await db.update(roleAssignments).set(cleaned).where(eq(roleAssignments.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteRoleAssignment(id: string): Promise<boolean> {
+    const result = await db.delete(roleAssignments).where(eq(roleAssignments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Customer Profile methods
+  async getCustomerProfile(orgId: string): Promise<CustomerProfile | undefined> {
+    const result = await db.select().from(customerProfiles).where(eq(customerProfiles.orgId, orgId)).limit(1);
+    return result[0];
+  }
+
+  async createCustomerProfile(profile: InsertCustomerProfile): Promise<CustomerProfile> {
+    const result = await db.insert(customerProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateCustomerProfile(orgId: string, updates: Partial<CustomerProfile>): Promise<CustomerProfile | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getCustomerProfile(orgId);
+    const result = await db.update(customerProfiles).set({ ...cleaned, updatedAt: new Date() }).where(eq(customerProfiles.orgId, orgId)).returning();
+    return result[0];
+  }
+
+  // User Context helper
+  async getUserContext(userId: string): Promise<UserContext | null> {
+    const user = await this.getUser(userId);
+    if (!user || !user.currentOrgId) return null;
+
+    const roleAssignment = await this.getRoleAssignment(userId, user.currentOrgId);
+    if (!roleAssignment) return null;
+
+    const role = await this.getRole(roleAssignment.roleId);
+    if (!role) return null;
+
+    const allAssignments = await this.getRoleAssignmentsByUser(userId);
+    const teamIds = allAssignments
+      .filter(ra => ra.orgId === user.currentOrgId && ra.teamId)
+      .map(ra => ra.teamId as string);
+
+    return {
+      userId,
+      orgId: user.currentOrgId,
+      role: role.name,
+      teamIds,
+      permissions: (role.permissions as Record<string, boolean>) || {},
+    };
+  }
+
+  // Seed default roles
+  async seedDefaultRoles(): Promise<void> {
+    const defaultRoles = [
+      {
+        name: 'Owner',
+        description: 'Full access to all organization settings and data',
+        permissions: {
+          manage_org: true,
+          manage_users: true,
+          manage_roles: true,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: true,
+          manage_billing: true,
+          export_data: true,
+        },
+      },
+      {
+        name: 'Admin',
+        description: 'Administrative access to manage users and teams',
+        permissions: {
+          manage_org: false,
+          manage_users: true,
+          manage_roles: true,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: true,
+          manage_billing: false,
+          export_data: true,
+        },
+      },
+      {
+        name: 'Manager',
+        description: 'Team management and oversight capabilities',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: true,
+          view_all_data: true,
+          edit_all_data: true,
+          delete_data: false,
+          manage_billing: false,
+          export_data: true,
+        },
+      },
+      {
+        name: 'SDR',
+        description: 'Sales Development Representative - standard user access',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: false,
+          view_all_data: false,
+          edit_all_data: false,
+          delete_data: false,
+          manage_billing: false,
+          export_data: false,
+        },
+      },
+      {
+        name: 'ReadOnly',
+        description: 'View-only access to data',
+        permissions: {
+          manage_org: false,
+          manage_users: false,
+          manage_roles: false,
+          manage_teams: false,
+          view_all_data: true,
+          edit_all_data: false,
+          delete_data: false,
+          manage_billing: false,
+          export_data: false,
+        },
+      },
+    ];
+
+    for (const roleData of defaultRoles) {
+      const existing = await this.getRoleByName(roleData.name);
+      if (!existing) {
+        await this.createRole(roleData);
+      }
+    }
   }
 }
 

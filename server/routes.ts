@@ -28,6 +28,14 @@ import { crowdIntelNetwork } from "./services/crowdIntel";
 import { insertSharedIntelSchema, insertIntelRatingSchema } from "@shared/schema";
 import { enterpriseManager } from "./services/enterprise";
 import { setupDevAuth } from "./devAuth";
+import { 
+  researchCompany, 
+  generateICPSuggestions, 
+  generatePersonas,
+  cacheCompanyResearch,
+  getCachedResearch,
+  runFullCompanyResearch
+} from './services/companyResearch';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup development authentication ONLY if not in production
@@ -5003,6 +5011,377 @@ Best regards,
     } catch (error) {
       console.error("Error checking permissions:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to check permissions' });
+    }
+  });
+
+  // ==================== Onboarding Routes ====================
+  
+  // Research company from website URL
+  app.post("/api/onboarding/research-company", isAuthenticated, async (req: any, res) => {
+    try {
+      const { websiteUrl } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!websiteUrl) {
+        return res.status(400).json({ error: "Website URL is required" });
+      }
+      
+      // Get or create org for user
+      let user = await storage.getUser(userId);
+      let orgId = user?.currentOrgId;
+      
+      if (!orgId) {
+        // Create a new org for this user
+        let domain: string;
+        try {
+          const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
+          domain = url.hostname.replace('www.', '');
+        } catch {
+          domain = websiteUrl.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+        }
+        
+        const org = await storage.createOrganization({
+          name: domain,
+          domain,
+          website: websiteUrl,
+          createdBy: userId,
+        });
+        orgId = org.id;
+        
+        // Update user's current org
+        await storage.upsertUser({ id: userId, currentOrgId: orgId });
+        
+        // Assign Owner role
+        const ownerRole = await storage.getRoleByName('Owner');
+        if (ownerRole) {
+          await storage.createRoleAssignment({
+            userId,
+            orgId,
+            roleId: ownerRole.id,
+          });
+        }
+      }
+      
+      // Check for cached research first
+      const cached = await getCachedResearch(orgId);
+      if (cached?.research) {
+        return res.json({
+          research: cached.research,
+          icp: cached.icp,
+          personas: cached.personas,
+          fromCache: true,
+        });
+      }
+      
+      // Run full research
+      const result = await runFullCompanyResearch(websiteUrl, orgId);
+      
+      res.json({
+        ...result,
+        fromCache: false,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Research error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to research company',
+        nextSteps: ['Check the website URL is valid', 'Try again in a moment']
+      });
+    }
+  });
+
+  // Update ICP selections and regenerate personas
+  app.post("/api/onboarding/update-icp", isAuthenticated, async (req: any, res) => {
+    try {
+      const { selectedIndustries, selectedSizes, selectedRoles } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Get user's org
+      const user = await storage.getUser(userId);
+      if (!user?.currentOrgId) {
+        return res.status(400).json({ 
+          error: "No organization found. Please complete company research first.",
+          nextSteps: ['Go back and enter your company website']
+        });
+      }
+      
+      const orgId = user.currentOrgId;
+      
+      // Get cached research
+      const cached = await getCachedResearch(orgId);
+      if (!cached?.research) {
+        return res.status(400).json({ 
+          error: "No company research found. Please complete company research first.",
+          nextSteps: ['Go back and enter your company website']
+        });
+      }
+      
+      // Validate selections
+      if (!selectedIndustries?.length || !selectedSizes?.length || !selectedRoles?.length) {
+        return res.status(400).json({ 
+          error: "Please select at least one industry, company size, and role.",
+          nextSteps: ['Select at least one option in each category']
+        });
+      }
+      
+      // Generate new personas based on selections
+      const personas = await generatePersonas(
+        cached.research,
+        cached.icp!,
+        selectedIndustries,
+        selectedSizes,
+        selectedRoles
+      );
+      
+      // Update cache with new ICP selections and personas
+      await cacheCompanyResearch(
+        orgId,
+        cached.research,
+        { 
+          ...cached.icp!, 
+          industries: selectedIndustries,
+          companySizes: selectedSizes,
+          roles: selectedRoles
+        },
+        personas
+      );
+      
+      res.json({
+        personas,
+        icp: {
+          industries: selectedIndustries,
+          companySizes: selectedSizes,
+          roles: selectedRoles,
+        }
+      });
+    } catch (error) {
+      console.error('[Onboarding] Update ICP error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to update ICP',
+        nextSteps: ['Try again', 'Reduce the number of selections']
+      });
+    }
+  });
+
+  // Confirm/update user name from email
+  app.post("/api/onboarding/confirm-name", isAuthenticated, async (req: any, res) => {
+    try {
+      const { firstName, lastName } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!firstName) {
+        return res.status(400).json({ 
+          error: "First name is required",
+          nextSteps: ['Enter your first name']
+        });
+      }
+      
+      // Update user name
+      const updatedUser = await storage.upsertUser({
+        id: userId,
+        firstName,
+        lastName: lastName || '',
+      });
+      
+      res.json({
+        success: true,
+        user: {
+          id: updatedUser.id,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          email: updatedUser.email,
+        }
+      });
+    } catch (error) {
+      console.error('[Onboarding] Confirm name error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to update name',
+        nextSteps: ['Try again']
+      });
+    }
+  });
+
+  // Accept privacy statement
+  app.post("/api/onboarding/accept-privacy", isAuthenticated, async (req: any, res) => {
+    try {
+      const { accepted, bugReportingConsent } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (accepted !== true) {
+        return res.status(400).json({ 
+          error: "Privacy policy must be accepted to continue",
+          nextSteps: ['Accept the privacy policy to proceed']
+        });
+      }
+      
+      // Update user privacy acceptance
+      const updatedUser = await storage.upsertUser({
+        id: userId,
+        privacyAccepted: true,
+        bugReportingConsent: bugReportingConsent === true,
+      });
+      
+      res.json({
+        success: true,
+        privacyAccepted: updatedUser.privacyAccepted,
+        bugReportingConsent: updatedUser.bugReportingConsent,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Accept privacy error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to accept privacy policy',
+        nextSteps: ['Try again']
+      });
+    }
+  });
+
+  // Mark onboarding as complete, create initial assets
+  app.post("/api/onboarding/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get user's org
+      const user = await storage.getUser(userId);
+      if (!user?.currentOrgId) {
+        return res.status(400).json({ 
+          error: "No organization found. Please complete the onboarding steps.",
+          nextSteps: ['Start from the beginning of onboarding']
+        });
+      }
+      
+      // Check if privacy is accepted
+      if (!user.privacyAccepted) {
+        return res.status(400).json({ 
+          error: "Privacy policy must be accepted before completing onboarding",
+          nextSteps: ['Accept the privacy policy']
+        });
+      }
+      
+      const orgId = user.currentOrgId;
+      
+      // Get cached research to create initial assets
+      const cached = await getCachedResearch(orgId);
+      
+      // Mark onboarding as complete
+      const updatedUser = await storage.upsertUser({
+        id: userId,
+        onboardingCompleted: true,
+      });
+      
+      // Create initial personas from cached data if available
+      const createdPersonas: any[] = [];
+      if (cached?.personas?.length) {
+        for (const persona of cached.personas.slice(0, 5)) {
+          try {
+            const created = await storage.createPersona({
+              name: `${persona.title} - ${persona.industry}`,
+              description: `${persona.communicationStyle}. Pain points: ${persona.pains.join(', ')}`,
+              targetTitles: [persona.title],
+              industries: [persona.industry],
+              companySizes: [persona.companySize],
+              valuePropositions: persona.valueProps,
+              toneGuidelines: { style: persona.communicationStyle },
+              createdBy: userId,
+            });
+            createdPersonas.push(created);
+          } catch (err) {
+            console.error('[Onboarding] Error creating persona:', err);
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        onboardingCompleted: true,
+        assetsCreated: {
+          personas: createdPersonas.length,
+        },
+        nextSteps: ['Explore your personalized dashboard', 'Create your first sequence']
+      });
+    } catch (error) {
+      console.error('[Onboarding] Complete error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to complete onboarding',
+        nextSteps: ['Try again']
+      });
+    }
+  });
+
+  // Get current onboarding status
+  app.get("/api/onboarding/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get user data
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.json({
+          step: 'name',
+          completed: false,
+          hasOrg: false,
+          hasResearch: false,
+          privacyAccepted: false,
+          onboardingCompleted: false,
+        });
+      }
+      
+      const hasOrg = !!user.currentOrgId;
+      let hasResearch = false;
+      let research = null;
+      let icp = null;
+      let personas: any[] = [];
+      
+      if (hasOrg) {
+        const cached = await getCachedResearch(user.currentOrgId!);
+        hasResearch = !!cached?.research;
+        if (cached) {
+          research = cached.research;
+          icp = cached.icp;
+          personas = cached.personas || [];
+        }
+      }
+      
+      // Determine current step based on progress
+      let step = 'name';
+      if (user.firstName) {
+        step = 'company';
+      }
+      if (hasResearch) {
+        step = 'icp';
+      }
+      if (hasResearch && personas.length > 0) {
+        step = 'privacy';
+      }
+      if (user.privacyAccepted) {
+        step = 'complete';
+      }
+      if (user.onboardingCompleted) {
+        step = 'done';
+      }
+      
+      res.json({
+        step,
+        completed: user.onboardingCompleted || false,
+        hasOrg,
+        hasResearch,
+        privacyAccepted: user.privacyAccepted || false,
+        onboardingCompleted: user.onboardingCompleted || false,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        research,
+        icp,
+        personas,
+      });
+    } catch (error) {
+      console.error('[Onboarding] Status error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to get onboarding status',
+        nextSteps: ['Try refreshing the page']
+      });
     }
   });
 

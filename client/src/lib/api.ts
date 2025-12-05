@@ -219,4 +219,28 @@ export const api = {
     const response = await apiRequest("POST", "/api/onboarding/apply-config", data);
     return response.json();
   },
+  
+  // AI-Powered Onboarding APIs
+  getOnboardingStatus: () =>
+    fetch("/api/onboarding/status").then(res => res.json()),
+  researchCompany: async (websiteUrl: string) => {
+    const response = await apiRequest("POST", "/api/onboarding/research-company", { websiteUrl });
+    return response.json();
+  },
+  updateICP: async (data: { selectedIndustries: string[]; selectedSizes: string[]; selectedRoles: string[] }) => {
+    const response = await apiRequest("POST", "/api/onboarding/update-icp", data);
+    return response.json();
+  },
+  confirmName: async (data: { firstName: string; lastName?: string }) => {
+    const response = await apiRequest("POST", "/api/onboarding/confirm-name", data);
+    return response.json();
+  },
+  acceptPrivacy: async (data: { accepted: boolean; bugReportingConsent?: boolean }) => {
+    const response = await apiRequest("POST", "/api/onboarding/accept-privacy", data);
+    return response.json();
+  },
+  completeOnboarding: async () => {
+    const response = await apiRequest("POST", "/api/onboarding/complete", {});
+    return response.json();
+  },
 };

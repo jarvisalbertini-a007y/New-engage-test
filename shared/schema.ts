@@ -14,6 +14,51 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// ==================== RBAC & Multi-Tenancy Foundation ====================
+
+// Visibility scope type for data access
+export const visibilityScopes = ['personal', 'team', 'org'] as const;
+export type VisibilityScope = typeof visibilityScopes[number];
+
+// Organizations table - top-level multi-tenancy
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  domain: text("domain"),
+  website: text("website"),
+  industry: text("industry"),
+  size: text("size"),
+  description: text("description"),
+  valueProposition: text("value_proposition"),
+  differentiators: text("differentiators").array(),
+  competitors: text("competitors").array(),
+  aiProfile: jsonb("ai_profile"), // Cached AI research data
+  aiProfileLastUpdated: timestamp("ai_profile_last_updated"),
+  settings: jsonb("settings"), // Org-level settings
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Teams table - subdivision within organizations
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  leadId: varchar("lead_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Roles table - RBAC role definitions
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // Owner, Admin, Manager, SDR, ReadOnly
+  description: text("description"),
+  permissions: jsonb("permissions"), // Detailed permission flags
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // User storage table for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -22,8 +67,37 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: text("role").notNull().default("Sales Rep"),
+  currentOrgId: varchar("current_org_id"), // No FK to avoid circular ref
+  onboardingCompleted: boolean("onboarding_completed").default(false),
+  bugReportingConsent: boolean("bug_reporting_consent"),
+  privacyAccepted: boolean("privacy_accepted").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Role assignments - links users to orgs with specific roles
+export const roleAssignments = pgTable("role_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  roleId: varchar("role_id").references(() => roles.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id), // Optional team scope
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Customer profiles - AI token caching for organizations
+export const customerProfiles = pgTable("customer_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  icpData: jsonb("icp_data"), // ICP research cache
+  personaData: jsonb("persona_data"), // Generated personas cache
+  companyResearch: jsonb("company_research"), // Cached company research
+  valueProps: jsonb("value_props"), // Value propositions
+  messagingFramework: jsonb("messaging_framework"), // Messaging templates
+  tokensSaved: integer("tokens_saved").default(0),
+  lastAiCallAt: timestamp("last_ai_call_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const companies = pgTable("companies", {
@@ -1021,6 +1095,35 @@ export const benchmarkData = pgTable("benchmark_data", {
 });
 
 // Insert schemas
+
+// RBAC & Multi-Tenancy Insert Schemas
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamSchema = createInsertSchema(teams).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRoleSchema = createInsertSchema(roles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRoleAssignmentSchema = createInsertSchema(roleAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomerProfileSchema = createInsertSchema(customerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -1641,6 +1744,23 @@ export const insertAgentMetricsSchema = createInsertSchema(agentMetrics).omit({
 });
 
 // Types
+
+// RBAC & Multi-Tenancy Types
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = z.infer<typeof insertRoleSchema>;
+
+export type RoleAssignment = typeof roleAssignments.$inferSelect;
+export type InsertRoleAssignment = z.infer<typeof insertRoleAssignmentSchema>;
+
+export type CustomerProfile = typeof customerProfiles.$inferSelect;
+export type InsertCustomerProfile = z.infer<typeof insertCustomerProfileSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
