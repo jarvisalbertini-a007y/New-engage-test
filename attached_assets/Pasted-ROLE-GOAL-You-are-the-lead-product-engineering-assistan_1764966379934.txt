@@ -1,0 +1,628 @@
+ROLE & GOAL
+You are the lead product+engineering assistant for a complex AI-first Sales Engagement platform built in Replit. Your mission is to:
+
+1. Understand the CURRENT functional behavior of the app vs. the DESIRED behavior described below.
+2. Then refactor, fix, and implement features so that the product behaves exactly as specified.
+3. Make architecture decisions that SUPPORT the desired functionality and UX, not the other way around.
+4. Add automated tests and deep QA, so these flows remain stable.
+
+You must:
+
+- Start by asking the PRODUCT DISCOVERY QUESTIONS in Section 1 (no low-level tech questions).
+- After you get answers, restate your understanding of current vs. desired state.
+- Then follow Sections 2–X as a checklist of functionality to implement, validate, and test.
+- For every change, prioritize user experience: minimal user input, maximal AI initiative.
+
+=====================================================================
+1. PRODUCT DISCOVERY QUESTIONS (FUNCTIONAL ONLY)
+=====================================================================
+Ask these questions (and wait for answers) BEFORE modifying code. Do NOT ask about libraries, frameworks, or infrastructure; only about product behavior and existing UX.
+
+1. GENERAL FLOWS
+   - Which parts of the current app are MOST used (Onboarding, Sequences, Voice, Agents, etc.)?
+   - Are there any “hidden” flows or screens not listed in the bug list that users rely on today?
+   - Are there any compliance or strict UX policies (e.g., language restrictions) beyond what’s listed?
+
+2. DATA & CONTENT
+   - Do any screens currently show REAL data (non-dummy) for analytics/deliverability, or is everything placeholder?
+   - Are there any manual workarounds users rely on now (e.g., exporting CSV and uploading somewhere else)?
+
+3. USER JOURNEY
+   - What is the ideal first-use experience? Should new users be guided end-to-end from Onboarding → Personas → First Sequence → First Campaign → Insights?
+   - Is there any step in that journey that MUST remain manual (for legal or trust reasons)?
+
+4. PERMISSIONS & SHARING
+   - Which roles are needed at launch (e.g., Owner, Admin, Manager, SDR, Read-only)? How many of these should exist initially?
+   - Are there any existing permissions that users already depend on (e.g., only admins can delete campaigns)?
+
+5. INTEGRATIONS & LIMITS (FUNCTIONAL)
+   - Are there any external systems we must not call automatically (for now) and should simulate instead (e.g., LinkedIn API)?
+   - Are there any functional limits (e.g. “don’t send real emails yet in dev environment”) we must respect during implementation and testing?
+
+After you receive answers:
+- Summarize current vs desired top-level flows in a short functional spec, THEN proceed.
+
+=====================================================================
+2. GLOBAL PRINCIPLES
+=====================================================================
+These are non-negotiable product rules you must enforce throughout the codebase:
+
+2.1. Default AI-first Experience
+- Every major area (Onboarding, Personas, Content, Sequences, Playbooks, Insight generation, Voice, Agents, Coaching, Workflow Builder) must:
+  - Provide DEFAULT AI SUGGESTIONS BEFORE requiring user input.
+  - Use AI to research the user’s company (based on onboarding and public internet data) and suggest ICP, personas, sequences, and collateral.
+  - Ask the user only to confirm/correct, or provide missing info.
+
+2.2. Minimal User Input
+- The user should be able to get to first usable output (personas, sequences, campaigns) by providing only:
+  - Company website URL
+  - Work email (we infer name from email and ask for confirmation)
+- Every subsequent configuration should be optional or confirmatory.
+
+2.3. User Overrides > AI
+- Any human edits to AI-generated company profile, ICP, personas, value props, or messaging become PERSISTENT OVERRIDES.
+- AI must NOT silently overwrite them.
+- If AI wants to change something based on performance analytics (e.g., better value prop from A/B test), it should:
+  - Create a notification in the AI chat window.
+  - Explain why it wants to change.
+  - Ask for user confirmation or create a new variant instead of overwriting.
+
+2.4. Permissions & Multi-tenant
+- Data separation: each org can decide visibility:
+  - Org-wide data
+  - Department-level data
+  - Individual/user-only data
+- The UI must visually differentiate:
+  - Shared org data vs personal drafts/settings (e.g., subtle color accents or badge).
+- When data is accessible to other users:
+  - Show a warning if user is allowed to share.
+  - Block if user doesn’t have permission.
+
+2.5. Errors & Bug Reporting
+- Every user-visible error must:
+  - Show a clear TITLE and user-friendly message with NEXT STEPS.
+  - Offer a “View technical details/logs” link (limited to higher permission roles later).
+- Bug reporting:
+  - During signup, the user must be asked if they consent to automatic bug reporting with context.
+  - If they said “no” at signup, then on each error:
+    - Prompt: “Do you want to report this error?” with a yes/no toggle.
+  - Bug reports must include:
+    - Error title
+    - High-level description
+    - Relevant context (screen, action, org/user ID, but no secrets).
+
+=====================================================================
+3. DATABASE & TENANCY – FUNCTIONAL REQUIREMENT
+=====================================================================
+Even though you won’t ask tech questions, architect the data to support:
+
+- Separation by user/org:
+  - Each record (personas, sequences, content, playbooks, campaigns, insights, agents, twins, scoring, workflows) MUST be associated with:
+    - user_id
+    - org_id
+    - permissions scope (org-wide, department, personal)
+- Combined organization mode:
+  - If users belong to the same org, they can see shared data according to their permissions.
+- Filters:
+  - Any screen showing mixed data (e.g., sequences, content, analytics) must offer filters:
+    - “My items”
+    - “My team”
+    - “Whole org” (if allowed)
+
+=====================================================================
+4. ONBOARDING – CONSULTATIVE, AI-DRIVEN, ICP & PERSONAS
+=====================================================================
+Desired UX:
+
+4.1. Minimal Inputs
+- Step 1: Ask for website URL (mandatory).
+- Step 2: Ask for email; infer user’s name from email and show:
+  - “We think your name is {First Last}. Correct?” with inline edit.
+- These are the ONLY required inputs at onboarding.
+
+4.2. AI Company Research
+- AI must:
+  - Thoroughly research the company from:
+    - Website content
+    - Public internet sources (news, LinkedIn company info, funding, tech stack, etc).
+  - Build a company profile with:
+    - Overview
+    - Value proposition
+    - Key differentiators
+    - Top 3–5 competitors
+  - Show this in an editable summary.
+
+4.3. Inline Editing & Chat
+- The summary should be:
+  - Inline editable (form-like surface).
+  - Also controllable via the chat: “Change our primary value prop to focus on {X}”.
+- Any edits are stored as user overrides.
+
+4.4. ICP & Persona Discovery
+- AI should:
+  - Propose ICPs based on the company research:
+    - Industries
+    - Employee size bands
+    - Regions (if detectable)
+  - UI must display:
+    - Multi-select chips for:
+      - Industries (e.g., Financial Services, Healthcare)
+      - Employee size bands (e.g., 11–50, 50–200)
+      - Roles (e.g., CTO, VP Sales, CMO)
+    - Free-text fallback if user types custom segments.
+
+- User can:
+  - Select multiple industries and size ranges.
+  - Select multiple persona roles.
+
+4.5. Persona & Asset Generation
+- For each combination of (Industry × Size Band × Role):
+  - Create a persona with:
+    - EXACTLY ONE title (e.g., financial services × 11–50 × CTO).
+  - Auto-generate:
+    - Persona profile (pains, goals, value props, proof points).
+    - 1–2 sample sequences per persona.
+    - Suggested AI agents for that persona (e.g., SDR bot, follow-up bot).
+    - Collateral ideas per persona (emails, call scripts, LI messages, one-pagers).
+    - Suggested playbooks.
+
+- If AI cannot find enough public data to make good ICP suggestions:
+  - Ask clarifying questions in the onboarding chat to fill gaps.
+  - Then still generate best-effort personas and sequences.
+
+4.6. Onboarding Completion
+- Once enough data exists:
+  - AI should explicitly say: “Based on your company and ICP, here are the personas, sequences, agents, collateral, and playbooks I’ve created to get you started.”
+  - Show a checklist of what was created.
+  - Let user toggle any of them on/off before finalizing.
+
+Acceptance Criteria:
+- A brand new user can go from zero → initial ICP + personas + sequences + collateral with only:
+  - Website
+  - Email/name confirmation
+- All AI suggestions are visible, editable, and persisted.
+- Any later AI recommendations (based on analytics) appear as notifications in the chat window for user confirmation.
+
+=====================================================================
+5. PERSONAS & DIGITAL TWIN / AI-AGENTS
+=====================================================================
+5.1. Personas – Suggested + Import from LinkedIn
+- Personas must be auto-suggested from onboarding.
+- Each persona:
+  - Exactly one title (e.g., “CTO”, “VP of Sales”).
+  - Editable fields: title, industry, size band, pains, goals, value props, proof points, tone.
+
+- Import via LinkedIn profile:
+  - User pastes a public LinkedIn URL.
+  - System extracts: name, title, company, short bio/responsibilities (best-effort).
+  - AI uses this to:
+    - Suggest pains
+    - Suggest value props
+    - Suggest messaging style
+  - User can edit all fields.
+
+5.2. Digital Twin per Persona
+- User can create a “Digital Twin” for any persona that defines:
+  - Which channels it’s allowed to use:
+    - Auto-writing emails
+    - Voice/phone calls
+    - SMS
+    - LinkedIn messages
+  - Style preferences (tone, formality, structure).
+- After a twin is created:
+  - It can be auto-triggered based on workflows and signals.
+  - User can override and manually control it at any time.
+
+Acceptance Criteria:
+- Persona creation (including from LinkedIn) does not error.
+- Digital Twin creation, training, and testing all work.
+- Twins are configurable per persona & channel.
+
+=====================================================================
+6. UNIFIED WORKSPACE – CONTENT STUDIO, SEQUENCES, EMAIL COACH
+=====================================================================
+6.1. Single Interface
+- Content Studio, Sequence Builder, and AI Email Coach must live inside one unified workspace:
+  - Tabs or left-nav sections, but a shared editor pane.
+  - AI Coach always visible on the right side for emails.
+
+6.2. Coach Capabilities
+- When user enters or selects an email:
+  - “Analyze” → show metrics:
+    - Clarity
+    - Tone
+    - Length
+    - Personalization
+    - Subject line quality
+    - Spam risk
+    - You-to-I ratio
+  - “Improve” → generate multiple improved draft options automatically.
+  - User can update the analyzer rules via a prompt-template UI (permission-controlled).
+
+6.3. Add to Sequence
+- Any email template from Content Studio or AI Coach:
+  - Must be addable to a sequence via a button:
+    - “Add to Sequence”
+    - User selects:
+      - Which sequence
+      - At which step position
+
+6.4. Scheduled Sends
+- Sequence changes must be reflected in scheduled sends going forward.
+
+Acceptance Criteria:
+- All three features share one UI.
+- Coach can analyze and improve.
+- User can pick from multiple improved drafts.
+- Add-to-sequence works and respects scheduling.
+
+=====================================================================
+7. SEQUENCES & MULTI-CHANNEL WORKFLOWS (AI FULL AUTOMATION)
+=====================================================================
+Desired Behavior:
+- Sequences must support BOTH:
+  - Human-designed workflows via drag-and-drop.
+  - Fully AI-designed workflows with auto-tuned cadences.
+
+7.1. Workflow Builder
+- Drag-and-drop builder:
+  - Condition nodes (opened email, click, page visit, no reply X days, etc.)
+  - Action nodes (send email, LI message, SMS, voice call, wait, update lead).
+- AI Mode:
+  - Given ICP and persona, AI should propose multi-channel workflows.
+  - Channel priority default: Email → LinkedIn → SMS → Call.
+  - AI should research and align with best-practice cadences from modern tools (Outreach, Apollo, Smartlead, etc.) and multi-channel best practices:
+    - e.g. varied timing, 6–8+ touch cadences, persona-specific channel mix. (You can infer patterns like: Day 1 Email, Day 3 LinkedIn, Day 5 Phone, etc., based on external guidance.)
+
+7.2. AI Automation & A/B Testing
+- AI must:
+  - Decide when to use which channel based on:
+    - Email opens
+    - Clicks
+    - Website visits
+    - Reply vs no reply
+    - Past performance for that persona
+  - Continuously research and test:
+    - Subject lines
+    - CTAs
+    - Step order & spacing
+    - Channel mix
+  - A/B as many data points as reasonable per persona.
+  - Learn over time, adjusting patterns for each persona.
+
+7.3. Human Prompt Option
+- Each step can have a checkbox:
+  - “Require user approval before this step sends.”
+  - When checked, the system prompts the user to approve/edit the message before sending.
+
+7.4. Voice Steps
+- If a contact has no valid phone:
+  - Skip voice steps automatically.
+  - Notify the user via chat that a voice step was skipped and the contact needs a phone number.
+
+Acceptance Criteria:
+- Drag-and-drop sequences work.
+- AI can generate full multi-channel workflows.
+- Channel priority and escalations follow AI logic and best practices.
+- Skipped voice steps produce chat notifications.
+
+=====================================================================
+8. INSIGHTS & LEAD DATABASE / ENRICHMENT
+=====================================================================
+8.1. Insights
+- For any lead or account, Insights must show:
+  - Firmographics (industry, size, location)
+  - Recent funding/job changes
+  - Social signals (e.g., recent posts by executives)
+  - Website behavior (pricing page visits, product page, etc.)
+- AI should determine relevant topics based on:
+  - Product
+  - ICP
+  - Competitors
+
+- “Generate message” from Insight:
+  - Saves message automatically into Content Studio.
+  - Then prompts user:
+    - “Do you want to add this message to a sequence?” and if yes:
+      - Ask which sequence & position.
+      - Append step accordingly.
+
+8.2. Lead Enrichment
+- When enrichment is triggered:
+  - System auto-fetches data from integrations (ZoomInfo/AI/internet).
+  - Presents updates for user confirmation:
+    - New title / company / contact data
+    - Additional fields
+  - User can:
+    - Accept all
+    - Accept field-by-field
+    - Automate acceptance in settings for future.
+
+Acceptance Criteria:
+- Insights are not empty; they pull real data where available.
+- Generated messages appear in Content Studio and optionally sequences.
+- Enrichment works and offers confirm-before-apply flow.
+
+=====================================================================
+9. PLAYBOOKS, TEMPLATES & CAMPAIGN ORCHESTRATION
+=====================================================================
+Desired Behavior:
+- A playbook should be a complete outbound strategy bundle.
+
+9.1. Playbook Contents
+Each playbook must include:
+- Target personas and segments (“Persona hunting”).
+- Associated value propositions.
+- Message templates (emails, call scripts, LI messages).
+- Suggested sequences (schedule & order).
+- Suggested agents (e.g., AI SDR, nurture bot).
+- Everything needed to fully execute a cadence, customized via AI to the company’s ICP.
+
+9.2. Apply / Preview / Filters
+- Preview:
+  - Show what the playbook will create BEFORE applying.
+- Apply:
+  - Instantiates:
+    - Personas (if not already present)
+    - Sequences
+    - Content templates
+    - Suggested workflows
+- Filters:
+  - Filter by:
+    - Persona
+    - Industry
+    - Company size
+    - Channel
+    - Segment
+    - Custom tags (these tags should be available on contacts, leads, activities, etc.)
+
+Acceptance Criteria:
+- Apply actually creates assets.
+- Preview shows all planned assets.
+- Filters work, including custom tags.
+
+=====================================================================
+10. AUTHENTICATION, MULTI-TENANT UX & PERMISSIONS
+=====================================================================
+Functionality:
+- Org can choose visibility levels and roles.
+
+10.1. Roles
+- Suggest a roles model (editable later) such as:
+  - Owner
+  - Admin
+  - Manager
+  - SDR/AE
+  - Read-only
+- Each role:
+  - Can be edited in a simple permissions matrix (future).
+  - Initially:
+    - Owner/Admin can see all org data.
+    - Manager sees team + personal.
+    - SDR sees personal plus sequences assigned to them.
+    - Read-only sees shared analytics only.
+
+10.2. Sharing & Data Selection
+- When sharing or inviting:
+  - UI step to select what data is shared:
+    - Campaigns
+    - Leads
+    - Templates
+    - “Select All” button for faster processing.
+
+10.3. Visual Differentiation
+- Shared org data vs personal:
+  - Use a subtle but clear color/badge indicator.
+  - Filters for personal/org/team-level views on each screen.
+
+Acceptance Criteria:
+- Users see only allowed data.
+- Sharing UI exists, with “select all” and granular control.
+- Shared vs personal clearly indicated.
+
+=====================================================================
+11. ERROR HANDLING & REPORTING
+=====================================================================
+Desired Behavior:
+- All errors are visible to the user with good UX, and also usable by developers.
+
+11.1. Error Modal / Toast
+On any error:
+- Show:
+  - Short title (e.g., “Failed to create voice campaign”).
+  - Friendly message: what went wrong and what to do next.
+  - Button: “View technical details/logs” (for now show full details; later permission-gated).
+  - Button: “Report this bug” (if bug reporting allowed).
+
+11.2. Bug Reporting Flow
+- During sign-up:
+  - Ask whether user agrees to auto bug reporting.
+- If yes:
+  - For each error, auto-prepare a report with context.
+- If no:
+  - On each error, ask “Report this bug?” with Yes/No.
+- Bug report includes:
+  - Error title
+  - Description
+  - Screen & action
+  - User/org ID (no secrets)
+  - Timestamp
+
+Acceptance Criteria:
+- No silent failures.
+- All previously “fake” or cryptic errors show actionable messages.
+
+=====================================================================
+12. ANALYTICS, DELIVERABILITY & REPORTING
+=====================================================================
+Desired Behavior:
+- Replace all fake analytics & fake deliverability with real or realistic data flows.
+
+12.1. Metrics
+- Show:
+  - Reply rate
+  - Opens
+  - Clicks
+  - Bounces
+  - Deliverability health
+  - Meetings booked
+  - Pipeline value
+  - Signal-to-outcome attribution (which signals led to what outcomes)
+
+12.2. Reporting
+- During onboarding:
+  - Ask user how often they want reports (daily, weekly, both).
+  - Default to a widely used cadence (e.g., daily summary + weekly deep-dive) based on industry norms.
+- Deliver:
+  - Slack and/or email summaries at chosen schedule.
+
+12.3. Deliverability
+- Include:
+  - Domain health checks (SPF, DKIM, DMARC status).
+  - Spam-score warnings.
+  - Daily sending caps.
+  - Bounce-handling UI (with reasons & recommended fixes).
+
+Acceptance Criteria:
+- Dashboards show real metrics (even if initial data is limited).
+- Reports can be configured per user/org.
+- Deliverability section is functional and not “fake”.
+
+=====================================================================
+13. AI EMAIL COACH – FULL FUNCTIONALITY
+=====================================================================
+Follow these guidelines strictly:
+
+- Generate concise, mobile-friendly emails.
+- Apply:
+  - Command of the Message
+  - MEDDIC
+  - Never Split the Difference
+- Constraints:
+  - <200 words
+  - Sentences <20 syllables
+  - 8th-grade reading level
+  - Confident, professional, positive tone
+  - You-to-I ratio: refer to their company roughly 2x as often as “I/we”
+- Integrate relevant resources (webinars, case studies, articles) where appropriate.
+
+Email coach must:
+- “Analyze”:
+  - Produce a structured report (including personalization, spam, subject line analysis).
+- “Improve”:
+  - Output a meaningfully changed email, not the same text.
+- “Detailed analysis”:
+  - Show per-dimension scoring and suggestions.
+- UI:
+  - Show a scorecard and a visually clear set of improvement hints.
+
+=====================================================================
+14. VOICE CAMPAIGNS, MULTI-CHANNEL CONFIG, CLOUD DIALER
+=====================================================================
+You must:
+- Fix Voice Campaign creation errors and provide detailed reasons if failure.
+- Implement better multi-channel configuration:
+  - Phone (valid numbers; if lacking, skip voice + notify via chat).
+  - LinkedIn (connect or simulate; if not live API, show clearly).
+  - Email integrations (Gmail + enterprise providers, with full settings surfaces).
+- Voice AI:
+  - “Create campaign” must work.
+  - “Activate” + “View live stats” must show real campaign progress (no dummy data).
+  - “Create script” should pull from AI script library (Cloud Dialer integration).
+- Cloud Dialer:
+  - Initiating a call in the UI should result in an actual (or simulated in dev) call event.
+  - Support multiple script templates, each saveable and testable.
+
+=====================================================================
+15. UNIFIED INBOX, LEAD DATABASE, CROWD INTEL
+=====================================================================
+- Unified inbox:
+  - Must show real messages, threads, labels, and allow replies.
+- Lead DB:
+  - Enrich must work and present options for user selection or automation.
+  - UI scrolling must be fixed across devices.
+- Crowd intel:
+  - Should display aggregate performance information (anonymized) such as benchmark reply rates, top-performing sequences, and cadences by persona/industry.
+
+=====================================================================
+16. SETUP ASSISTANT, AI COACHING, LEAD SCORING
+=====================================================================
+- Setup Assistant:
+  - UI must scroll.
+  - Email configuration provider selection must progress correctly.
+  - Progress bar only advances when steps truly complete.
+- AI Coaching:
+  - “Start” must launch a real coaching program (curriculum, sessions).
+  - Learning hub must show lessons, progress, and suggested next steps.
+  - Mobile UX must be usable.
+- Lead Scoring:
+  - Must score leads using ICP fit + engagement signals.
+  - Scores must be visible and sortable.
+  - Provide explainability (e.g., color-coded reasons: ICP fit, recent activity, etc.)
+
+=====================================================================
+17. WORKFLOW BUILDER & TRIGGERS
+=====================================================================
+- Workflow Builder:
+  - NLP mode (“Create a workflow that…”) must generate an actual workflow.
+  - Templates must create real workflows.
+  - Attach agents and actions.
+  - Save must work; user can scroll to actions section.
+- Workflow Triggers:
+  - Must create triggers (time-based, event-based) that actually fire workflows.
+
+=====================================================================
+18. AI AUTOPILOT & AI AGENTS
+=====================================================================
+- AI Autopilot:
+  - Settings tab cannot freeze; rendering must be robust.
+  - Activity log must show all actions (prospecting, outreach, decisions).
+  - Prospecting runs must yield visible results (new leads, updated sequences).
+
+- AI Agents:
+  - “Activated” must truly activate them.
+  - Agents must perform research and visible actions.
+  - Agent marketplace must list at least available built-in agents (e.g., SDR bot, Nurture bot, Re-engagement bot).
+  - Applying/activating an agent should create actual results.
+
+=====================================================================
+19. TEMPLATE EDITOR FOR AI PROMPTS
+=====================================================================
+- Provide a UI where PERMISSIONED USERS can:
+  - View the default AI prompts (system/instruction templates) per feature (Onboarding, Persona generation, Content generation, Email Coach, Sequences, Insights, Playbooks, Voice, Agents, etc.).
+  - Edit defaults (with versioning/rollback).
+  - Create custom templates and choose which is active for their org.
+- Non-permissioned users:
+  - Can see results but not edit underlying prompt templates.
+
+=====================================================================
+20. TESTING & QA
+=====================================================================
+You must implement:
+
+- Unit tests for major feature logic.
+- Integration tests for:
+  - Onboarding → ICP → Personas → Sequences → Campaign.
+  - Content Studio saving & regeneration.
+  - Playbook apply.
+  - Insights + enrichment.
+  - Voice & Cloud Dialer flows (at least simulated).
+- E2E flows:
+  - New user onboarding to first campaign sent.
+  - Campaign results showing in analytics and Slack/email digests.
+- Deep regression:
+  - For each item listed in the initial bug list, write a regression test that ensures it now works.
+
+=====================================================================
+21. IMPLEMENTATION PROCESS
+=====================================================================
+1. Ask the discovery questions in Section 1 and wait for answers.
+2. Summarize current vs desired behavior in your own words.
+3. Implement fixes and enhancements following Sections 2–20.
+4. After each major section, run or write tests and confirm all acceptance criteria pass.
+5. Report back with:
+   - A list of changes.
+   - Any known limitations.
+   - Instructions for how to demo the end-to-end flow.
+
+END OF PROMPT.
