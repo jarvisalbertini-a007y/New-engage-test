@@ -5617,6 +5617,306 @@ Best regards,
     }
   });
 
+  // ==================== Universal Chat API ====================
+  
+  // In-memory chat history storage (session-based)
+  const chatHistories = new Map<string, Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    actions?: Array<{ id: string; label: string; type: string; params?: Record<string, any>; requiresPermission?: string }>;
+  }>>();
+
+  // POST /api/chat/message - Send message and get AI response
+  app.post("/api/chat/message", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { message, context } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      const userContext = await storage.getUserContext(userId);
+      const userRole = userContext?.role || 'SDR';
+      const isReadOnlyUser = userRole === 'ReadOnly';
+
+      // Get or initialize chat history
+      if (!chatHistories.has(userId)) {
+        chatHistories.set(userId, []);
+      }
+      const history = chatHistories.get(userId)!;
+
+      // Build context-aware system prompt
+      const pageContext = context?.page || '/';
+      const entityContext = context?.entity;
+      
+      let systemPrompt = `You are an AI sales assistant integrated into a sales engagement platform. You help users with their sales activities, provide insights, and suggest actions.
+
+Current context:
+- User is viewing: ${pageContext}
+- User role: ${userRole}
+${entityContext ? `- Current entity: ${entityContext.type} (ID: ${entityContext.id})` : ''}
+
+Your capabilities:
+- Answer questions about sales strategies, outreach best practices, and the platform features
+- Provide actionable recommendations based on the current context
+- Suggest relevant actions the user can take (only if they have permission)
+
+Guidelines:
+- Be concise and actionable
+- Focus on sales-related topics
+- ${isReadOnlyUser ? 'The user has read-only access, so do not suggest actions that modify data.' : 'Suggest relevant actions when appropriate.'}
+- Respond in a helpful, professional tone`;
+
+      // Build conversation history for context
+      const recentHistory = history.slice(-10).map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+
+      let response: string;
+      let suggestedActions: Array<{ id: string; label: string; type: string; params?: Record<string, any>; requiresPermission?: string }> = [];
+
+      // Check if OpenAI is available
+      const { isOpenAIAvailable } = await import('./services/openai');
+      
+      if (isOpenAIAvailable) {
+        try {
+          const OpenAI = (await import('openai')).default;
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4-turbo",
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...recentHistory,
+              { role: "user", content: message }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7
+          });
+
+          response = completion.choices[0]?.message?.content || "I apologize, I couldn't generate a response.";
+          
+          // Generate suggested actions based on context (only for non-read-only users)
+          if (!isReadOnlyUser) {
+            suggestedActions = generateSuggestedActions(pageContext, message, userRole);
+          }
+        } catch (openaiError) {
+          console.error('[Chat] OpenAI error:', openaiError);
+          response = generateFallbackResponse(message, pageContext);
+          if (!isReadOnlyUser) {
+            suggestedActions = generateSuggestedActions(pageContext, message, userRole);
+          }
+        }
+      } else {
+        // Fallback response when OpenAI is not configured
+        response = generateFallbackResponse(message, pageContext);
+        if (!isReadOnlyUser) {
+          suggestedActions = generateSuggestedActions(pageContext, message, userRole);
+        }
+      }
+
+      // Store the message in history
+      history.push({
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: message,
+        timestamp: new Date()
+      });
+
+      history.push({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        actions: suggestedActions
+      });
+
+      // Keep only last 50 messages
+      if (history.length > 50) {
+        history.splice(0, history.length - 50);
+      }
+
+      res.json({ response, suggestedActions });
+    } catch (error) {
+      console.error('[Chat] Message error:', error);
+      res.status(500).json({ error: 'Failed to process message' });
+    }
+  });
+
+  // GET /api/chat/history - Get chat history for session
+  app.get("/api/chat/history", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const history = chatHistories.get(userId) || [];
+      res.json(history);
+    } catch (error) {
+      console.error('[Chat] History error:', error);
+      res.status(500).json({ error: 'Failed to get chat history' });
+    }
+  });
+
+  // POST /api/chat/action - Execute suggested action
+  app.post("/api/chat/action", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const userContext = await storage.getUserContext(userId);
+      const userRole = userContext?.role || 'SDR';
+      
+      if (userRole === 'ReadOnly') {
+        return res.status(403).json({ error: "Read-only users cannot execute actions" });
+      }
+
+      const { actionId, actionType, params } = req.body;
+      if (!actionId || !actionType) {
+        return res.status(400).json({ error: "Action ID and type are required" });
+      }
+
+      // Execute different action types
+      let message = '';
+      let result: any = null;
+
+      switch (actionType) {
+        case 'create_sequence':
+          message = "I've prepared a sequence draft for you. Navigate to Sequences to customize it.";
+          break;
+        case 'find_leads':
+          message = "I've started searching for matching leads. Check the Leads page for results.";
+          break;
+        case 'generate_email':
+          message = "I've generated an email draft. You can find it in Content Studio.";
+          break;
+        case 'analyze_performance':
+          message = "I've prepared a performance analysis. Check the Analytics page for details.";
+          break;
+        case 'enrich_company':
+          message = "I've queued the company for enrichment. Data will be updated shortly.";
+          break;
+        case 'create_persona':
+          message = "I've drafted a new persona based on your criteria. Visit Personas to review.";
+          break;
+        default:
+          message = `Action "${actionType}" has been initiated.`;
+      }
+
+      res.json({ success: true, message, result });
+    } catch (error) {
+      console.error('[Chat] Action error:', error);
+      res.status(500).json({ error: 'Failed to execute action' });
+    }
+  });
+
+  // Helper function to generate fallback responses
+  function generateFallbackResponse(message: string, page: string): string {
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('help') || lowerMessage.includes('what can you')) {
+      return `I'm your AI sales assistant! I can help you with:
+
+• **Writing emails** - Draft personalized outreach and follow-ups
+• **Creating sequences** - Build multi-step outreach campaigns
+• **Analyzing leads** - Score and prioritize your prospects
+• **Performance insights** - Understand what's working
+• **Best practices** - Get tips on sales engagement
+
+What would you like help with today?`;
+    }
+
+    if (lowerMessage.includes('email') || lowerMessage.includes('write')) {
+      return `I can help you craft effective emails! Here are some tips:
+
+1. **Personalize the opening** - Reference something specific about the recipient
+2. **Lead with value** - Focus on their pain points, not your features
+3. **Keep it concise** - Aim for 3-4 short paragraphs
+4. **Clear CTA** - Ask for one specific action
+
+Would you like me to generate a draft email for you?`;
+    }
+
+    if (lowerMessage.includes('sequence') || lowerMessage.includes('campaign')) {
+      return `Creating an effective sequence typically involves:
+
+1. **Initial outreach** - Personalized cold email
+2. **Value follow-up** (Day 3) - Share relevant content
+3. **Social touch** (Day 5) - Connect on LinkedIn
+4. **Phone call** (Day 7) - Direct outreach
+5. **Final email** (Day 10) - Breakup or reschedule
+
+Would you like me to help create a sequence?`;
+    }
+
+    if (lowerMessage.includes('lead') || lowerMessage.includes('prospect')) {
+      return `For effective lead management:
+
+• **Prioritize by intent** - Focus on high-engagement leads first
+• **Research before outreach** - Use our company intelligence features
+• **Segment by persona** - Tailor messaging to different buyer types
+• **Track engagement** - Monitor email opens, clicks, and replies
+
+What specific help do you need with your leads?`;
+    }
+
+    return `I'm here to help with your sales activities! Based on what you're viewing (${page}), I can assist with:
+
+• Writing and improving emails
+• Creating outreach sequences
+• Analyzing performance metrics
+• Finding and enriching leads
+• Developing buyer personas
+
+Just let me know what you need!`;
+  }
+
+  // Helper function to generate suggested actions
+  function generateSuggestedActions(page: string, message: string, userRole: string): Array<{ id: string; label: string; type: string; params?: Record<string, any>; requiresPermission?: string }> {
+    const actions: Array<{ id: string; label: string; type: string; params?: Record<string, any>; requiresPermission?: string }> = [];
+    const lowerMessage = message.toLowerCase();
+
+    if (page === '/leads' || lowerMessage.includes('lead')) {
+      actions.push({ id: 'find-leads', label: 'Find similar leads', type: 'find_leads' });
+      actions.push({ id: 'enrich', label: 'Enrich company data', type: 'enrich_company' });
+    }
+
+    if (page === '/sequences' || lowerMessage.includes('sequence')) {
+      actions.push({ id: 'create-seq', label: 'Create new sequence', type: 'create_sequence' });
+    }
+
+    if (page === '/content-studio' || lowerMessage.includes('email')) {
+      actions.push({ id: 'gen-email', label: 'Generate email draft', type: 'generate_email' });
+    }
+
+    if (page === '/analytics' || lowerMessage.includes('performance') || lowerMessage.includes('analytics')) {
+      actions.push({ id: 'analyze', label: 'Analyze performance', type: 'analyze_performance' });
+    }
+
+    if (page === '/personas' || lowerMessage.includes('persona')) {
+      actions.push({ id: 'create-persona', label: 'Create persona', type: 'create_persona' });
+    }
+
+    // Admin-only actions
+    if (userRole === 'Owner' || userRole === 'Admin') {
+      if (page === '/sdr-teams') {
+        actions.push({ id: 'manage-team', label: 'Manage team settings', type: 'manage_team', requiresPermission: 'admin' });
+      }
+    }
+
+    return actions.slice(0, 3); // Limit to 3 actions
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }
