@@ -4249,6 +4249,52 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
+  // Sequence Execution methods
+  async getSequenceExecution(id: string): Promise<SequenceExecution | undefined> {
+    const result = await db.select().from(sequenceExecutions).where(eq(sequenceExecutions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSequenceExecutions(filters?: { sequenceId?: string; contactId?: string; status?: string }): Promise<SequenceExecution[]> {
+    let query = db.select().from(sequenceExecutions);
+    const conditions = [];
+    
+    if (filters?.sequenceId) {
+      conditions.push(eq(sequenceExecutions.sequenceId, filters.sequenceId));
+    }
+    
+    if (filters?.contactId) {
+      conditions.push(eq(sequenceExecutions.contactId, filters.contactId));
+    }
+    
+    if (filters?.status) {
+      conditions.push(eq(sequenceExecutions.status, filters.status));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query;
+  }
+
+  async createSequenceExecution(insertExecution: InsertSequenceExecution): Promise<SequenceExecution> {
+    const result = await db.insert(sequenceExecutions).values(insertExecution).returning();
+    return result[0];
+  }
+
+  async updateSequenceExecution(id: string, updates: Partial<SequenceExecution>): Promise<SequenceExecution | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getSequenceExecution(id);
+    const result = await db.update(sequenceExecutions).set(cleaned).where(eq(sequenceExecutions.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSequenceExecution(id: string): Promise<boolean> {
+    const result = await db.delete(sequenceExecutions).where(eq(sequenceExecutions.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Email methods
   async getEmail(id: string): Promise<Email | undefined> {
     const result = await db.select().from(emails).where(eq(emails.id, id)).limit(1);

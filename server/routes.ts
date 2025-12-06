@@ -1,10 +1,80 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage as legacyStorage } from "./storage";
+import { storage as legacyStorage, UserContext } from "./storage";
 import { ContentStudioStorage } from "./storage/contentStudioStorage";
 
 // Use legacy storage directly for most routes
 const storage = legacyStorage;
+
+// Extend Express Request to include userContext for RBAC
+declare global {
+  namespace Express {
+    interface Request {
+      userContext?: UserContext;
+    }
+  }
+}
+
+// RBAC Middleware: Populates user context from storage
+async function populateUserContext(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = (req as any).user?.claims?.sub;
+    if (userId) {
+      const context = await storage.getUserContext(userId);
+      req.userContext = context || undefined;
+    }
+    next();
+  } catch (error) {
+    console.error("[RBAC] Error populating user context:", error);
+    next();
+  }
+}
+
+// RBAC Middleware: Requires user to have org access
+function requireOrgAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.userContext?.orgId) {
+    return res.status(403).json({ error: "No organization access" });
+  }
+  next();
+}
+
+// RBAC Helper: Check if user can perform action based on role
+function hasPermission(userContext: UserContext | undefined, permission: string): boolean {
+  if (!userContext) return false;
+  return userContext.permissions?.[permission] === true;
+}
+
+// RBAC Helper: Check if user can view all data (Owners, Admins, Managers with view_all_data)
+function canViewAllData(userContext: UserContext | undefined): boolean {
+  return hasPermission(userContext, 'view_all_data');
+}
+
+// RBAC Helper: Check if user can edit all data (Owners, Admins, Managers with edit_all_data)
+function canEditAllData(userContext: UserContext | undefined): boolean {
+  return hasPermission(userContext, 'edit_all_data');
+}
+
+// RBAC Helper: Check if user can delete data
+function canDeleteData(userContext: UserContext | undefined): boolean {
+  return hasPermission(userContext, 'delete_data');
+}
+
+// RBAC Helper: Check if user is Owner or Admin
+function isOwnerOrAdmin(userContext: UserContext | undefined): boolean {
+  if (!userContext) return false;
+  return userContext.role === 'Owner' || userContext.role === 'Admin';
+}
+
+// RBAC Helper: Check if user is Manager or above
+function isManagerOrAbove(userContext: UserContext | undefined): boolean {
+  if (!userContext) return false;
+  return ['Owner', 'Admin', 'Manager'].includes(userContext.role);
+}
+
+// RBAC Helper: Check if user is ReadOnly
+function isReadOnly(userContext: UserContext | undefined): boolean {
+  return userContext?.role === 'ReadOnly';
+}
 // Create typed facade for Content Studio endpoints only
 const contentStudioStorage = new ContentStudioStorage(legacyStorage);
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -125,6 +195,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Seed default roles endpoint (for development/setup)
+  app.post("/api/admin/seed-roles", async (req, res) => {
+    try {
+      await storage.seedDefaultRoles();
+      const roles = await storage.getAllRoles();
+      res.json({ message: "Roles seeded successfully", roles });
+    } catch (error) {
+      console.error('[Seed] Error seeding roles:', error);
+      res.status(500).json({ error: 'Failed to seed roles' });
+    }
+  });
+
+  // Get all roles endpoint
+  app.get("/api/roles", isAuthenticated, async (req, res) => {
+    try {
+      const roles = await storage.getAllRoles();
+      res.json(roles);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get roles' });
     }
   });
 
@@ -274,33 +366,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   
-  // Company Routes
-  app.get("/api/companies", async (req: any, res) => {
+  // Company Routes - RBAC enforced
+  app.get("/api/companies", populateUserContext, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const companies = await storage.getCompanies({ userId, limit });
+      
+      // RBAC: Apply visibility scoping based on user role
+      // - Owner/Admin/Manager with view_all_data: see all org data (using no userId filter)
+      // - SDR: see only personal data (filter by userId)
+      // - ReadOnly: see all org data (if view_all_data permission)
+      let companies;
+      if (canViewAllData(req.userContext)) {
+        // Users with view_all_data permission can see all companies
+        companies = await storage.getCompanies({ limit });
+      } else {
+        // SDR and others only see their own data
+        companies = await storage.getCompanies({ userId, limit });
+      }
+      
       res.json(companies);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.get("/api/companies/:id", async (req, res) => {
+  app.get("/api/companies/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const company = await storage.getCompany(req.params.id);
       if (!company) {
         return res.status(404).json({ error: "Company not found" });
       }
+      
+      // RBAC: Check if user can access this company
+      // Owner/Admin/Manager can see all; SDR only sees own data
+      if (!canViewAllData(req.userContext) && company.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
       res.json(company);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/companies", async (req: any, res) => {
+  app.post("/api/companies", populateUserContext, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      
+      // RBAC: ReadOnly users cannot create data
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot create companies" });
+      }
+      
       const validatedData = insertCompanySchema.parse({ ...req.body, userId });
       const company = await storage.createCompany(validatedData);
       res.json(company);
@@ -309,29 +428,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Update company endpoint
-  app.put("/api/companies/:id", async (req, res) => {
+  // Update company endpoint - RBAC enforced
+  app.put("/api/companies/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
       const updates = req.body;
+      
+      // RBAC: Check permissions before updating
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot update companies" });
+      }
+      
+      // Get existing company to check ownership
+      const existingCompany = await storage.getCompany(id);
+      if (!existingCompany) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      
+      // RBAC: SDR can only edit own data; Managers+ can edit all
+      if (!canEditAllData(req.userContext) && existingCompany.userId !== userId) {
+        return res.status(403).json({ error: "Access denied - you can only edit your own companies" });
+      }
       
       // Remove id from updates if present
       delete updates.id;
       
       const company = await storage.updateCompany(id, updates);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
-      }
       res.json(company);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update company' });
     }
   });
   
-  // Delete company endpoint
-  app.delete("/api/companies/:id", async (req, res) => {
+  // Delete company endpoint - RBAC enforced
+  app.delete("/api/companies/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
+      
+      // RBAC: Only users with delete_data permission can delete
+      if (!canDeleteData(req.userContext)) {
+        return res.status(403).json({ error: "You don't have permission to delete companies" });
+      }
+      
+      // Get existing company to check ownership
+      const existingCompany = await storage.getCompany(id);
+      if (!existingCompany) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      
       const success = await storage.deleteCompany(id);
       if (!success) {
         return res.status(404).json({ error: "Company not found" });
@@ -366,22 +512,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contact Routes
-  app.get("/api/contacts", async (req: any, res) => {
+  // Contact Routes - RBAC enforced
+  app.get("/api/contacts", populateUserContext, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const companyId = req.query.companyId as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const contacts = await storage.getContacts({ userId, companyId, limit });
+      
+      // RBAC: Apply visibility scoping based on user role
+      let contacts;
+      if (canViewAllData(req.userContext)) {
+        // Users with view_all_data permission can see all contacts
+        contacts = await storage.getContacts({ companyId, limit });
+      } else {
+        // SDR and others only see their own data
+        contacts = await storage.getContacts({ userId, companyId, limit });
+      }
+      
       res.json(contacts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/contacts", async (req: any, res) => {
+  app.post("/api/contacts", populateUserContext, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      
+      // RBAC: ReadOnly users cannot create data
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot create contacts" });
+      }
+      
       const validatedData = insertContactSchema.parse({ ...req.body, userId });
       const contact = await storage.createContact(validatedData);
       res.json(contact);
@@ -390,29 +552,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update contact endpoint
-  app.put("/api/contacts/:id", async (req, res) => {
+  // Update contact endpoint - RBAC enforced
+  app.put("/api/contacts/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
       const updates = req.body;
+      
+      // RBAC: Check permissions before updating
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot update contacts" });
+      }
+      
+      // Get existing contact to check ownership
+      const existingContact = await storage.getContact(id);
+      if (!existingContact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      
+      // RBAC: SDR can only edit own data; Managers+ can edit all
+      if (!canEditAllData(req.userContext) && existingContact.userId !== userId) {
+        return res.status(403).json({ error: "Access denied - you can only edit your own contacts" });
+      }
       
       // Remove id from updates if present
       delete updates.id;
       
       const contact = await storage.updateContact(id, updates);
-      if (!contact) {
-        return res.status(404).json({ error: "Contact not found" });
-      }
       res.json(contact);
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update contact' });
     }
   });
   
-  // Delete contact endpoint
-  app.delete("/api/contacts/:id", async (req, res) => {
+  // Delete contact endpoint - RBAC enforced
+  app.delete("/api/contacts/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
+      
+      // RBAC: Only users with delete_data permission can delete
+      if (!canDeleteData(req.userContext)) {
+        return res.status(403).json({ error: "You don't have permission to delete contacts" });
+      }
+      
+      // Get existing contact to check ownership
+      const existingContact = await storage.getContact(id);
+      if (!existingContact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      
       const success = await storage.deleteContact(id);
       if (!success) {
         return res.status(404).json({ error: "Contact not found" });
@@ -645,22 +834,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sequence Routes
-  app.get("/api/sequences", async (req: any, res) => {
+  // Sequence Routes - RBAC enforced
+  app.get("/api/sequences", populateUserContext, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const status = req.query.status as string;
-      const sequences = await storage.getSequences({ createdBy: userId, status });
+      
+      // RBAC: Apply visibility scoping based on user role
+      let sequences;
+      if (canViewAllData(req.userContext)) {
+        // Users with view_all_data permission can see all sequences
+        sequences = await storage.getSequences({ status });
+      } else {
+        // SDR and others only see their own data
+        sequences = await storage.getSequences({ createdBy: userId, status });
+      }
+      
       res.json(sequences);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  app.post("/api/sequences", async (req, res) => {
+  app.post("/api/sequences", populateUserContext, async (req: any, res) => {
     try {
-      // Add createdBy from authenticated user
-      const userId = (req.user as any)?.claims?.sub || null;
+      const userId = req.user?.claims?.sub;
+      
+      // RBAC: ReadOnly users cannot create data
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot create sequences" });
+      }
+      
       const sequenceData = {
         ...req.body,
         createdBy: userId,
@@ -679,24 +883,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update a sequence
-  app.patch("/api/sequences/:id", async (req, res) => {
+  // Update a sequence - RBAC enforced
+  app.patch("/api/sequences/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
-      const sequence = await storage.updateSequence(id, req.body);
-      if (!sequence) {
+      
+      // RBAC: Check permissions before updating
+      if (isReadOnly(req.userContext)) {
+        return res.status(403).json({ error: "Read-only users cannot update sequences" });
+      }
+      
+      // Get existing sequence to check ownership
+      const existingSequence = await storage.getSequence(id);
+      if (!existingSequence) {
         return res.status(404).json({ error: "Sequence not found" });
       }
+      
+      // RBAC: SDR can only edit own data; Managers+ can edit all
+      if (!canEditAllData(req.userContext) && existingSequence.createdBy !== userId) {
+        return res.status(403).json({ error: "Access denied - you can only edit your own sequences" });
+      }
+      
+      const sequence = await storage.updateSequence(id, req.body);
       res.json(sequence);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
-  // Delete a sequence
-  app.delete("/api/sequences/:id", async (req, res) => {
+  // Delete a sequence - RBAC enforced
+  app.delete("/api/sequences/:id", populateUserContext, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
+      
+      // RBAC: Only users with delete_data permission can delete
+      if (!canDeleteData(req.userContext)) {
+        return res.status(403).json({ error: "You don't have permission to delete sequences" });
+      }
+      
+      // Get existing sequence to check ownership
+      const existingSequence = await storage.getSequence(id);
+      if (!existingSequence) {
+        return res.status(404).json({ error: "Sequence not found" });
+      }
+      
       const success = await storage.deleteSequence(id);
       if (!success) {
         return res.status(404).json({ error: "Sequence not found" });

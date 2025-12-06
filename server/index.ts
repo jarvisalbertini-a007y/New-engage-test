@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeWorkflowData } from "./services/workflowTemplates";
 import { initializePlaybookTemplates } from "./services/seedPlaybooks";
+import { storage } from "./storage";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
@@ -137,6 +138,12 @@ async function initializeServer(): Promise<Server> {
   // Initialize playbook templates
   await initializePlaybookTemplates();
   console.log("[Server] Playbook templates initialized");
+  
+  // Seed default roles
+  await storage.seedDefaultRoles().catch(err => 
+    console.error('[Startup] Failed to seed default roles:', err)
+  );
+  console.log("[Server] Default roles seeded");
   
   // Initialize AI Agent Executor service
   const { aiAgentExecutor } = await import("./services/aiAgentExecutor");
