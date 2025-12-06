@@ -29,7 +29,10 @@ The platform is built with a modern web stack:
     - **Revenue Operations Command Center**: Deal forensics AI, pipeline health monitoring, and coaching insights.
     - **Native Multi-Channel Orchestration**: Seamless coordination across various communication channels, including voice AI integration for automated calls.
     - **Workflow Automation**: NLP-first workflow creation with a visual drag-and-drop editor, specialized AI agents, smart triggers, and human-in-the-loop controls.
-- **Security**: Comprehensive security measures including Helmet.js, rate limiting, payload size limits, secure session management, and robust file access protection, addressing OWASP Top 10 vulnerabilities. All API endpoints are protected with global authentication middleware.
+- **AI-First Onboarding**: 7-step guided flow where users provide minimal input (website URL) and AI researches company, generates ICP suggestions, creates personas, and designs sequences automatically.
+    - **Universal Chat Interface**: Permission-aware floating chat accessible from anywhere in the app with context-aware quick actions and AI assistance.
+    - **RBAC (Role-Based Access Control)**: Multi-tenancy support with 5 roles (Owner, Admin, Manager, SDR, ReadOnly), organization-scoped data isolation, and visibility scopes (personal/team/org).
+- **Security**: Comprehensive security measures including Helmet.js, rate limiting, payload size limits, secure session management, RBAC enforcement on all data routes, and robust file access protection, addressing OWASP Top 10 vulnerabilities. All API endpoints are protected with global authentication middleware.
 - **Project Structure**: Organized into `server/`, `client/`, and `shared/` directories, with clear separation of concerns for database, API routes, services, UI components, and shared schemas.
 
 ## External Dependencies
