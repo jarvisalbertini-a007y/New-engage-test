@@ -1,19 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+export interface User {
+  id?: string;
+  email?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+}
+
 // Authentication can be bypassed in demo mode for testing
 const TESTING_MODE = window.location.hostname === 'localhost' && 
   new URLSearchParams(window.location.search).get('demo') === 'true';
 
-export function useAuth() {
+export function useAuth(): { user: User | undefined; isLoading: boolean; isAuthenticated: boolean; logout: () => void } {
   // In testing mode, return mock authenticated user
   if (TESTING_MODE) {
-    const mockUser = {
+    const mockUser: User = {
       id: 'test-user-123',
       email: 'test@example.com',
       name: 'Test User',
       firstName: 'Test',
-      lastName: 'User'
+      lastName: 'User',
+      profileImageUrl: undefined
     };
     
     return {
@@ -25,7 +35,7 @@ export function useAuth() {
   }
   
   // Normal authentication flow
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     retry: false,
   });

@@ -5,18 +5,12 @@ import {
   Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, 
   Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut,
   Menu, X, ChevronLeft, ChevronRight, Store, Sparkles, GitBranch, TrendingUp,
-  Globe, Network, Building2
+  Globe, Network, Building2, Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-
-// Type definition for user object
-interface User {
-  profileImageUrl?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-}
+import { useAuth, User } from "@/hooks/useAuth";
+import { useNotifications } from "@/contexts/notifications-context";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,8 +28,9 @@ import {
 
 const navigation = [
   {
-    name: "Intelligence",
+    name: "Mission Control",
     items: [
+      { name: "Pulse", href: "/pulse", icon: Zap, badge: "new" },
       { name: "Dashboard", href: "/dashboard", icon: ChartLine },
       { name: "Deal Intelligence", href: "/deal-intelligence", icon: Brain },
       { name: "Revenue Operations", href: "/revenue-ops", icon: TrendingUp },
@@ -89,6 +84,7 @@ const navigation = [
 export default function CollapsibleSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { unreadCount, urgentCount, setIsOpen: openNotifications } = useNotifications();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     // Initialize from localStorage or default based on screen size
     const saved = localStorage.getItem("sidebarCollapsed");
@@ -168,13 +164,35 @@ export default function CollapsibleSidebar() {
         )}>
           <div className={cn(
             "flex items-center",
-            isCollapsed ? "justify-center" : "space-x-3"
+            isCollapsed ? "justify-center" : "justify-between"
           )}>
-            <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center soft-shadow">
-              <Brain className="h-4 w-4 text-primary-foreground" />
+            <div className={cn("flex items-center", !isCollapsed && "space-x-3")}>
+              <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center soft-shadow">
+                <Brain className="h-4 w-4 text-primary-foreground" />
+              </div>
+              {!isCollapsed && (
+                <span className="font-bold text-lg text-foreground">SalesAI Pro</span>
+              )}
             </div>
             {!isCollapsed && (
-              <span className="font-bold text-lg text-foreground">SalesAI Pro</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-8 w-8"
+                onClick={() => openNotifications(true)}
+                data-testid="notifications-trigger"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <Badge
+                    variant={urgentCount > 0 ? "destructive" : "default"}
+                    className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px]"
+                    data-testid="notifications-badge"
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Button>
             )}
           </div>
         </div>

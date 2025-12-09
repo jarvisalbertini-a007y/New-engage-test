@@ -8,7 +8,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatContextProvider, useChatContext } from "@/contexts/chat-context";
+import { NotificationsProvider } from "@/contexts/notifications-context";
+import { AgentNotificationsPanel } from "@/components/agent-notifications";
 import { UniversalChat } from "@/components/universal-chat";
+import { ConsultativeSidecar } from "@/components/consultative-sidecar";
 import Dashboard from "@/pages/dashboard";
 import DashboardAi from "@/pages/dashboard-ai";
 import OutreachReview from "@/pages/outreach-review";
@@ -48,6 +51,7 @@ import VoiceAIPage from "@/pages/voice-ai";
 import { BrowserExtension } from "@/pages/browser-extension";
 import CrowdIntelPage from "@/pages/crowd-intel";
 import EnterprisePage from "@/pages/enterprise";
+import PulseDashboard from "@/pages/pulse-dashboard";
 
 function ChatContextUpdater() {
   const [location] = useLocation();
@@ -128,11 +132,13 @@ function Router() {
               <Route path="/browser-extension" component={BrowserExtension} />
               <Route path="/crowd-intel" component={CrowdIntelPage} />
               <Route path="/enterprise" component={EnterprisePage} />
+              <Route path="/pulse" component={PulseDashboard} />
               <Route component={NotFound} />
             </Switch>
           </div>
         </div>
         <UniversalChat />
+        <ConsultativeSidecar />
       </>
     );
   }
@@ -201,11 +207,13 @@ function Router() {
             <Route path="/browser-extension" component={BrowserExtension} />
             <Route path="/crowd-intel" component={CrowdIntelPage} />
             <Route path="/enterprise" component={EnterprisePage} />
+            <Route path="/pulse" component={PulseDashboard} />
             <Route component={NotFound} />
           </Switch>
         </div>
       </div>
       <UniversalChat />
+      <ConsultativeSidecar />
     </>
   );
 }
@@ -214,10 +222,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ChatContextProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <NotificationsProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+            <AgentNotificationsPanel />
+          </TooltipProvider>
+        </NotificationsProvider>
       </ChatContextProvider>
     </QueryClientProvider>
   );

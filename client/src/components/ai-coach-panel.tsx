@@ -6,6 +6,12 @@ import { Wand2, NotebookPen, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+interface EmailAnalysis {
+  score: number;
+  suggestions?: string[];
+  spamScore: number;
+}
+
 interface AICoachPanelProps {
   initialContent?: string;
   onImprove?: (improved: { subject: string; body: string }) => void;
@@ -15,7 +21,7 @@ interface AICoachPanelProps {
 export default function AICoachPanel({ initialContent = "", onImprove, onAddToSequence }: AICoachPanelProps) {
   const [emailContent, setEmailContent] = useState(initialContent);
 
-  const { data: analysis, isLoading: analyzing } = useQuery({
+  const { data: analysis, isLoading: analyzing } = useQuery<EmailAnalysis>({
     queryKey: ["/api/emails/analyze", emailContent],
     enabled: emailContent.length > 10,
     staleTime: 1000 * 60 * 5, // 5 minutes

@@ -243,4 +243,10 @@ export const api = {
     const response = await apiRequest("POST", "/api/onboarding/complete", {});
     return response.json();
   },
+  
+  // Genius onboarding - single call that does everything
+  geniusSetup: async (websiteUrl: string) => {
+    const response = await apiRequest("POST", "/api/onboarding/genius-setup", { websiteUrl });
+    return response.json();
+  },
 };

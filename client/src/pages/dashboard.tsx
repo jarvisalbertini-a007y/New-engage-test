@@ -11,25 +11,59 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
+interface DashboardStats {
+  activeVisitors: number;
+  replyRate: number;
+  pipelineValue: number;
+  aiSequences: number;
+}
+
+interface ActiveVisitor {
+  session: { id: string; pagesViewed?: string[] };
+  company: { name: string; location?: string; industry?: string; size?: string };
+  intentScore: number;
+  timeAgo: string;
+}
+
+interface Sequence {
+  id: string;
+  name: string;
+  status: string;
+}
+
+interface Insight {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  priority: string;
+}
+
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: activeVisitors, isLoading: visitorsLoading } = useQuery({
+  const { data: activeVisitors, isLoading: visitorsLoading } = useQuery<ActiveVisitor[]>({
     queryKey: ["/api/visitors/active"],
   });
 
-  const { data: sequences, isLoading: sequencesLoading } = useQuery({
+  const { data: sequences, isLoading: sequencesLoading } = useQuery<Sequence[]>({
     queryKey: ["/api/sequences"],
   });
 
-  const { data: insights, isLoading: insightsLoading } = useQuery({
+  const { data: insights, isLoading: insightsLoading } = useQuery<Insight[]>({
     queryKey: ["/api/insights"],
     queryFn: () => api.getInsights({ limit: 10 }),
   });
 
-  const { data: tasks, isLoading: tasksLoading } = useQuery({
+  const { data: tasks, isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
     queryFn: () => api.getTasks({ status: "pending" }),
   });
