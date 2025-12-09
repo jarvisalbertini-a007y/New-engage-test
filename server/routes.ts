@@ -6145,6 +6145,92 @@ Just let me know what you need!`;
     return actions.slice(0, 3); // Limit to 3 actions
   }
 
+  // ====== Pulse Dashboard API ======
+  app.get("/api/pulse/decisions", async (req: any, res) => {
+    try {
+      // Return mock decision cards for the Pulse dashboard
+      const decisions = [
+        {
+          id: '1',
+          type: 'opportunity',
+          title: '50 Series B CFOs Found',
+          description: 'Identified 50 CFOs at recently funded Series B companies that match your ICP.',
+          aiInsight: 'These leads have 3x higher conversion rate based on your historical data.',
+          actions: [
+            { label: 'Start Outreach', action: 'start_outreach', variant: 'primary' },
+            { label: 'Add to List', action: 'add_to_list', variant: 'secondary' }
+          ],
+          timestamp: new Date().toISOString(),
+          priority: 'high',
+          dismissed: false
+        },
+        {
+          id: '2',
+          type: 'optimization',
+          title: 'Open Rates Dropped 15%',
+          description: 'Your email open rates have decreased from 32% to 27% over the past week.',
+          aiInsight: 'Subject lines are averaging 12 words. Consider shortening to 6-8 words.',
+          actions: [
+            { label: 'Apply Fix', action: 'apply_fix', variant: 'primary' },
+            { label: 'Ignore', action: 'dismiss', variant: 'secondary' }
+          ],
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+          priority: 'medium',
+          dismissed: false
+        },
+        {
+          id: '3',
+          type: 'alert',
+          title: 'Buying Signal: Acme Corp',
+          description: 'Acme Corp just raised $40M Series B and is hiring 5 SDRs.',
+          aiInsight: 'High probability of needing sales enablement tools. Mention speed-to-ramp.',
+          actions: [
+            { label: 'Engage Now', action: 'engage', variant: 'primary' },
+            { label: 'Skip', action: 'dismiss', variant: 'secondary' }
+          ],
+          timestamp: new Date(Date.now() - 7200000).toISOString(),
+          priority: 'high',
+          dismissed: false
+        },
+        {
+          id: '4',
+          type: 'milestone',
+          title: '100 Emails Sent This Week',
+          description: 'Your autonomous engine has successfully sent 100 personalized emails.',
+          aiInsight: '23 replies received (23% reply rate) - above industry average of 15%.',
+          actions: [
+            { label: 'View Details', action: 'view_details', variant: 'primary' }
+          ],
+          timestamp: new Date(Date.now() - 86400000).toISOString(),
+          priority: 'low',
+          dismissed: false
+        }
+      ];
+      
+      res.json({ decisions, stats: { decisionsToday: 12, leadsEngaged: 34, approvalRate: 87 } });
+    } catch (error) {
+      console.error("Error fetching pulse decisions:", error);
+      res.status(500).json({ error: "Failed to fetch decisions" });
+    }
+  });
+
+  app.post("/api/pulse/action", async (req: any, res) => {
+    try {
+      const { decisionId, action } = req.body;
+      
+      // In a real app, this would execute the action
+      res.json({ 
+        success: true, 
+        message: `Action '${action}' executed for decision ${decisionId}`,
+        decisionId,
+        action
+      });
+    } catch (error) {
+      console.error("Error executing pulse action:", error);
+      res.status(500).json({ error: "Failed to execute action" });
+    }
+  });
+
   // ====== NLP Command Bar ======
   app.post("/api/nlp/parse-command", async (req: any, res) => {
     try {
