@@ -69,6 +69,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("Sales Rep"),
   currentOrgId: varchar("current_org_id"), // No FK to avoid circular ref
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  onboardingStatus: text("onboarding_status").default("pending"), // pending, processing, complete
   bugReportingConsent: boolean("bug_reporting_consent"),
   privacyAccepted: boolean("privacy_accepted").default(false),
   createdAt: timestamp("created_at").defaultNow(),

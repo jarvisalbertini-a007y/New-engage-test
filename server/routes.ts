@@ -5747,6 +5747,7 @@ Position nodes in a vertical flow, starting at y=50, incrementing by 120 for eac
       await storage.upsertUser({
         id: userId,
         onboardingCompleted: true,
+        onboardingStatus: 'complete',
       });
       
       res.json({
@@ -5762,6 +5763,150 @@ Position nodes in a vertical flow, starting at y=50, incrementing by 120 for eac
       console.error('[Genius Onboarding] Setup error:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Failed to complete genius setup',
+      });
+    }
+  });
+
+  // Skip onboarding - allows user to go to dashboard while AI processes in background
+  app.post("/api/onboarding/skip", isAuthenticated, async (req: any, res) => {
+    try {
+      const { websiteUrl } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Get or create user
+      let user = await storage.getUser(userId);
+      if (!user) {
+        user = await storage.upsertUser({
+          id: userId,
+          email: req.user.claims.email,
+          firstName: req.user.claims.first_name,
+          lastName: req.user.claims.last_name,
+        });
+      }
+      
+      // Mark as processing so user can access dashboard
+      await storage.upsertUser({
+        id: userId,
+        onboardingStatus: 'processing',
+        onboardingCompleted: false,
+        privacyAccepted: true,
+      });
+      
+      // If websiteUrl provided, start background processing
+      if (websiteUrl) {
+        // Extract domain from URL
+        let domain: string;
+        try {
+          const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
+          domain = url.hostname.replace('www.', '');
+        } catch {
+          domain = websiteUrl.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+        }
+        
+        // Create org if needed
+        let orgId = user?.currentOrgId;
+        if (!orgId) {
+          const org = await storage.createOrganization({
+            name: domain,
+            domain,
+            website: websiteUrl,
+            createdBy: userId,
+          });
+          orgId = org.id;
+          await storage.upsertUser({ id: userId, currentOrgId: orgId });
+          
+          // Assign Owner role
+          const ownerRole = await storage.getRoleByName('Owner');
+          if (ownerRole) {
+            await storage.createRoleAssignment({
+              userId,
+              orgId,
+              roleId: ownerRole.id,
+            });
+          }
+        }
+        
+        // Start background processing (async - don't await)
+        (async () => {
+          try {
+            console.log('[Background Onboarding] Starting for user:', userId);
+            const result = await runFullCompanyResearch(websiteUrl, orgId!);
+            
+            // Create personas
+            if (result.personas?.length) {
+              for (const persona of result.personas.slice(0, 3)) {
+                try {
+                  await storage.createPersona({
+                    name: `${persona.title} - ${persona.industry}`,
+                    description: `${persona.communicationStyle}. Pain points: ${persona.pains?.join(', ') || 'TBD'}`,
+                    targetTitles: [persona.title],
+                    industries: [persona.industry],
+                    companySizes: [persona.companySize],
+                    valuePropositions: persona.valueProps || [],
+                    toneGuidelines: { style: persona.communicationStyle },
+                    createdBy: userId,
+                  });
+                } catch (err) {
+                  console.error('[Background Onboarding] Error creating persona:', err);
+                }
+              }
+            }
+            
+            // Create sequence
+            try {
+              await storage.createSequence({
+                name: `${result.research.name} Outreach`,
+                description: `AI-generated outreach sequence`,
+                status: 'draft',
+                steps: [
+                  { step: 1, type: 'email', delay: 0, subject: 'Quick intro', template: 'personalized intro' },
+                  { step: 2, type: 'email', delay: 3, subject: 'Following up', template: 'Value-add follow up' },
+                  { step: 3, type: 'email', delay: 7, subject: 'Closing thoughts', template: 'Final touch' },
+                ],
+                createdBy: userId,
+              });
+            } catch (err) {
+              console.error('[Background Onboarding] Error creating sequence:', err);
+            }
+            
+            // Mark as complete
+            await storage.upsertUser({
+              id: userId,
+              onboardingCompleted: true,
+              onboardingStatus: 'complete',
+            });
+            
+            console.log('[Background Onboarding] Complete for user:', userId);
+          } catch (error) {
+            console.error('[Background Onboarding] Error:', error);
+            // Still mark as complete even on error so user isn't stuck
+            await storage.upsertUser({
+              id: userId,
+              onboardingCompleted: true,
+              onboardingStatus: 'complete',
+            });
+          }
+        })();
+      } else {
+        // No URL provided, just mark as complete
+        await storage.upsertUser({
+          id: userId,
+          onboardingCompleted: true,
+          onboardingStatus: 'complete',
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: websiteUrl 
+          ? 'Onboarding skipped. AI is setting up your account in the background.' 
+          : 'Onboarding skipped. You can set up your account anytime.',
+        isProcessing: !!websiteUrl,
+      });
+    } catch (error) {
+      console.error('[Onboarding Skip] Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to skip onboarding',
       });
     }
   });
@@ -5782,6 +5927,7 @@ Position nodes in a vertical flow, starting at y=50, incrementing by 120 for eac
           hasResearch: false,
           privacyAccepted: false,
           onboardingCompleted: false,
+          onboardingStatus: 'pending',
         });
       }
       
@@ -5819,6 +5965,10 @@ Position nodes in a vertical flow, starting at y=50, incrementing by 120 for eac
         step = 'done';
       }
       
+      // Get the onboarding status from user or derive it
+      const onboardingStatus = (user as any).onboardingStatus || 
+        (user.onboardingCompleted ? 'complete' : 'pending');
+      
       res.json({
         step,
         completed: user.onboardingCompleted || false,
@@ -5826,6 +5976,7 @@ Position nodes in a vertical flow, starting at y=50, incrementing by 120 for eac
         hasResearch,
         privacyAccepted: user.privacyAccepted || false,
         onboardingCompleted: user.onboardingCompleted || false,
+        onboardingStatus,
         user: {
           id: user.id,
           email: user.email,
