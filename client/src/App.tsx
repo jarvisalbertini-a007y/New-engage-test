@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatContextProvider, useChatContext } from "@/contexts/chat-context";
 import { NotificationsProvider } from "@/contexts/notifications-context";
-import { AgentNotifications } from "@/components/agent-notifications";
+import { AgentNotificationsPanel } from "@/components/agent-notifications";
 import { UniversalChat } from "@/components/universal-chat";
 import { ConsultativeSidecar } from "@/components/consultative-sidecar";
 import Dashboard from "@/pages/dashboard";
@@ -226,7 +226,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
-            <AgentNotifications />
+            <AgentNotificationsPanel />
           </TooltipProvider>
         </NotificationsProvider>
       </ChatContextProvider>

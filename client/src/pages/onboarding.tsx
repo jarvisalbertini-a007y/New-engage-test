@@ -57,7 +57,8 @@ export default function Onboarding() {
     if (onboardingStatus?.onboardingCompleted) {
       setLocation("/pulse");
     }
-  }, [onboardingStatus, setLocation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingStatus?.onboardingCompleted]);
 
   const geniusSetupMutation = useMutation({
     mutationFn: api.geniusSetup,
