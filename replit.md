@@ -23,6 +23,7 @@ The platform is built with a modern web stack:
     - **Email Deliverability**: Domain health monitoring, email warming, and authentication.
     - **Analytics Dashboard**: Performance metrics, conversion funnels, and team insights.
     - **AI Agents**: Autonomous prospecting with CRUD operations and real metrics, featuring an AI Agent Marketplace for community-driven sharing.
+    - **Agent Catalog**: Library of 100+ pre-built AI agent templates organized hierarchically (Department Leaders → Specialists → Workers) across 10 categories (Prospecting, Research, Outreach, Qualification, Scheduling, Content, Analysis, Integration, Data, Management). Supports one-click deployment, filtering by tier/domain, and agent evolution tracking.
     - **Digital Twin Prospects**: AI models for hyper-personalization and behavior prediction.
     - **Autonomous SDR Teams**: AI personas (Researcher, Writer, Qualifier, Scheduler, Manager) collaborating on deals.
     - **Predictive Deal Intelligence**: Intent signals, micro-timing optimization, and buying stage prediction.

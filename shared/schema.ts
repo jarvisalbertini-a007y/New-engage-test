@@ -1979,3 +1979,379 @@ export type InsertAgentExecution = z.infer<typeof insertAgentExecutionSchema>;
 
 export type AgentMetric = typeof agentMetrics.$inferSelect;
 export type InsertAgentMetric = z.infer<typeof insertAgentMetricsSchema>;
+
+// ==================== COMPREHENSIVE AGENT CATALOG (Lindy-like) ====================
+
+// Agent Template Categories - hierarchical organization
+export const agentCategories = pgTable("agent_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  icon: text("icon"), // Lucide icon name
+  parentId: varchar("parent_id"), // Self-reference for hierarchical categories
+  sortOrder: integer("sort_order").default(0),
+  color: text("color"), // Hex color for UI
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Agent Template Library - 1000+ prebuilt agent templates
+export const agentTemplates = pgTable("agent_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  longDescription: text("long_description"),
+  categoryId: varchar("category_id").references(() => agentCategories.id),
+  
+  // Agent classification
+  tier: text("tier").notNull().default("worker"), // leader, specialist, worker
+  domain: text("domain").notNull(), // prospecting, research, outreach, qualification, scheduling, analysis, content, data, integration
+  complexity: text("complexity").default("simple"), // simple, moderate, complex, expert
+  
+  // Capabilities and requirements
+  capabilities: text("capabilities").array(), // Array of capability slugs
+  requiredInputs: jsonb("required_inputs"), // { name, type, description, required }[]
+  expectedOutputs: jsonb("expected_outputs"), // { name, type, description }[]
+  triggers: jsonb("triggers"), // Event types that can start this agent
+  actions: jsonb("actions"), // Actions this agent can perform
+  
+  // AI Configuration
+  systemPrompt: text("system_prompt"),
+  modelPreference: text("model_preference").default("gpt-4o"), // gpt-4o, gpt-4o-mini, claude-3, etc.
+  temperature: decimal("temperature", { precision: 2, scale: 1 }).default("0.7"),
+  maxTokens: integer("max_tokens").default(2000),
+  
+  // Examples and context
+  examples: jsonb("examples"), // Few-shot examples
+  useCases: text("use_cases").array(),
+  bestPractices: text("best_practices").array(),
+  
+  // Governance
+  requiresApproval: boolean("requires_approval").default(false),
+  approvalThreshold: text("approval_threshold"), // always, high_risk, cost_over_x, external_action
+  humanInLoopSteps: jsonb("human_in_loop_steps"), // Steps requiring human review
+  
+  // Integration
+  requiredIntegrations: text("required_integrations").array(), // email, crm, calendar, linkedin, etc.
+  supportsWebhook: boolean("supports_webhook").default(false),
+  supportsSchedule: boolean("supports_schedule").default(true),
+  
+  // Metadata
+  icon: text("icon"),
+  tags: text("tags").array(),
+  isBuiltIn: boolean("is_built_in").default(true),
+  isActive: boolean("is_active").default(true),
+  version: text("version").default("1.0.0"),
+  popularity: integer("popularity").default(0),
+  successRate: decimal("success_rate", { precision: 5, scale: 2 }),
+  avgExecutionTime: integer("avg_execution_time"), // milliseconds
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Agent Hierarchy - Department Leaders govern Specialists who govern Workers
+export const agentHierarchy = pgTable("agent_hierarchy", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  
+  // The deployed agent instance
+  agentInstanceId: varchar("agent_instance_id").references(() => deployedAgents.id).notNull(),
+  
+  // Hierarchy relationships
+  parentAgentId: varchar("parent_agent_id"), // Self-reference - the supervising agent
+  tier: text("tier").notNull(), // leader, specialist, worker
+  department: text("department"), // sales, marketing, operations, research, etc.
+  
+  // Governance rules inherited from parent
+  governanceRules: jsonb("governance_rules"), // Rules this agent must follow
+  delegationLimits: jsonb("delegation_limits"), // What this agent can delegate to children
+  budgetLimit: decimal("budget_limit", { precision: 10, scale: 2 }), // Token/cost budget
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Deployed Agents - Actual running agent instances in an organization
+export const deployedAgents = pgTable("deployed_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  templateId: varchar("template_id").references(() => agentTemplates.id),
+  
+  // Instance configuration (can override template defaults)
+  name: text("name").notNull(),
+  description: text("description"),
+  customSystemPrompt: text("custom_system_prompt"),
+  customConfig: jsonb("custom_config"), // Override template settings
+  
+  // Status and state
+  status: text("status").notNull().default("active"), // active, paused, learning, error, retired
+  healthScore: integer("health_score").default(100), // 0-100
+  lastError: text("last_error"),
+  
+  // Learning and adaptation
+  memoryContext: jsonb("memory_context"), // Persistent memory for this agent
+  learnings: jsonb("learnings"), // What this agent has learned
+  adaptations: jsonb("adaptations"), // How agent has adapted from feedback
+  
+  // Performance tracking
+  totalExecutions: integer("total_executions").default(0),
+  successfulExecutions: integer("successful_executions").default(0),
+  failedExecutions: integer("failed_executions").default(0),
+  avgResponseTime: integer("avg_response_time"), // milliseconds
+  
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  teamId: varchar("team_id").references(() => teams.id),
+  
+  // Scheduling
+  schedule: jsonb("schedule"), // Cron-like schedule configuration
+  lastRun: timestamp("last_run"),
+  nextRun: timestamp("next_run"),
+  
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Agent Capabilities - Reusable capability definitions
+export const agentCapabilities = pgTable("agent_capabilities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  category: text("category").notNull(), // action, analysis, integration, communication
+  
+  // Execution details
+  executorType: text("executor_type").notNull(), // ai, api, function, workflow
+  executorConfig: jsonb("executor_config"), // Configuration for executor
+  
+  // Input/Output schema
+  inputSchema: jsonb("input_schema"),
+  outputSchema: jsonb("output_schema"),
+  
+  // Requirements
+  requiredPermissions: text("required_permissions").array(),
+  requiredIntegrations: text("required_integrations").array(),
+  
+  // Risk classification
+  riskLevel: text("risk_level").default("low"), // low, medium, high, critical
+  requiresApproval: boolean("requires_approval").default(false),
+  
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Agent Evolution - Self-improvement and A/B testing
+export const agentEvolution = pgTable("agent_evolution", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => deployedAgents.id).notNull(),
+  
+  // Evolution type
+  evolutionType: text("evolution_type").notNull(), // prompt_variation, workflow_change, new_capability, parameter_tuning
+  
+  // The proposed change
+  proposedChange: jsonb("proposed_change").notNull(),
+  changeDescription: text("change_description"),
+  hypothesis: text("hypothesis"), // Why this change might improve performance
+  
+  // A/B testing
+  isABTest: boolean("is_ab_test").default(false),
+  variantA: jsonb("variant_a"), // Control
+  variantB: jsonb("variant_b"), // Treatment
+  trafficSplit: decimal("traffic_split", { precision: 3, scale: 2 }).default("0.50"), // % to variant B
+  
+  // Results
+  status: text("status").notNull().default("proposed"), // proposed, testing, approved, rejected, deployed
+  metricsToTrack: text("metrics_to_track").array(),
+  baselineMetrics: jsonb("baseline_metrics"),
+  currentMetrics: jsonb("current_metrics"),
+  statisticalSignificance: decimal("statistical_significance", { precision: 5, scale: 4 }),
+  
+  // Approval
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  
+  // Tracking
+  testStartedAt: timestamp("test_started_at"),
+  testEndedAt: timestamp("test_ended_at"),
+  deployedAt: timestamp("deployed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Agent Orchestration - Multi-agent workflow coordination
+export const agentOrchestrations = pgTable("agent_orchestrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Workflow definition
+  triggerType: text("trigger_type").notNull(), // event, schedule, manual, webhook, nlp_command
+  triggerConfig: jsonb("trigger_config"),
+  
+  // The orchestration flow (nodes are agent executions)
+  nodes: jsonb("nodes").notNull(), // { id, agentId, type, config, position }[]
+  edges: jsonb("edges").notNull(), // { source, target, condition }[]
+  
+  // Governance
+  leaderAgentId: varchar("leader_agent_id").references(() => deployedAgents.id), // The supervising agent
+  requiredApprovals: jsonb("required_approvals"), // Steps requiring human approval
+  escalationRules: jsonb("escalation_rules"), // When to escalate to humans
+  
+  // State and tracking
+  status: text("status").notNull().default("active"), // draft, active, paused, archived
+  totalRuns: integer("total_runs").default(0),
+  successfulRuns: integer("successful_runs").default(0),
+  avgDuration: integer("avg_duration"), // milliseconds
+  
+  // ICP and strategy alignment
+  alignedIcp: jsonb("aligned_icp"), // ICP this orchestration targets
+  strategyTags: text("strategy_tags").array(),
+  
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Agent Orchestration Runs - Execution instances of orchestrations
+export const orchestrationRuns = pgTable("orchestration_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orchestrationId: varchar("orchestration_id").references(() => agentOrchestrations.id).notNull(),
+  
+  // Execution state
+  status: text("status").notNull().default("running"), // running, paused, completed, failed, cancelled
+  currentNodeId: text("current_node_id"),
+  context: jsonb("context"), // Shared context across all agents
+  
+  // Progress tracking
+  nodesCompleted: text("nodes_completed").array().default(sql`ARRAY[]::text[]`),
+  nodeResults: jsonb("node_results"), // { nodeId: result }
+  
+  // Approvals and handoffs
+  pendingApprovals: jsonb("pending_approvals"), // Nodes waiting for human approval
+  agentHandoffs: jsonb("agent_handoffs"), // Record of agent-to-agent handoffs
+  
+  // Error handling
+  error: text("error"),
+  errorNodeId: text("error_node_id"),
+  retryCount: integer("retry_count").default(0),
+  
+  // Timing
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  
+  triggeredBy: varchar("triggered_by"), // user ID, system, or webhook
+});
+
+// Agent Memory - Persistent knowledge base for agents
+export const agentMemory = pgTable("agent_memory", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => deployedAgents.id).notNull(),
+  
+  // Memory type
+  memoryType: text("memory_type").notNull(), // procedural, declarative, episodic, semantic
+  
+  // The memory content
+  key: text("key").notNull(), // Searchable key for retrieval
+  content: text("content").notNull(),
+  embedding: text("embedding"), // Vector embedding for similarity search
+  metadata: jsonb("metadata"),
+  
+  // Source and confidence
+  source: text("source"), // user_correction, execution_result, training, ingestion
+  confidence: decimal("confidence", { precision: 3, scale: 2 }).default("0.90"),
+  
+  // Usage tracking
+  accessCount: integer("access_count").default(0),
+  lastAccessed: timestamp("last_accessed"),
+  
+  // Validity
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Agent Actions - Specific executable actions agents can perform
+export const agentActions = pgTable("agent_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  categoryId: varchar("category_id").references(() => agentCategories.id),
+  
+  // Execution configuration
+  actionType: text("action_type").notNull(), // api_call, email_send, crm_update, calendar_create, webhook, internal
+  executorConfig: jsonb("executor_config").notNull(),
+  
+  // Input/Output
+  inputSchema: jsonb("input_schema"),
+  outputSchema: jsonb("output_schema"),
+  
+  // Requirements and permissions
+  requiredIntegrations: text("required_integrations").array(),
+  requiredPermissions: text("required_permissions").array(),
+  
+  // Risk and approval
+  riskLevel: text("risk_level").default("low"), // low, medium, high, critical
+  requiresApproval: boolean("requires_approval").default(false),
+  approvalConfig: jsonb("approval_config"),
+  
+  // Rate limiting
+  rateLimit: jsonb("rate_limit"), // { requests, period }
+  cooldown: integer("cooldown"), // seconds between executions
+  
+  // Metadata
+  isBuiltIn: boolean("is_built_in").default(true),
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert schemas for new tables
+export const insertAgentCategorySchema = createInsertSchema(agentCategories).omit({ id: true, createdAt: true });
+export const insertAgentTemplateSchema = createInsertSchema(agentTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAgentHierarchySchema = createInsertSchema(agentHierarchy).omit({ id: true, createdAt: true });
+export const insertDeployedAgentSchema = createInsertSchema(deployedAgents).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAgentCapabilitySchema = createInsertSchema(agentCapabilities).omit({ id: true, createdAt: true });
+export const insertAgentEvolutionSchema = createInsertSchema(agentEvolution).omit({ id: true, createdAt: true });
+export const insertAgentOrchestrationSchema = createInsertSchema(agentOrchestrations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOrchestrationRunSchema = createInsertSchema(orchestrationRuns).omit({ id: true, startedAt: true });
+export const insertAgentMemorySchema = createInsertSchema(agentMemory).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAgentActionSchema = createInsertSchema(agentActions).omit({ id: true, createdAt: true });
+
+// Types for new tables
+export type AgentCategory = typeof agentCategories.$inferSelect;
+export type InsertAgentCategory = z.infer<typeof insertAgentCategorySchema>;
+
+export type AgentTemplate = typeof agentTemplates.$inferSelect;
+export type InsertAgentTemplate = z.infer<typeof insertAgentTemplateSchema>;
+
+export type AgentHierarchyEntry = typeof agentHierarchy.$inferSelect;
+export type InsertAgentHierarchy = z.infer<typeof insertAgentHierarchySchema>;
+
+export type DeployedAgent = typeof deployedAgents.$inferSelect;
+export type InsertDeployedAgent = z.infer<typeof insertDeployedAgentSchema>;
+
+export type AgentCapability = typeof agentCapabilities.$inferSelect;
+export type InsertAgentCapability = z.infer<typeof insertAgentCapabilitySchema>;
+
+export type AgentEvolutionEntry = typeof agentEvolution.$inferSelect;
+export type InsertAgentEvolution = z.infer<typeof insertAgentEvolutionSchema>;
+
+export type AgentOrchestration = typeof agentOrchestrations.$inferSelect;
+export type InsertAgentOrchestration = z.infer<typeof insertAgentOrchestrationSchema>;
+
+export type OrchestrationRun = typeof orchestrationRuns.$inferSelect;
+export type InsertOrchestrationRun = z.infer<typeof insertOrchestrationRunSchema>;
+
+export type AgentMemoryEntry = typeof agentMemory.$inferSelect;
+export type InsertAgentMemory = z.infer<typeof insertAgentMemorySchema>;
+
+export type AgentAction = typeof agentActions.$inferSelect;
+export type InsertAgentAction = z.infer<typeof insertAgentActionSchema>;

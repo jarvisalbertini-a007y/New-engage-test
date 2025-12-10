@@ -2,6 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage as legacyStorage, UserContext } from "./storage";
 import { ContentStudioStorage } from "./storage/contentStudioStorage";
+import { agentCategories, agentTemplates, deployedAgents, agentOrchestrations, agentHierarchy } from "@shared/schema";
+import { db } from "./db";
+import { sql, eq, and, or, ilike, desc, type SQL } from "drizzle-orm";
 
 // Use legacy storage directly for most routes
 const storage = legacyStorage;
@@ -6731,6 +6734,9 @@ When responding:
     }
   });
 
+  // Register Agent Catalog routes
+  registerAgentCatalogRoutes(app);
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -7301,4 +7307,222 @@ async function applyPlaybook(playbook: any, userId: string, selectedSequenceName
   }
   
   return results;
+}
+
+// ==================== AGENT CATALOG API ROUTES ====================
+
+export function registerAgentCatalogRoutes(app: Express) {
+  
+  // Get all agent categories
+  app.get("/api/agent-catalog/categories", isAuthenticated, async (req, res) => {
+    try {
+      const categories = await db.select().from(agentCategories).orderBy(agentCategories.sortOrder);
+      res.json(categories);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+  
+  // Get agent templates with optional filtering
+  app.get("/api/agent-catalog/templates", isAuthenticated, async (req, res) => {
+    try {
+      const { category, tier, domain, search, limit = "50", offset = "0" } = req.query;
+      
+      // Validate pagination parameters with fallback to defaults
+      const parsedLimit = Math.max(1, Math.min(100, parseInt(limit as string) || 50));
+      const parsedOffset = Math.max(0, parseInt(offset as string) || 0);
+      
+      // Build conditions array for proper filter composition
+      const conditions: SQL[] = [eq(agentTemplates.isActive, true)];
+      
+      if (category) {
+        conditions.push(eq(agentTemplates.categoryId, category as string));
+      }
+      if (tier) {
+        conditions.push(eq(agentTemplates.tier, tier as string));
+      }
+      if (domain) {
+        conditions.push(eq(agentTemplates.domain, domain as string));
+      }
+      if (search) {
+        const searchCondition = or(
+          ilike(agentTemplates.name, `%${search}%`),
+          ilike(agentTemplates.description, `%${search}%`)
+        );
+        if (searchCondition) {
+          conditions.push(searchCondition);
+        }
+      }
+      
+      const templates = await db.select().from(agentTemplates)
+        .where(and(...conditions))
+        .orderBy(desc(agentTemplates.popularity))
+        .limit(parsedLimit)
+        .offset(parsedOffset);
+      
+      res.json(templates);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching templates:", error);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+  
+  // Get template by ID
+  app.get("/api/agent-catalog/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [template] = await db.select().from(agentTemplates).where(eq(agentTemplates.id, id));
+      
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching template:", error);
+      res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+  
+  // Get catalog stats
+  app.get("/api/agent-catalog/stats", isAuthenticated, async (req, res) => {
+    try {
+      const [categoryCount] = await db.select({ count: sql<number>`count(*)` }).from(agentCategories);
+      const [templateCount] = await db.select({ count: sql<number>`count(*)` }).from(agentTemplates);
+      const [leaderCount] = await db.select({ count: sql<number>`count(*)` }).from(agentTemplates).where(sql`${agentTemplates.tier} = 'leader'`);
+      const [specialistCount] = await db.select({ count: sql<number>`count(*)` }).from(agentTemplates).where(sql`${agentTemplates.tier} = 'specialist'`);
+      const [workerCount] = await db.select({ count: sql<number>`count(*)` }).from(agentTemplates).where(sql`${agentTemplates.tier} = 'worker'`);
+      
+      res.json({
+        categories: categoryCount?.count || 0,
+        templates: templateCount?.count || 0,
+        byTier: {
+          leaders: leaderCount?.count || 0,
+          specialists: specialistCount?.count || 0,
+          workers: workerCount?.count || 0,
+        }
+      });
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+  
+  // Seed catalog (admin only - for initial setup)
+  app.post("/api/agent-catalog/seed", isAuthenticated, async (req: any, res) => {
+    try {
+      const { seedAgentCatalog, isAgentCatalogSeeded } = await import("./seeds/agentCatalog");
+      const isSeeded = await isAgentCatalogSeeded();
+      if (isSeeded) {
+        return res.json({ message: "Catalog already seeded", alreadySeeded: true });
+      }
+      
+      const result = await seedAgentCatalog();
+      res.json({ message: "Catalog seeded successfully", ...result });
+    } catch (error) {
+      console.error("[AgentCatalog] Error seeding:", error);
+      res.status(500).json({ error: "Failed to seed catalog" });
+    }
+  });
+  
+  // Deploy an agent from template
+  app.post("/api/agent-catalog/deploy", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentOrgId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+      
+      const { templateId, name, description, customConfig } = req.body;
+      
+      // Validate template exists
+      const [template] = await db.select().from(agentTemplates).where(sql`${agentTemplates.id} = ${templateId}`);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      // Create deployed agent
+      const [deployedAgent] = await db.insert(deployedAgents).values({
+        orgId: user.currentOrgId,
+        templateId,
+        name: name || template.name,
+        description: description || template.description,
+        customConfig: customConfig || {},
+        status: "active",
+        createdBy: userId,
+      }).returning();
+      
+      res.json(deployedAgent);
+    } catch (error) {
+      console.error("[AgentCatalog] Error deploying agent:", error);
+      res.status(500).json({ error: "Failed to deploy agent" });
+    }
+  });
+  
+  // Get deployed agents for org
+  app.get("/api/agent-catalog/deployed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentOrgId) {
+        return res.json([]);
+      }
+      
+      const agents = await db.select().from(deployedAgents)
+        .where(sql`${deployedAgents.orgId} = ${user.currentOrgId}`)
+        .orderBy(sql`${deployedAgents.createdAt} DESC`);
+      
+      res.json(agents);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching deployed agents:", error);
+      res.status(500).json({ error: "Failed to fetch deployed agents" });
+    }
+  });
+  
+  // Get agent hierarchy for org
+  app.get("/api/agent-catalog/hierarchy", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentOrgId) {
+        return res.json([]);
+      }
+      
+      const hierarchy = await db.select().from(agentHierarchy)
+        .where(sql`${agentHierarchy.orgId} = ${user.currentOrgId}`);
+      
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch hierarchy" });
+    }
+  });
+  
+  // Get orchestrations for org
+  app.get("/api/agent-catalog/orchestrations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentOrgId) {
+        return res.json([]);
+      }
+      
+      const orchestrations = await db.select().from(agentOrchestrations)
+        .where(sql`${agentOrchestrations.orgId} = ${user.currentOrgId}`)
+        .orderBy(sql`${agentOrchestrations.createdAt} DESC`);
+      
+      res.json(orchestrations);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching orchestrations:", error);
+      res.status(500).json({ error: "Failed to fetch orchestrations" });
+    }
+  });
+  
+  console.log("[AgentCatalog] Routes registered");
 }

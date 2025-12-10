@@ -5,7 +5,7 @@ import {
   Inbox, Database, Bot, UsersRound, Shield, BarChart, Settings, 
   Phone, BookOpen, Zap, MessageSquare, GraduationCap, LogOut,
   Menu, X, ChevronLeft, ChevronRight, Store, Sparkles, GitBranch, TrendingUp,
-  Globe, Network, Building2, Bell
+  Globe, Network, Building2, Bell, Library
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, User } from "@/hooks/useAuth";
@@ -59,6 +59,7 @@ const navigation = [
       { name: "Lead Database", href: "/leads", icon: Database },
       { name: "Digital Twins", href: "/digital-twins", icon: Sparkles },
       { name: "AI Agents", href: "/agents", icon: Bot },
+      { name: "Agent Catalog", href: "/agent-catalog", icon: Library, badge: "100+" },
       { name: "Agent Marketplace", href: "/marketplace", icon: Store },
       { name: "Personas", href: "/personas", icon: UsersRound },
       { name: "Crowd Intel", href: "/crowd-intel", icon: Network },

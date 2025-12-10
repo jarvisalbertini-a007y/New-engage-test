@@ -52,6 +52,7 @@ import { BrowserExtension } from "@/pages/browser-extension";
 import CrowdIntelPage from "@/pages/crowd-intel";
 import EnterprisePage from "@/pages/enterprise";
 import PulseDashboard from "@/pages/pulse-dashboard";
+import AgentCatalogPage from "@/pages/agent-catalog";
 
 function ChatContextUpdater() {
   const [location] = useLocation();
@@ -179,6 +180,7 @@ function Router() {
               <Route path="/crowd-intel" component={CrowdIntelPage} />
               <Route path="/enterprise" component={EnterprisePage} />
               <Route path="/pulse" component={PulseDashboard} />
+              <Route path="/agent-catalog" component={AgentCatalogPage} />
               <Route component={NotFound} />
             </Switch>
           </div>
@@ -254,6 +256,7 @@ function Router() {
             <Route path="/crowd-intel" component={CrowdIntelPage} />
             <Route path="/enterprise" component={EnterprisePage} />
             <Route path="/pulse" component={PulseDashboard} />
+            <Route path="/agent-catalog" component={AgentCatalogPage} />
             <Route component={NotFound} />
           </Switch>
         </div>
