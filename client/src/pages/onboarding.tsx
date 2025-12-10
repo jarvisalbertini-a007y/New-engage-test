@@ -30,6 +30,7 @@ interface GeniusSetupResult {
 
 interface OnboardingStatusResponse {
   onboardingCompleted: boolean;
+  onboardingStatus: 'pending' | 'processing' | 'complete';
 }
 
 const aiSteps = [
@@ -77,6 +78,26 @@ export default function Onboarding() {
       setCurrentStep(1);
       setAiProgress(0);
       setCompletedAiSteps([]);
+    },
+  });
+
+  const skipOnboardingMutation = useMutation({
+    mutationFn: () => api.skipOnboarding(websiteUrl || undefined),
+    onSuccess: (data: { success: boolean; isProcessing: boolean; message: string }) => {
+      toast({
+        title: "Welcome to SalesFlow Vision",
+        description: data.isProcessing 
+          ? "AI is setting up your account in the background. We'll notify you when it's ready." 
+          : "You can set up your account anytime from the settings.",
+      });
+      setLocation("/pulse");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Skip Failed",
+        description: error.message || "Could not skip onboarding. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -176,6 +197,23 @@ export default function Onboarding() {
         {" "}and{" "}
         <a href="/terms" className="text-primary hover:underline">Terms of Service</a>.
       </p>
+      
+      <Button 
+        variant="ghost" 
+        onClick={() => skipOnboardingMutation.mutate()}
+        disabled={skipOnboardingMutation.isPending}
+        className="text-muted-foreground hover:text-foreground"
+        data-testid="button-skip-onboarding"
+      >
+        {skipOnboardingMutation.isPending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Skipping...
+          </>
+        ) : (
+          "Skip for now — I'll set up later"
+        )}
+      </Button>
     </motion.div>
   );
 
@@ -246,6 +284,25 @@ export default function Onboarding() {
               </motion.div>
             );
           })}
+        </div>
+        
+        <div className="pt-4 border-t border-border/50">
+          <Button 
+            variant="ghost" 
+            onClick={() => skipOnboardingMutation.mutate()}
+            disabled={skipOnboardingMutation.isPending}
+            className="w-full text-muted-foreground hover:text-foreground"
+            data-testid="button-skip-to-dashboard"
+          >
+            {skipOnboardingMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Skipping...
+              </>
+            ) : (
+              "Skip to Dashboard (AI will continue in background)"
+            )}
+          </Button>
         </div>
       </div>
     </motion.div>

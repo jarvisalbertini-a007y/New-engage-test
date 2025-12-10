@@ -249,4 +249,14 @@ export const api = {
     const response = await apiRequest("POST", "/api/onboarding/genius-setup", { websiteUrl });
     return response.json();
   },
+  
+  // Skip onboarding - allows user to go to dashboard while AI processes in background
+  skipOnboarding: async (websiteUrl?: string) => {
+    const response = await apiRequest("POST", "/api/onboarding/skip", { websiteUrl });
+    return response.json();
+  },
+  
+  // Get onboarding status
+  getOnboardingStatus: () =>
+    fetch("/api/onboarding/status").then(res => res.json()),
 };

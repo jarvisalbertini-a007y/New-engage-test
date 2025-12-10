@@ -72,20 +72,23 @@ function Router() {
   const TESTING_MODE = false; // Real authentication is now required
   
   // Check onboarding status (only for authenticated users)
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["/api/onboarding/profile"],
-    queryFn: api.getOnboardingProfile,
-    enabled: isAuthenticated && !TESTING_MODE, // Skip in testing mode
+  const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["/api/onboarding/status"],
+    queryFn: api.getOnboardingStatus,
+    enabled: isAuthenticated && !TESTING_MODE,
   });
   
   useEffect(() => {
-    if (!TESTING_MODE && isAuthenticated && !profileLoading) {
-      // Redirect to onboarding if profile doesn't exist or not completed
-      if ((!profile || !profile.isComplete) && location !== "/onboarding") {
+    if (!TESTING_MODE && isAuthenticated && !statusLoading && onboardingStatus) {
+      // Only redirect to onboarding if status is 'pending' (not started)
+      // Allow access if 'processing' (AI working in background) or 'complete'
+      const status = onboardingStatus.onboardingStatus || 'pending';
+      if (status === 'pending' && !onboardingStatus.onboardingCompleted && location !== "/onboarding") {
         setLocation("/onboarding");
       }
     }
-  }, [profile, profileLoading, location, setLocation, isAuthenticated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingStatus?.onboardingStatus, onboardingStatus?.onboardingCompleted, statusLoading, isAuthenticated]);
 
   // In testing mode, skip authentication and onboarding checks
   if (TESTING_MODE) {
