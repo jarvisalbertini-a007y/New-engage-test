@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { ChatContextProvider, useChatContext } from "@/contexts/chat-context";
-import { NotificationsProvider } from "@/contexts/notifications-context";
+import { NotificationsProvider, useNotifications } from "@/contexts/notifications-context";
 import { AgentNotificationsPanel } from "@/components/agent-notifications";
 import { UniversalChat } from "@/components/universal-chat";
 import { ConsultativeSidecar } from "@/components/consultative-sidecar";
@@ -60,6 +60,49 @@ function ChatContextUpdater() {
   useEffect(() => {
     setContext({ currentPage: location });
   }, [location, setContext]);
+  
+  return null;
+}
+
+function OnboardingStatusWatcher() {
+  const { isAuthenticated } = useAuth();
+  const { addNotification } = useNotifications();
+  const lastStatusRef = useRef<string | null>(null);
+  
+  const { data: onboardingStatus } = useQuery({
+    queryKey: ["/api/onboarding/status"],
+    queryFn: api.getOnboardingStatus,
+    enabled: isAuthenticated,
+    refetchInterval: (query) => {
+      const status = query.state.data?.onboardingStatus;
+      return status === 'processing' ? 3000 : false;
+    },
+  });
+  
+  useEffect(() => {
+    if (onboardingStatus) {
+      const currentStatus = onboardingStatus.onboardingStatus;
+      const previousStatus = lastStatusRef.current;
+      
+      if (previousStatus === 'processing' && currentStatus === 'complete') {
+        addNotification({
+          type: "insight",
+          priority: "high",
+          agentId: "onboarding-agent",
+          agentName: "Setup Assistant",
+          title: "Your account setup is complete!",
+          description: "AI has analyzed your company and created personas, sequences, and target accounts. Check your Pulse dashboard to see what's ready.",
+          actions: [
+            { label: "View Pulse", variant: "default" },
+            { label: "Dismiss", variant: "ghost" },
+          ],
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/onboarding/status"] });
+      }
+      
+      lastStatusRef.current = currentStatus;
+    }
+  }, [onboardingStatus?.onboardingStatus, addNotification]);
   
   return null;
 }
@@ -228,6 +271,7 @@ function App() {
         <NotificationsProvider>
           <TooltipProvider>
             <Toaster />
+            <OnboardingStatusWatcher />
             <Router />
             <AgentNotificationsPanel />
           </TooltipProvider>
