@@ -37,6 +37,7 @@ const aiSteps = [
   { id: 2, label: "Identifying your ideal customers...", icon: Target },
   { id: 3, label: "Creating buyer personas...", icon: Users },
   { id: 4, label: "Writing your first outreach sequence...", icon: Mail },
+  { id: 5, label: "Finalizing your setup...", icon: Rocket },
 ];
 
 export default function Onboarding() {
@@ -64,7 +65,7 @@ export default function Onboarding() {
     onSuccess: (data: GeniusSetupResult) => {
       setSetupResult(data);
       setAiProgress(100);
-      setCompletedAiSteps([1, 2, 3, 4]);
+      setCompletedAiSteps([1, 2, 3, 4, 5]);
       setTimeout(() => setCurrentStep(3), 500);
     },
     onError: (error: any) => {
@@ -90,12 +91,12 @@ export default function Onboarding() {
 
       const stepInterval = setInterval(() => {
         setCompletedAiSteps(prev => {
-          if (prev.length < 4) {
+          if (prev.length < 5) {
             return [...prev, prev.length + 1];
           }
           return prev;
         });
-      }, 1500);
+      }, 1800);
 
       return () => {
         clearInterval(interval);
