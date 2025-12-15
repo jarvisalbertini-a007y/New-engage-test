@@ -77,7 +77,10 @@ import {
   type Role, type InsertRole,
   type RoleAssignment, type InsertRoleAssignment,
   type CustomerProfile, type InsertCustomerProfile,
-  users, companies, contacts, visitorSessions, sequences, sequenceExecutions, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls, organizations, teams, roles, roleAssignments, customerProfiles
+  type DeployedAgent, type InsertDeployedAgent,
+  type AgentTemplate,
+  type AgentCatalogExecution, type InsertAgentCatalogExecution,
+  users, companies, contacts, visitorSessions, sequences, sequenceExecutions, emails, insights, personas, tasks, phoneCalls, callScripts, voicemails, aiAgents, agentExecutions, agentMetrics, onboardingProfiles, platformConfigs, workflowTriggers, playbooks, autopilotCampaigns, autopilotRuns, leadScoringModels, leadScores, workflows, workflowExecutions, agentTypes, workflowTemplates, humanApprovals, marketplaceAgents, agentRatings, agentDownloads, agentPurchases, digitalTwins, twinInteractions, twinPredictions, sdrTeams, sdrTeamMembers, teamCollaborations, teamPerformance, intentSignals, dealIntelligence, timingOptimization, predictiveModels, pipelineHealth, dealForensics, revenueForecasts, coachingInsights, channelConfigs, multiChannelCampaigns, channelMessages, channelOrchestration, inboxMessages, voiceCampaigns, voiceCalls, voiceScripts, callAnalytics, extensionUsers, enrichmentCache, extensionActivities, quickActions, sharedIntel, intelContributions, intelRatings, benchmarkData, contentTemplates, templateVersions, audienceSegments, contentTemplateSegments, templateMetrics, whiteLabels, enterpriseSecurity, auditLogs, accessControls, organizations, teams, roles, roleAssignments, customerProfiles, deployedAgents, agentTemplates, agentCatalogExecutions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -609,6 +612,19 @@ export interface IStorage {
 
   // User Context helper
   getUserContext(userId: string): Promise<UserContext | null>;
+
+  // Deployed Agents & Catalog Executions
+  getDeployedAgent(id: string): Promise<DeployedAgent | undefined>;
+  getDeployedAgentWithTemplate(id: string): Promise<{ agent: DeployedAgent; template: AgentTemplate | null } | undefined>;
+  getDeployedAgents(filters?: { orgId?: string; status?: string; templateId?: string }): Promise<DeployedAgent[]>;
+  createDeployedAgent(agent: InsertDeployedAgent): Promise<DeployedAgent>;
+  updateDeployedAgent(id: string, updates: Partial<DeployedAgent>): Promise<DeployedAgent | undefined>;
+  updateDeployedAgentMetrics(id: string, success: boolean, executionTimeMs: number): Promise<DeployedAgent | undefined>;
+  
+  createAgentCatalogExecution(execution: InsertAgentCatalogExecution): Promise<AgentCatalogExecution>;
+  updateAgentCatalogExecution(id: string, updates: Partial<AgentCatalogExecution>): Promise<AgentCatalogExecution | undefined>;
+  getAgentCatalogExecution(id: string): Promise<AgentCatalogExecution | undefined>;
+  getAgentCatalogExecutions(filters?: { deployedAgentId?: string; orgId?: string; status?: string; limit?: number }): Promise<AgentCatalogExecution[]>;
 
   // Seed default roles
   seedDefaultRoles(): Promise<void>;
@@ -3991,6 +4007,117 @@ export class MemStorage implements IStorage {
     };
   }
 
+  // Deployed Agents & Catalog Executions - Stub implementations for MemStorage
+  private deployedAgentsMap: Map<string, DeployedAgent> = new Map();
+  private agentCatalogExecutionsMap: Map<string, AgentCatalogExecution> = new Map();
+
+  async getDeployedAgent(id: string): Promise<DeployedAgent | undefined> {
+    return this.deployedAgentsMap.get(id);
+  }
+
+  async getDeployedAgentWithTemplate(id: string): Promise<{ agent: DeployedAgent; template: AgentTemplate | null } | undefined> {
+    const agent = this.deployedAgentsMap.get(id);
+    if (!agent) return undefined;
+    return { agent, template: null };
+  }
+
+  async getDeployedAgents(_filters?: { orgId?: string; status?: string; templateId?: string }): Promise<DeployedAgent[]> {
+    return Array.from(this.deployedAgentsMap.values());
+  }
+
+  async createDeployedAgent(agent: InsertDeployedAgent): Promise<DeployedAgent> {
+    const id = randomUUID();
+    const newAgent: DeployedAgent = {
+      id,
+      orgId: agent.orgId,
+      templateId: agent.templateId ?? null,
+      name: agent.name,
+      description: agent.description ?? null,
+      customSystemPrompt: agent.customSystemPrompt ?? null,
+      customConfig: agent.customConfig ?? null,
+      status: agent.status ?? 'active',
+      healthScore: agent.healthScore ?? 100,
+      lastError: agent.lastError ?? null,
+      memoryContext: agent.memoryContext ?? null,
+      learnings: agent.learnings ?? null,
+      adaptations: agent.adaptations ?? null,
+      totalExecutions: agent.totalExecutions ?? 0,
+      successfulExecutions: agent.successfulExecutions ?? 0,
+      failedExecutions: agent.failedExecutions ?? 0,
+      avgResponseTime: agent.avgResponseTime ?? null,
+      assignedTo: agent.assignedTo ?? null,
+      teamId: agent.teamId ?? null,
+      schedule: agent.schedule ?? null,
+      lastRun: agent.lastRun ?? null,
+      nextRun: agent.nextRun ?? null,
+      createdBy: agent.createdBy ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.deployedAgentsMap.set(id, newAgent);
+    return newAgent;
+  }
+
+  async updateDeployedAgent(id: string, updates: Partial<DeployedAgent>): Promise<DeployedAgent | undefined> {
+    const agent = this.deployedAgentsMap.get(id);
+    if (!agent) return undefined;
+    const updated = { ...agent, ...updates, updatedAt: new Date() };
+    this.deployedAgentsMap.set(id, updated);
+    return updated;
+  }
+
+  async updateDeployedAgentMetrics(id: string, success: boolean, executionTimeMs: number): Promise<DeployedAgent | undefined> {
+    const agent = this.deployedAgentsMap.get(id);
+    if (!agent) return undefined;
+    const totalExecutions = (agent.totalExecutions || 0) + 1;
+    const successfulExecutions = (agent.successfulExecutions || 0) + (success ? 1 : 0);
+    const failedExecutions = (agent.failedExecutions || 0) + (success ? 0 : 1);
+    const currentAvg = agent.avgResponseTime || 0;
+    const previousTotal = agent.totalExecutions || 0;
+    const newAvgResponseTime = previousTotal === 0 ? executionTimeMs : Math.round((currentAvg * previousTotal + executionTimeMs) / totalExecutions);
+    return this.updateDeployedAgent(id, { totalExecutions, successfulExecutions, failedExecutions, avgResponseTime: newAvgResponseTime, lastRun: new Date() });
+  }
+
+  async createAgentCatalogExecution(execution: InsertAgentCatalogExecution): Promise<AgentCatalogExecution> {
+    const id = randomUUID();
+    const newExecution: AgentCatalogExecution = {
+      id,
+      deployedAgentId: execution.deployedAgentId,
+      orgId: execution.orgId,
+      targetType: execution.targetType ?? null,
+      targetId: execution.targetId ?? null,
+      inputContext: execution.inputContext ?? null,
+      status: execution.status ?? 'pending',
+      startedAt: execution.startedAt ?? null,
+      completedAt: execution.completedAt ?? null,
+      executionTimeMs: execution.executionTimeMs ?? null,
+      aiResponse: execution.aiResponse ?? null,
+      parsedActions: execution.parsedActions ?? null,
+      actionsExecuted: execution.actionsExecuted ?? null,
+      error: execution.error ?? null,
+      executedBy: execution.executedBy ?? null,
+      createdAt: new Date(),
+    };
+    this.agentCatalogExecutionsMap.set(id, newExecution);
+    return newExecution;
+  }
+
+  async updateAgentCatalogExecution(id: string, updates: Partial<AgentCatalogExecution>): Promise<AgentCatalogExecution | undefined> {
+    const execution = this.agentCatalogExecutionsMap.get(id);
+    if (!execution) return undefined;
+    const updated = { ...execution, ...updates };
+    this.agentCatalogExecutionsMap.set(id, updated);
+    return updated;
+  }
+
+  async getAgentCatalogExecution(id: string): Promise<AgentCatalogExecution | undefined> {
+    return this.agentCatalogExecutionsMap.get(id);
+  }
+
+  async getAgentCatalogExecutions(_filters?: { deployedAgentId?: string; orgId?: string; status?: string; limit?: number }): Promise<AgentCatalogExecution[]> {
+    return Array.from(this.agentCatalogExecutionsMap.values()).slice(0, _filters?.limit || 100);
+  }
+
   // Seed default roles
   async seedDefaultRoles(): Promise<void> {
     const defaultRoles = [
@@ -7332,6 +7459,106 @@ Mike`,
       teamIds,
       permissions: (role.permissions as Record<string, boolean>) || {},
     };
+  }
+
+  // Deployed Agents & Catalog Executions
+  async getDeployedAgent(id: string): Promise<DeployedAgent | undefined> {
+    const result = await db.select().from(deployedAgents).where(eq(deployedAgents.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDeployedAgentWithTemplate(id: string): Promise<{ agent: DeployedAgent; template: AgentTemplate | null } | undefined> {
+    const agentResult = await db.select().from(deployedAgents).where(eq(deployedAgents.id, id)).limit(1);
+    if (!agentResult[0]) return undefined;
+    
+    const agent = agentResult[0];
+    let template: AgentTemplate | null = null;
+    
+    if (agent.templateId) {
+      const templateResult = await db.select().from(agentTemplates).where(eq(agentTemplates.id, agent.templateId)).limit(1);
+      template = templateResult[0] || null;
+    }
+    
+    return { agent, template };
+  }
+
+  async getDeployedAgents(filters?: { orgId?: string; status?: string; templateId?: string }): Promise<DeployedAgent[]> {
+    const conditions: any[] = [];
+    if (filters?.orgId) conditions.push(eq(deployedAgents.orgId, filters.orgId));
+    if (filters?.status) conditions.push(eq(deployedAgents.status, filters.status));
+    if (filters?.templateId) conditions.push(eq(deployedAgents.templateId, filters.templateId));
+    
+    if (conditions.length > 0) {
+      return await db.select().from(deployedAgents).where(and(...conditions));
+    }
+    return await db.select().from(deployedAgents);
+  }
+
+  async createDeployedAgent(agent: InsertDeployedAgent): Promise<DeployedAgent> {
+    const result = await db.insert(deployedAgents).values(agent).returning();
+    return result[0];
+  }
+
+  async updateDeployedAgent(id: string, updates: Partial<DeployedAgent>): Promise<DeployedAgent | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getDeployedAgent(id);
+    const result = await db.update(deployedAgents).set({ ...cleaned, updatedAt: new Date() }).where(eq(deployedAgents.id, id)).returning();
+    return result[0];
+  }
+
+  async updateDeployedAgentMetrics(id: string, success: boolean, executionTimeMs: number): Promise<DeployedAgent | undefined> {
+    const agent = await this.getDeployedAgent(id);
+    if (!agent) return undefined;
+
+    const totalExecutions = (agent.totalExecutions || 0) + 1;
+    const successfulExecutions = (agent.successfulExecutions || 0) + (success ? 1 : 0);
+    const failedExecutions = (agent.failedExecutions || 0) + (success ? 0 : 1);
+    
+    // Calculate new average response time
+    const currentAvg = agent.avgResponseTime || 0;
+    const previousTotal = agent.totalExecutions || 0;
+    const newAvgResponseTime = previousTotal === 0 
+      ? executionTimeMs 
+      : Math.round((currentAvg * previousTotal + executionTimeMs) / totalExecutions);
+
+    return await this.updateDeployedAgent(id, {
+      totalExecutions,
+      successfulExecutions,
+      failedExecutions,
+      avgResponseTime: newAvgResponseTime,
+      lastRun: new Date()
+    });
+  }
+
+  async createAgentCatalogExecution(execution: InsertAgentCatalogExecution): Promise<AgentCatalogExecution> {
+    const result = await db.insert(agentCatalogExecutions).values(execution).returning();
+    return result[0];
+  }
+
+  async updateAgentCatalogExecution(id: string, updates: Partial<AgentCatalogExecution>): Promise<AgentCatalogExecution | undefined> {
+    const cleaned = cleanPartial(updates);
+    if (Object.keys(cleaned).length === 0) return this.getAgentCatalogExecution(id);
+    const result = await db.update(agentCatalogExecutions).set(cleaned).where(eq(agentCatalogExecutions.id, id)).returning();
+    return result[0];
+  }
+
+  async getAgentCatalogExecution(id: string): Promise<AgentCatalogExecution | undefined> {
+    const result = await db.select().from(agentCatalogExecutions).where(eq(agentCatalogExecutions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAgentCatalogExecutions(filters?: { deployedAgentId?: string; orgId?: string; status?: string; limit?: number }): Promise<AgentCatalogExecution[]> {
+    const conditions: any[] = [];
+    if (filters?.deployedAgentId) conditions.push(eq(agentCatalogExecutions.deployedAgentId, filters.deployedAgentId));
+    if (filters?.orgId) conditions.push(eq(agentCatalogExecutions.orgId, filters.orgId));
+    if (filters?.status) conditions.push(eq(agentCatalogExecutions.status, filters.status));
+    
+    let query = db.select().from(agentCatalogExecutions);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(agentCatalogExecutions.createdAt)).limit(filters?.limit || 100);
   }
 
   // Seed default roles

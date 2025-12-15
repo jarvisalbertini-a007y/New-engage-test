@@ -2313,6 +2313,35 @@ export const agentActions = pgTable("agent_actions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Agent Catalog Executions - Execution log for deployed agents
+export const agentCatalogExecutions = pgTable("agent_catalog_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deployedAgentId: varchar("deployed_agent_id").references(() => deployedAgents.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  
+  // Input
+  targetType: text("target_type"), // lead, company, contact, custom
+  targetId: varchar("target_id"),
+  inputContext: jsonb("input_context"),
+  
+  // Execution
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  executionTimeMs: integer("execution_time_ms"),
+  
+  // Output
+  aiResponse: text("ai_response"),
+  parsedActions: jsonb("parsed_actions"), // [{type, params, result}]
+  actionsExecuted: jsonb("actions_executed"),
+  
+  // Errors
+  error: text("error"),
+  
+  executedBy: varchar("executed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert schemas for new tables
 export const insertAgentCategorySchema = createInsertSchema(agentCategories).omit({ id: true, createdAt: true });
 export const insertAgentTemplateSchema = createInsertSchema(agentTemplates).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2324,6 +2353,7 @@ export const insertAgentOrchestrationSchema = createInsertSchema(agentOrchestrat
 export const insertOrchestrationRunSchema = createInsertSchema(orchestrationRuns).omit({ id: true, startedAt: true });
 export const insertAgentMemorySchema = createInsertSchema(agentMemory).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAgentActionSchema = createInsertSchema(agentActions).omit({ id: true, createdAt: true });
+export const insertAgentCatalogExecutionSchema = createInsertSchema(agentCatalogExecutions).omit({ id: true, createdAt: true });
 
 // Types for new tables
 export type AgentCategory = typeof agentCategories.$inferSelect;
@@ -2355,3 +2385,6 @@ export type InsertAgentMemory = z.infer<typeof insertAgentMemorySchema>;
 
 export type AgentAction = typeof agentActions.$inferSelect;
 export type InsertAgentAction = z.infer<typeof insertAgentActionSchema>;
+
+export type AgentCatalogExecution = typeof agentCatalogExecutions.$inferSelect;
+export type InsertAgentCatalogExecution = z.infer<typeof insertAgentCatalogExecutionSchema>;
