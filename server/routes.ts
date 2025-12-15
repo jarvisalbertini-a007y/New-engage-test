@@ -7524,5 +7524,118 @@ export function registerAgentCatalogRoutes(app: Express) {
     }
   });
   
+  // Run a deployed agent (Run Now)
+  app.post("/api/agent-catalog/deployed/:id/run", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { id } = req.params;
+      const { targetType, targetId, action, additionalContext } = req.body;
+      
+      if (!user?.currentOrgId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+      
+      // Verify the deployed agent belongs to this org
+      const [deployedAgent] = await db.select().from(deployedAgents)
+        .where(and(
+          eq(deployedAgents.id, id),
+          eq(deployedAgents.orgId, user.currentOrgId)
+        ));
+      
+      if (!deployedAgent) {
+        return res.status(404).json({ error: "Deployed agent not found" });
+      }
+      
+      if (deployedAgent.status !== "active") {
+        return res.status(400).json({ error: "Agent is not active" });
+      }
+      
+      // Import and execute the agent
+      const { agentCatalogExecutor } = await import("./services/agentCatalogExecutor");
+      
+      const result = await agentCatalogExecutor.executeDeployedAgent(
+        id,
+        { targetType, targetId, action, additionalContext },
+        userId
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[AgentCatalog] Error running agent:", error);
+      res.status(500).json({ 
+        error: "Failed to run agent",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Get execution history for a deployed agent
+  app.get("/api/agent-catalog/deployed/:id/executions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { id } = req.params;
+      const { limit = "20" } = req.query;
+      
+      if (!user?.currentOrgId) {
+        return res.json([]);
+      }
+      
+      // Verify the deployed agent belongs to this org
+      const [deployedAgent] = await db.select().from(deployedAgents)
+        .where(and(
+          eq(deployedAgents.id, id),
+          eq(deployedAgents.orgId, user.currentOrgId)
+        ));
+      
+      if (!deployedAgent) {
+        return res.status(404).json({ error: "Deployed agent not found" });
+      }
+      
+      // Get executions
+      const { agentCatalogExecutor } = await import("./services/agentCatalogExecutor");
+      const executions = await agentCatalogExecutor.getExecutionHistory({
+        deployedAgentId: id,
+        limit: Math.min(100, parseInt(limit as string) || 20)
+      });
+      
+      res.json(executions);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching executions:", error);
+      res.status(500).json({ error: "Failed to fetch execution history" });
+    }
+  });
+  
+  // Get a single execution
+  app.get("/api/agent-catalog/executions/:executionId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { executionId } = req.params;
+      
+      if (!user?.currentOrgId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+      
+      const { agentCatalogExecutor } = await import("./services/agentCatalogExecutor");
+      const execution = await agentCatalogExecutor.getExecution(executionId);
+      
+      if (!execution) {
+        return res.status(404).json({ error: "Execution not found" });
+      }
+      
+      // Verify the execution belongs to this org
+      if (execution.orgId !== user.currentOrgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(execution);
+    } catch (error) {
+      console.error("[AgentCatalog] Error fetching execution:", error);
+      res.status(500).json({ error: "Failed to fetch execution" });
+    }
+  });
+  
   console.log("[AgentCatalog] Routes registered");
 }

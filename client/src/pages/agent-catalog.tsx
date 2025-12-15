@@ -61,6 +61,23 @@ interface DeployedAgent {
   createdAt: string;
 }
 
+interface AgentExecution {
+  id: string;
+  deployedAgentId: string;
+  status: string;
+  targetType: string | null;
+  targetId: string | null;
+  inputContext: any;
+  aiResponse: string | null;
+  parsedActions: any;
+  actionsExecuted: any;
+  error: string | null;
+  executionTimeMs: number | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 interface CatalogStats {
   categories: number;
   templates: number;
@@ -119,6 +136,10 @@ export default function AgentCatalogPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
+  const [showExecutionDialog, setShowExecutionDialog] = useState(false);
+  const [selectedDeployedAgent, setSelectedDeployedAgent] = useState<DeployedAgent | null>(null);
+  const [executionResult, setExecutionResult] = useState<any>(null);
   const { toast } = useToast();
 
   // Fetch catalog stats
@@ -201,6 +222,50 @@ export default function AgentCatalogPage() {
       });
       setIsDeploying(false);
     },
+  });
+
+  // Run agent mutation
+  const runMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const res = await apiRequest("POST", `/api/agent-catalog/deployed/${agentId}/run`, {
+        targetType: "lead",
+        action: "analyze"
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setExecutionResult(data);
+      toast({
+        title: "Agent Executed",
+        description: data.execution?.status === "completed" 
+          ? `Completed in ${data.execution.executionTimeMs}ms with ${data.actionsExecuted?.length || 0} actions`
+          : "Agent execution completed",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent-catalog/deployed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agent-catalog/deployed", selectedDeployedAgent?.id, "executions"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Execution Failed",
+        description: error.message || "Failed to run agent",
+        variant: "destructive",
+      });
+      setExecutionResult(null);
+    },
+    onSettled: () => {
+      setRunningAgentId(null);
+    }
+  });
+
+  // Fetch executions for selected deployed agent
+  const { data: executions = [] } = useQuery<AgentExecution[]>({
+    queryKey: ["/api/agent-catalog/deployed", selectedDeployedAgent?.id, "executions"],
+    queryFn: async () => {
+      if (!selectedDeployedAgent?.id) return [];
+      const res = await fetch(`/api/agent-catalog/deployed/${selectedDeployedAgent.id}/executions`);
+      return res.json();
+    },
+    enabled: !!selectedDeployedAgent?.id,
   });
 
   // Auto-seed on mount if empty
@@ -529,24 +594,60 @@ export default function AgentCatalogPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {deployedAgents.map(agent => (
-                  <Card key={agent.id} className="bg-card/50">
+                  <Card key={agent.id} className="bg-card/50" data-testid={`deployed-agent-card-${agent.id}`}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{agent.name}</CardTitle>
-                        <Badge variant="outline" className="bg-green-500/10 text-green-400">
-                          Active
+                        <Badge variant="outline" className={cn(
+                          agent.status === "active" ? "bg-green-500/10 text-green-400" :
+                          agent.status === "error" ? "bg-red-500/10 text-red-400" :
+                          "bg-yellow-500/10 text-yellow-400"
+                        )}>
+                          {agent.status}
                         </Badge>
                       </div>
                       <CardDescription>{agent.description}</CardDescription>
                     </CardHeader>
+                    <CardContent>
+                      <div className="text-xs text-muted-foreground">
+                        Deployed {new Date(agent.createdAt).toLocaleDateString()}
+                      </div>
+                    </CardContent>
                     <CardFooter className="gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configure
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedDeployedAgent(agent);
+                          setShowExecutionDialog(true);
+                        }}
+                        data-testid={`button-history-${agent.id}`}
+                      >
+                        <Activity className="h-4 w-4 mr-2" />
+                        History
                       </Button>
-                      <Button size="sm" className="flex-1">
-                        <Play className="h-4 w-4 mr-2" />
-                        Run
+                      <Button 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          setRunningAgentId(agent.id);
+                          runMutation.mutate(agent.id);
+                        }}
+                        disabled={runningAgentId === agent.id || agent.status !== "active"}
+                        data-testid={`button-run-${agent.id}`}
+                      >
+                        {runningAgentId === agent.id ? (
+                          <>
+                            <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Run Now
+                          </>
+                        )}
                       </Button>
                     </CardFooter>
                   </Card>
@@ -738,6 +839,124 @@ export default function AgentCatalogPage() {
                 </DialogFooter>
               </>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Execution History Dialog */}
+        <Dialog open={showExecutionDialog} onOpenChange={setShowExecutionDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Execution History: {selectedDeployedAgent?.name}
+              </DialogTitle>
+              <DialogDescription>
+                View past executions and results for this agent
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="h-[500px] pr-4">
+              {executions.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No executions yet</p>
+                  <p className="text-sm">Run the agent to see execution history</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {executions.map(execution => (
+                    <Card key={execution.id} className={cn(
+                      "bg-card/30",
+                      execution.status === "completed" && "border-green-500/20",
+                      execution.status === "failed" && "border-red-500/20",
+                      execution.status === "running" && "border-blue-500/20"
+                    )} data-testid={`execution-card-${execution.id}`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={cn(
+                              execution.status === "completed" && "bg-green-500/10 text-green-400",
+                              execution.status === "failed" && "bg-red-500/10 text-red-400",
+                              execution.status === "running" && "bg-blue-500/10 text-blue-400 animate-pulse",
+                              execution.status === "pending" && "bg-yellow-500/10 text-yellow-400"
+                            )} data-testid={`execution-status-${execution.id}`}>
+                              {execution.status}
+                            </Badge>
+                            {execution.executionTimeMs && (
+                              <span className="text-xs text-muted-foreground" data-testid={`execution-time-${execution.id}`}>
+                                {execution.executionTimeMs}ms
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(execution.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {execution.parsedActions && (
+                          <div>
+                            <h4 className="text-xs font-medium mb-1">Actions Taken</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {(execution.parsedActions as any)?.actions?.map((action: any, i: number) => (
+                                <Badge key={i} variant="secondary" className="text-xs">
+                                  {action.type}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {execution.error && (
+                          <div className="p-2 bg-red-500/10 rounded text-red-400 text-sm" data-testid={`execution-error-${execution.id}`}>
+                            {execution.error}
+                          </div>
+                        )}
+                        {execution.aiResponse && (
+                          <details className="text-sm">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground" data-testid={`execution-response-toggle-${execution.id}`}>
+                              View AI Response
+                            </summary>
+                            <pre className="mt-2 p-2 bg-muted/50 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                              {typeof execution.aiResponse === 'string' 
+                                ? execution.aiResponse 
+                                : JSON.stringify(execution.aiResponse, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowExecutionDialog(false)} data-testid="button-close-history">
+                Close
+              </Button>
+              {selectedDeployedAgent && (
+                <Button 
+                  onClick={() => {
+                    setRunningAgentId(selectedDeployedAgent.id);
+                    runMutation.mutate(selectedDeployedAgent.id);
+                  }}
+                  disabled={runningAgentId === selectedDeployedAgent.id}
+                  data-testid="button-run-from-history"
+                >
+                  {runningAgentId === selectedDeployedAgent.id ? (
+                    <>
+                      <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Run Now
+                    </>
+                  )}
+                </Button>
+              )}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
