@@ -26,7 +26,15 @@ export default function UniversalChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sessionId] = useState(() => `session-${Date.now()}`);
+  const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<AgentTemplate | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch agent templates for quick selection
+  const { data: agentTemplates = [] } = useQuery<AgentTemplate[]>({
+    queryKey: ['agentTemplates'],
+    queryFn: () => api.getAgentTemplates()
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
