@@ -169,4 +169,25 @@ export const api = {
     apiRequest('POST', '/api/smart-onboarding/approve', data),
   refreshSmartOnboardingResearch: () =>
     apiRequest('POST', '/api/smart-onboarding/refresh-research', {}),
+
+  // Knowledge Base - Additional methods
+  deleteKnowledge: (id: string) => apiRequest('DELETE', `/api/knowledge/${id}`),
+  getKnowledgeDocument: (id: string) => apiRequest('GET', `/api/knowledge/${id}`),
+
+  // Settings
+  getSettings: () => apiRequest('GET', '/api/settings'),
+  updateSettings: (section: string, data: any) => 
+    apiRequest('PUT', `/api/settings/${section}`, data),
+
+  // Agent Teams
+  getAgentTeams: () => apiRequest('GET', '/api/agent-teams'),
+  createAgentTeam: (data: any) => apiRequest('POST', '/api/agent-teams', data),
+  updateAgentTeam: (id: string, data: any) => apiRequest('PUT', `/api/agent-teams/${id}`, data),
+  deleteAgentTeam: (id: string) => apiRequest('DELETE', `/api/agent-teams/${id}`),
+
+  // Autonomous Mode
+  getAutonomousStatus: () => apiRequest('GET', '/api/autonomous/status'),
+  setAutonomousMode: (enabled: boolean) => 
+    apiRequest('POST', '/api/autonomous/toggle', { enabled }),
+  getAutonomousActivity: () => apiRequest('GET', '/api/autonomous/activity'),
 };
