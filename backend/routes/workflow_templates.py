@@ -153,8 +153,8 @@ WORKFLOW_TEMPLATES = [
             {"id": "n1", "type": "trigger", "label": "Form Submit", "config": {"triggerType": "form"}},
             {"id": "n2", "type": "agent", "label": "AI Qualify", "config": {"agent": "intent-classifier"}},
             {"id": "n3", "type": "branch", "label": "Intent Check", "config": {}},
-            {"id": "n4", "type": "email", "label": "Hot Lead Email", "config": {"template": "hot_lead_response", "immediate": true}},
-            {"id": "n5", "type": "notification", "label": "Alert Sales", "config": {"channel": "slack", "urgent": true}},
+            {"id": "n4", "type": "email", "label": "Hot Lead Email", "config": {"template": "hot_lead_response", "immediate": True}},
+            {"id": "n5", "type": "notification", "label": "Alert Sales", "config": {"channel": "slack", "urgent": True}},
             {"id": "n6", "type": "email", "label": "Standard Response", "config": {"template": "inbound_response"}},
             {"id": "n7", "type": "end", "label": "End", "config": {}}
         ],
