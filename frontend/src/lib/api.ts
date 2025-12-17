@@ -202,4 +202,25 @@ export const api = {
   createAbTest: (data: any) => apiRequest('POST', '/api/execute/ab-test/create', data),
   getAbTests: () => apiRequest('GET', '/api/execute/ab-tests'),
   getOptimizationLog: () => apiRequest('GET', '/api/execute/optimization-log'),
+
+  // Real Integrations
+  getIntegrations: () => apiRequest('GET', '/api/integrations/integrations'),
+  saveSendgridIntegration: (data: { api_key: string; from_email: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/sendgrid', data),
+  removeSendgridIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/sendgrid'),
+  
+  // Real Lead Search
+  searchRealLeads: (criteria: string, count?: number) =>
+    apiRequest('POST', '/api/integrations/search-leads', { criteria, count }),
+  
+  // Company Scraping
+  scrapeCompany: (domain: string, company?: string) =>
+    apiRequest('POST', '/api/integrations/scrape-company', { domain, company }),
+  
+  // Send Email
+  sendEmail: (data: { to: string; subject: string; body: string; prospectId?: string }) =>
+    apiRequest('POST', '/api/integrations/email/send', data),
+  
+  // Email Analytics
+  getEmailAnalytics: () => apiRequest('GET', '/api/integrations/email/analytics'),
 };
