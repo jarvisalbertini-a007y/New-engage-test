@@ -186,7 +186,7 @@ def parse_actions(response: str) -> List[dict]:
     return actions
 
 async def execute_action(action: dict, user: dict, db) -> dict:
-    """Execute a parsed action"""
+    """Execute a parsed action - NOW USES REAL EXECUTION ENGINE"""
     action_type = action.get("action")
     params = action.get("params", {})
     
@@ -196,39 +196,154 @@ async def execute_action(action: dict, user: dict, db) -> dict:
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
-    # Map action types to actual operations
-    if action_type == "create_agent":
-        agent = {
-            "id": str(uuid4()),
-            "userId": user["id"],
-            "name": params.get("name", "New Agent"),
-            "category": params.get("category", "general"),
-            "description": params.get("description", ""),
-            "status": "active",
-            "createdAt": datetime.now(timezone.utc).isoformat()
+    # Import execution engine functions
+    from routes.execution_engine import (
+        action_find_prospects, action_research_company, 
+        action_draft_email, action_score_prospect,
+        action_create_sequence, action_send_email
+    )
+    
+    try:
+        if action_type == "find_prospects":
+            exec_result = await action_find_prospects(params, user, db)
+            result["data"] = exec_result
+            result["message"] = f"Found {exec_result.get('prospectsFound', 0)} prospects"
+            
+        elif action_type == "research_company":
+            exec_result = await action_research_company(params, user, db)
+            result["data"] = exec_result
+            result["message"] = f"Researched {params.get('company', 'company')}"
+            
+        elif action_type == "draft_email":
+            exec_result = await action_draft_email(params, user, db)
+            result["data"] = exec_result
+            result["message"] = f"Drafted email: {exec_result.get('subject', 'Email drafted')}"
+            
+        elif action_type == "score_prospect":
+            exec_result = await action_score_prospect(params, user, db)
+            result["data"] = exec_result
+            result["message"] = f"Scored prospect: {exec_result.get('score', 0)}/100"
+            
+        elif action_type == "create_sequence":
+            exec_result = await action_create_sequence(params, user, db)
+            result["data"] = exec_result
+            result["message"] = f"Created sequence: {exec_result.get('name', 'New sequence')}"
+            
+        elif action_type == "send_email":
+            exec_result = await action_send_email(params, user, db)
+            result["data"] = exec_result
+            result["message"] = "Email sent successfully"
+            
+        elif action_type == "create_agent":
+            agent = {
+                "id": str(uuid4()),
+                "userId": user["id"],
+                "name": params.get("name", "New Agent"),
+                "category": params.get("category", "general"),
+                "description": params.get("description", ""),
+                "status": "active",
+                "createdAt": datetime.now(timezone.utc).isoformat()
+            }
+            await db.agents.insert_one(agent)
+            result["agentId"] = agent["id"]
+            result["message"] = f"Created agent: {agent['name']}"
+            
+        elif action_type == "create_workflow":
+            workflow = {
+                "id": str(uuid4()),
+                "userId": user["id"],
+                "name": params.get("name", "New Workflow"),
+                "status": "draft",
+                "nodes": params.get("nodes", []),
+                "edges": params.get("edges", []),
+                "createdAt": datetime.now(timezone.utc).isoformat()
+            }
+            await db.workflows.insert_one(workflow)
+            result["workflowId"] = workflow["id"]
+            result["message"] = f"Created workflow: {workflow['name']}"
+            
+        else:
+            result["message"] = f"Action '{action_type}' acknowledged"
+            
+    except Exception as e:
+        result["status"] = "error"
+        result["message"] = str(e)
+        
+    return result
+
+
+async def auto_execute_intent(intent: str, message: str, user: dict, db) -> dict:
+    """Automatically execute based on detected intent"""
+    from routes.execution_engine import (
+        action_find_prospects, action_research_company, action_draft_email
+    )
+    
+    result = None
+    
+    try:
+        if intent == "prospect_search":
+            # Extract count and criteria from message
+            import re
+            count_match = re.search(r'(\d+)', message)
+            count = int(count_match.group(1)) if count_match else 10
+            
+            exec_result = await action_find_prospects(
+                {"criteria": message, "count": min(count, 50)},
+                user, db
+            )
+            result = {
+                "action": "find_prospects",
+                "status": "executed",
+                "message": f"✅ Found {exec_result.get('prospectsFound', 0)} prospects matching your criteria",
+                "data": exec_result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+        elif intent == "research":
+            # Extract company name from message
+            import re
+            company_match = re.search(r'(?:research|about|analyze)\\s+([A-Z][\\w\\s]+?)(?:\\s+before|\\s+for|$)', message, re.I)
+            company = company_match.group(1).strip() if company_match else message.split()[-1]
+            
+            exec_result = await action_research_company(
+                {"company": company},
+                user, db
+            )
+            result = {
+                "action": "research_company",
+                "status": "executed",
+                "message": f"✅ Researched {company}",
+                "data": exec_result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+        elif intent == "generate_content":
+            # Get recent prospect for personalization
+            prospect = await db.prospects.find_one(
+                {"userId": user["id"]},
+                {"_id": 0}
+            )
+            
+            exec_result = await action_draft_email(
+                {"prospect": prospect or {}, "type": "cold_intro"},
+                user, db
+            )
+            result = {
+                "action": "draft_email",
+                "status": "executed",
+                "message": f"✅ Drafted email: {exec_result.get('subject', 'New email')}",
+                "data": exec_result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+    except Exception as e:
+        result = {
+            "action": intent,
+            "status": "error",
+            "message": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        await db.agents.insert_one(agent)
-        result["agentId"] = agent["id"]
-        result["message"] = f"Created agent: {agent['name']}"
-        
-    elif action_type == "create_workflow":
-        workflow = {
-            "id": str(uuid4()),
-            "userId": user["id"],
-            "name": params.get("name", "New Workflow"),
-            "status": "draft",
-            "nodes": params.get("nodes", []),
-            "edges": params.get("edges", []),
-            "createdAt": datetime.now(timezone.utc).isoformat()
-        }
-        await db.workflows.insert_one(workflow)
-        result["workflowId"] = workflow["id"]
-        result["message"] = f"Created workflow: {workflow['name']}"
-        
-    elif action_type == "send_email":
-        result["message"] = "Email queued for sending"
-        result["status"] = "queued"
-        
+    
     return result
 
 def generate_suggestions(intent: str, context: dict) -> List[dict]:
