@@ -15,6 +15,11 @@ from routes.onboarding import router as onboarding_router
 from routes.prospects import router as prospects_router
 from routes.content import router as content_router
 from routes.command import router as command_router
+from routes.universal_chat import router as universal_chat_router
+from routes.micro_agents import router as micro_agents_router
+from routes.knowledge import router as knowledge_router
+from routes.workflow_templates import router as workflow_templates_router
+from routes.smart_onboarding import router as smart_onboarding_router
 from database import connect_db, close_db
 
 @asynccontextmanager
