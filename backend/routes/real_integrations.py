@@ -314,7 +314,7 @@ Return ONLY JSON."""
             system_message="You are a company research analyst. Return only JSON."
         )
         
-        response = await llm.send_message(prompt)
+        response = await llm.send_message(UserMessage(content=prompt))
         
         content = response
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
