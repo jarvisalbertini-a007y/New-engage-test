@@ -1,73 +1,60 @@
-# EngageAI Sales Engine - Test Results
+# SalesFlow AI - Test Results
 
 ## Application Overview
-EngageAI is a fully autonomous sales engine platform with 1000+ AI agents for sales automation. Built with FastAPI backend and React frontend.
+SalesFlow AI is an NLP-first autonomous sales engagement platform combining features of Autobound, Lavender, Warmly, Regie, and Instantly. Built with FastAPI backend and React frontend.
 
 ## Testing Protocol
 - Backend: FastAPI on port 8001
 - Frontend: React on port 3000
 - Database: MongoDB
 
-## Completed Features to Test
+## New Features Added
 
-### 1. Authentication (Backend + Frontend)
-- **POST /api/auth/register** - User registration
-- **POST /api/auth/login** - User login with JWT
-- **GET /api/auth/me** - Get current user
+### 1. Universal Chat (NLP-First Command Center)
+- **POST /api/chat/message** - Process NLP commands and execute actions
+- **GET /api/chat/sessions** - Get chat history
+- **POST /api/chat/agents/select** - Select agents from chat
 
-### 2. Agent System
-- **GET /api/agents/categories** - Get agent categories
-- **GET /api/agents/templates** - Get agent templates (26 templates seeded)
-- **POST /api/agents** - Deploy/create an agent
-- **GET /api/agents** - List user's agents
-- **POST /api/agents/{id}/execute** - Execute an agent
+### 2. Micro Agents (Specialized Task Executors)
+- **GET /api/micro-agents/types** - Get all micro agent types (12 types)
+- **POST /api/micro-agents/execute** - Execute single micro agent
+- **POST /api/micro-agents/chain** - Execute chain of micro agents
 
-### 3. Workflows
-- **GET /api/workflows** - List workflows
-- **POST /api/workflows** - Create workflow
-- **POST /api/workflows/{id}/execute** - Execute workflow
-- **POST /api/workflows/generate** - Generate workflow from NLP
+### 3. Knowledge Base (RAG)
+- **POST /api/knowledge/upload** - Upload files for knowledge extraction
+- **GET /api/knowledge** - List knowledge documents
+- **POST /api/knowledge/query** - Query knowledge base with RAG
+- **POST /api/knowledge/instructions** - Create custom instructions
 
-### 4. Prospects
-- **GET /api/prospects** - List prospects
-- **POST /api/prospects** - Create prospect
-- **GET /api/prospects/companies** - List companies
-- **POST /api/prospects/companies** - Create company
+### 4. Workflow Templates (Prebuilt + Human-in-the-Loop)
+- **GET /api/workflow-templates/templates** - Get 5 prebuilt templates
+- **POST /api/workflow-templates/templates/{id}/clone** - Clone template
+- **GET /api/workflow-templates/approvals** - Get pending approvals
+- **POST /api/workflow-templates/approvals/{id}/respond** - Respond to approval
+- **POST /api/workflow-templates/generate-from-nlp** - Generate workflow from NLP
 
-### 5. Command Center
-- **POST /api/command/execute** - Execute natural language command
-- **GET /api/command/suggestions** - Get command suggestions
-- **GET /api/command/history** - Get command history
-
-### 6. Onboarding
-- **GET /api/onboarding/profile** - Get onboarding profile
-- **POST /api/onboarding/research-company** - Research company by domain
-- **POST /api/onboarding/approve-icp** - Approve ICP
-- **POST /api/onboarding/approve-strategy** - Approve strategy
-- **POST /api/onboarding/complete** - Complete onboarding
-
-### 7. Content Generation
-- **POST /api/content/generate** - Generate content (email, linkedin, script)
-- **GET /api/content/templates** - Get content templates
+### 5. Smart Onboarding (Email-Only)
+- **POST /api/smart-onboarding/start** - Start with just email, AI researches everything
+- **GET /api/smart-onboarding/session** - Get onboarding session
+- **POST /api/smart-onboarding/approve** - Approve AI research
 
 ## Test User Credentials
-- Email: newtest@test.com
+- Email: apitest@example.com
 - Password: test123456
 
 ## Current Status
-- Backend: RUNNING
-- Frontend: RUNNING
-- Database: Connected
+- Backend: RUNNING with all new routes
+- Frontend: RUNNING with new pages
 
-## Known Issues
-- External URL routing issue (infrastructure-level, not code issue)
+## Key Features to Verify
+1. NLP chat commands work and return intelligent responses
+2. Workflow templates load (5 templates)
+3. Micro agents execute correctly
+4. Smart onboarding researches company from email domain
+5. Human-in-the-loop approvals work
 
 ## Incorporate User Feedback
-- None at this time
-
-## Notes for Testing Agent
-1. Test all CRUD operations for agents, workflows, prospects
-2. Test authentication flow (register -> login -> protected routes)
-3. Test command execution with different command types
-4. Verify onboarding flow steps
-5. Test content generation for different types
+- User wants more NLP, less clicks
+- User wants direct agent selection from chat
+- User wants prebuilt workflow templates with approval points
+- User wants email-only onboarding with AI research
