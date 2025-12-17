@@ -64,6 +64,7 @@ app.include_router(workflow_templates_router, prefix="/api/workflow-templates", 
 app.include_router(smart_onboarding_router, prefix="/api/smart-onboarding", tags=["Smart Onboarding"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(agent_teams_router, prefix="/api/agent-teams", tags=["Agent Teams"])
+app.include_router(execution_router, prefix="/api/execute", tags=["Execution Engine"])
 
 @app.get("/api/health")
 async def health_check():
