@@ -14,6 +14,14 @@ interface Message {
   timestamp: Date;
 }
 
+interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tier: string;
+}
+
 export default function UniversalChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
