@@ -186,8 +186,20 @@ export const api = {
   deleteAgentTeam: (id: string) => apiRequest('DELETE', `/api/agent-teams/${id}`),
 
   // Autonomous Mode
-  getAutonomousStatus: () => apiRequest('GET', '/api/autonomous/status'),
+  getAutonomousStatus: () => apiRequest('GET', '/api/settings/autonomous/status'),
   setAutonomousMode: (enabled: boolean) => 
-    apiRequest('POST', '/api/autonomous/toggle', { enabled }),
-  getAutonomousActivity: () => apiRequest('GET', '/api/autonomous/activity'),
+    apiRequest('POST', '/api/settings/autonomous/toggle', { enabled }),
+  getAutonomousActivity: () => apiRequest('GET', '/api/settings/autonomous/activity'),
+
+  // Execution Engine
+  executeAction: (action: string, params: any) =>
+    apiRequest('POST', '/api/execute/execute-action', { action, params }),
+  startAutonomous: () => apiRequest('POST', '/api/execute/autonomous/start', {}),
+  stopAutonomous: () => apiRequest('POST', '/api/execute/autonomous/stop', {}),
+  getExecutionActivity: () => apiRequest('GET', '/api/execute/autonomous/activity'),
+
+  // A/B Testing
+  createAbTest: (data: any) => apiRequest('POST', '/api/execute/ab-test/create', data),
+  getAbTests: () => apiRequest('GET', '/api/execute/ab-tests'),
+  getOptimizationLog: () => apiRequest('GET', '/api/execute/optimization-log'),
 };
