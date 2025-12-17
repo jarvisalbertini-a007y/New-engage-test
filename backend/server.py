@@ -20,6 +20,8 @@ from routes.micro_agents import router as micro_agents_router
 from routes.knowledge import router as knowledge_router
 from routes.workflow_templates import router as workflow_templates_router
 from routes.smart_onboarding import router as smart_onboarding_router
+from routes.settings import router as settings_router
+from routes.agent_teams import router as agent_teams_router
 from database import connect_db, close_db
 
 @asynccontextmanager
