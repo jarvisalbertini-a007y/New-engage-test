@@ -81,11 +81,15 @@ function AppRoutes() {
       }>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/agent-teams" element={<AgentTeams />} />
         <Route path="/workflows" element={<Workflows />} />
         <Route path="/workflow-builder" element={<WorkflowBuilder />} />
+        <Route path="/approvals" element={<Approvals />} />
+        <Route path="/knowledge" element={<KnowledgeBase />} />
         <Route path="/prospects" element={<Prospects />} />
         <Route path="/command" element={<Command />} />
         <Route path="/chat" element={<UniversalChat />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );
