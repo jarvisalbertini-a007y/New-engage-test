@@ -23,6 +23,7 @@ from routes.smart_onboarding import router as smart_onboarding_router
 from routes.settings import router as settings_router
 from routes.agent_teams import router as agent_teams_router
 from routes.execution_engine import router as execution_router
+from routes.real_integrations import router as integrations_router
 from database import connect_db, close_db
 
 @asynccontextmanager
