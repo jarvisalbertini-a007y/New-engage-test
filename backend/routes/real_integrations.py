@@ -132,10 +132,10 @@ Return ONLY the JSON array, no other text."""
             system_message="You are a data parsing assistant. Return only JSON."
         )
         
-        response = await llm.chat([UserMessage(content=parse_prompt)])
+        response = await llm.send_message(parse_prompt)
         
         # Extract JSON from response
-        content = response.message if hasattr(response, 'message') else str(response)
+        content = response
         json_match = re.search(r'\[.*\]', content, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
