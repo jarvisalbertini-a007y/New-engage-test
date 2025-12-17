@@ -132,7 +132,7 @@ Return ONLY the JSON array, no other text."""
             system_message="You are a data parsing assistant. Return only JSON."
         )
         
-        response = await llm.send_message(parse_prompt)
+        response = await llm.send_message(UserMessage(content=parse_prompt))
         
         # Extract JSON from response
         content = response
