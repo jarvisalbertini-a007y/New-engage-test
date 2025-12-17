@@ -9,10 +9,13 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Onboarding from './pages/Onboarding';
+import SmartOnboarding from './pages/SmartOnboarding';
 import Agents from './pages/Agents';
 import Workflows from './pages/Workflows';
+import WorkflowBuilder from './pages/WorkflowBuilder';
 import Prospects from './pages/Prospects';
 import Command from './pages/Command';
+import UniversalChat from './pages/UniversalChat';
 
 const queryClient = new QueryClient();
 
