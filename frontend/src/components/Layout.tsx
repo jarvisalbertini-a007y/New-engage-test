@@ -5,10 +5,11 @@ import { Button } from './ui/button';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/chat', label: 'AI Chat', icon: '💬' },
   { path: '/agents', label: 'Agents', icon: '🤖' },
-  { path: '/workflows', label: 'Workflows', icon: '⚡' },
+  { path: '/workflow-builder', label: 'Workflows', icon: '⚡' },
   { path: '/prospects', label: 'Prospects', icon: '👥' },
-  { path: '/command', label: 'Command', icon: '💬' },
+  { path: '/command', label: 'Command', icon: '🎯' },
 ];
 
 export default function Layout() {
