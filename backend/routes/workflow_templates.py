@@ -52,7 +52,7 @@ WORKFLOW_TEMPLATES = [
             {"id": "n1", "type": "trigger", "label": "Start", "config": {"triggerType": "signal", "signal": "icp_match"}},
             {"id": "n2", "type": "research", "label": "Research Company", "config": {"agent": "company-research-agent"}},
             {"id": "n3", "type": "approval", "label": "Approve Research", "config": {"approver": "owner", "timeout": 24}},
-            {"id": "n4", "type": "linkedin", "label": "LinkedIn Connect", "config": {"action": "connect", "message": true}},
+            {"id": "n4", "type": "linkedin", "label": "LinkedIn Connect", "config": {"action": "connect", "message": True}},
             {"id": "n5", "type": "wait", "label": "Wait 2 Days", "config": {"days": 2}},
             {"id": "n6", "type": "email", "label": "Personalized Email", "config": {"template": "personalized_intro"}},
             {"id": "n7", "type": "wait", "label": "Wait 3 Days", "config": {"days": 3}},
