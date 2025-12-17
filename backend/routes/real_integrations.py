@@ -41,7 +41,7 @@ Return structured data about 10 real prospects."""
             system_message="You are a B2B sales research assistant."
         )
         
-        response = await llm.send_message(UserMessage(content=search_prompt))
+        response = await llm.send_message(UserMessage(text=search_prompt))
         return response
     except Exception as e:
         print(f"Web search error: {e}")
@@ -132,7 +132,7 @@ Return ONLY the JSON array, no other text."""
             system_message="You are a data parsing assistant. Return only JSON."
         )
         
-        response = await llm.send_message(UserMessage(content=parse_prompt))
+        response = await llm.send_message(UserMessage(text=parse_prompt))
         
         # Extract JSON from response
         content = response
@@ -314,7 +314,7 @@ Return ONLY JSON."""
             system_message="You are a company research analyst. Return only JSON."
         )
         
-        response = await llm.send_message(UserMessage(content=prompt))
+        response = await llm.send_message(UserMessage(text=prompt))
         
         content = response
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
