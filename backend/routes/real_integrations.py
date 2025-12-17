@@ -275,7 +275,7 @@ async def scrape_website(domain: str) -> dict:
 async def enrich_company_data(scraped_data: dict, company_name: str) -> dict:
     """Use AI to analyze and enrich scraped company data"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         prompt = f"""Analyze this scraped company data and provide structured insights:
 
@@ -307,13 +307,16 @@ Provide analysis as JSON with:
 
 Return ONLY JSON."""
 
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=prompt)]
+        session_id = f"enrich-{uuid4()}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are a company research analyst. Return only JSON."
         )
         
-        content = response.message.content
+        response = await llm.chat([UserMessage(content=prompt)])
+        
+        content = response.message if hasattr(response, 'message') else str(response)
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
