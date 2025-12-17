@@ -11,14 +11,14 @@ export default function WorkflowBuilder() {
   const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null);
   const queryClient = useQueryClient();
 
-  const { data: templates } = useQuery({
+  const { data: templates = [] } = useQuery<any[]>({
     queryKey: ['workflowTemplates'],
     queryFn: () => api.getWorkflowTemplates()
   });
 
-  const { data: approvals } = useQuery({
+  const { data: approvals = [] } = useQuery<any[]>({
     queryKey: ['pendingApprovals'],
-    queryFn: api.getPendingApprovals
+    queryFn: () => api.getPendingApprovals()
   });
 
   const generateMutation = useMutation({
