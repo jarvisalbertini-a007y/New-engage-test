@@ -111,4 +111,62 @@ export const api = {
 
   // Health
   healthCheck: () => apiRequest('GET', '/api/health'),
+
+  // Universal Chat
+  sendChatMessage: (data: { message: string; sessionId: string; context?: any }) =>
+    apiRequest('POST', '/api/chat/message', data),
+  getChatSessions: () => apiRequest('GET', '/api/chat/sessions'),
+  selectAgentFromChat: (data: { agentType: string; task?: string }) =>
+    apiRequest('POST', '/api/chat/agents/select', data),
+
+  // Micro Agents
+  getMicroAgentTypes: () => apiRequest('GET', '/api/micro-agents/types'),
+  executeMicroAgent: (data: { type: string; input: any; model?: string }) =>
+    apiRequest('POST', '/api/micro-agents/execute', data),
+  executeMicroAgentChain: (data: { chain: any[]; input: any }) =>
+    apiRequest('POST', '/api/micro-agents/chain', data),
+  getMicroAgentStats: () => apiRequest('GET', '/api/micro-agents/stats'),
+
+  // Knowledge Base
+  uploadKnowledge: (formData: FormData) => {
+    const token = localStorage.getItem('token');
+    return fetch(`${API_BASE}/api/knowledge/upload`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData
+    }).then(r => r.json());
+  },
+  listKnowledge: (category?: string) => {
+    const params = category ? `?category=${category}` : '';
+    return apiRequest('GET', `/api/knowledge${params}`);
+  },
+  queryKnowledge: (query: string, categories?: string[]) =>
+    apiRequest('POST', '/api/knowledge/query', { query, categories }),
+  createCustomInstruction: (data: any) =>
+    apiRequest('POST', '/api/knowledge/instructions', data),
+  listCustomInstructions: () => apiRequest('GET', '/api/knowledge/instructions'),
+
+  // Workflow Templates
+  getWorkflowTemplates: (category?: string, complexity?: string) => {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (complexity) params.append('complexity', complexity);
+    return apiRequest('GET', `/api/workflow-templates/templates?${params}`);
+  },
+  cloneWorkflowTemplate: (templateId: string, data: { name: string; settings?: any }) =>
+    apiRequest('POST', `/api/workflow-templates/templates/${templateId}/clone`, data),
+  getPendingApprovals: () => apiRequest('GET', '/api/workflow-templates/approvals'),
+  respondToApproval: (approvalId: string, data: { action: string; comment?: string }) =>
+    apiRequest('POST', `/api/workflow-templates/approvals/${approvalId}/respond`, data),
+  generateWorkflowFromNlp: (description: string) =>
+    apiRequest('POST', '/api/workflow-templates/generate-from-nlp', { description }),
+
+  // Smart Onboarding
+  startSmartOnboarding: (data?: { email?: string }) =>
+    apiRequest('POST', '/api/smart-onboarding/start', data || {}),
+  getSmartOnboardingSession: () => apiRequest('GET', '/api/smart-onboarding/session'),
+  approveSmartOnboarding: (data: any) =>
+    apiRequest('POST', '/api/smart-onboarding/approve', data),
+  refreshSmartOnboardingResearch: () =>
+    apiRequest('POST', '/api/smart-onboarding/refresh-research', {}),
 };
