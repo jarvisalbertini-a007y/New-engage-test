@@ -61,6 +61,8 @@ app.include_router(micro_agents_router, prefix="/api/micro-agents", tags=["Micro
 app.include_router(knowledge_router, prefix="/api/knowledge", tags=["Knowledge Base"])
 app.include_router(workflow_templates_router, prefix="/api/workflow-templates", tags=["Workflow Templates"])
 app.include_router(smart_onboarding_router, prefix="/api/smart-onboarding", tags=["Smart Onboarding"])
+app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
+app.include_router(agent_teams_router, prefix="/api/agent-teams", tags=["Agent Teams"])
 
 @app.get("/api/health")
 async def health_check():
