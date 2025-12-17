@@ -13,7 +13,7 @@ export default function WorkflowBuilder() {
 
   const { data: templates } = useQuery({
     queryKey: ['workflowTemplates'],
-    queryFn: api.getWorkflowTemplates
+    queryFn: () => api.getWorkflowTemplates()
   });
 
   const { data: approvals } = useQuery({
