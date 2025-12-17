@@ -211,12 +211,52 @@ export default function UniversalChat() {
               
               {/* Action results */}
               {message.actions && message.actions.length > 0 && (
-                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm font-medium text-green-800">Actions Executed:</p>
-                  {message.actions.map((action, idx) => (
-                    <p key={idx} className="text-sm text-green-600">
-                      ✓ {action.message || action.action}
-                    </p>
+                <div className="mt-3 space-y-2">
+                  {message.actions.map((action: any, idx: number) => (
+                    <div key={idx} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-800 flex items-center gap-2">
+                        <span>✅</span> {action.message || action.action}
+                      </p>
+                      
+                      {/* Show prospect list if found */}
+                      {action.data?.prospects && action.data.prospects.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {action.data.prospects.slice(0, 5).map((p: any, pidx: number) => (
+                            <div key={pidx} className="text-xs text-gray-600 flex items-center gap-2 pl-5">
+                              <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                              <span className="font-medium">{p.firstName} {p.lastName}</span>
+                              <span className="text-gray-400">-</span>
+                              <span>{p.title} at {p.company}</span>
+                              {p.icpScore && (
+                                <span className="ml-auto px-1.5 py-0.5 bg-green-100 rounded text-green-700">
+                                  {p.icpScore}% match
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {action.data.prospects.length > 5 && (
+                            <p className="text-xs text-gray-500 pl-5">
+                              +{action.data.prospects.length - 5} more prospects
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Show email draft if created */}
+                      {action.data?.subject && (
+                        <div className="mt-2 p-2 bg-white rounded border text-xs">
+                          <p className="font-medium text-gray-700">Subject: {action.data.subject}</p>
+                          <p className="text-gray-500 mt-1 line-clamp-3">{action.data.body}</p>
+                        </div>
+                      )}
+                      
+                      {/* Show research summary if available */}
+                      {action.data?.company && action.action === 'research_company' && (
+                        <div className="mt-2 text-xs text-gray-600 pl-5">
+                          <p>📊 Research completed for {action.data.company}</p>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
