@@ -52,7 +52,7 @@ app.include_router(command_router, prefix="/api/command", tags=["Command Center"
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "EngageAI Sales Engine"}
+    return {"status": "healthy", "service": "EngageAI Sales Engine", "version": "1.0.0"}
 
 @app.get("/api")
 async def root():
