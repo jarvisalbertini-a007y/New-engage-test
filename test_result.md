@@ -101,3 +101,42 @@ SalesFlow AI is an NLP-first autonomous sales engagement platform combining feat
 
 ### 🧹 Cleanup Done
 - Removed obsolete `/app/client` and `/app/server` directories (old Express.js code)
+
+## New Features Added (Dec 17, 2025 - Session 2)
+
+### 1. Settings Page with Velocity Control & Autonomous Mode
+- `/settings` - Comprehensive settings for controlling sales engine
+- Velocity Control: Daily limits for email/LinkedIn, workflow concurrency, timezone
+- Autonomous Mode: Self-driving prospecting toggle, ICP strictness slider
+- A/B Testing: Auto-optimization, confidence thresholds, test controls
+
+### 2. Knowledge Base with RAG (Retrieval Augmented Generation)
+- `/knowledge` - Upload documents and query with AI
+- Document categories: Company Info, ICP, Competitors, Messaging, Case Studies
+- Natural language querying with AI-powered responses
+- Source citations for RAG answers
+
+### 3. Human-in-the-Loop Approval Center
+- `/approvals` - Dedicated page for workflow approval management
+- Approve/Reject workflow actions
+- Detailed context and content preview
+- Comment support for approvals
+
+### 4. Multi-Agent Teams
+- `/agent-teams` - Create teams of specialized agents
+- Team templates: Outbound, Inbound, Nurture
+- Automated handoff rules between agents
+- Visual agent flow display
+
+### 5. Enhanced AI Chat with Agent Selection
+- Direct agent selection panel in chat
+- Choose specific agents for tasks (LinkedIn Lead Finder, Company Research, etc.)
+- Active agent indicator in header
+
+### New Backend APIs Added
+- `/api/settings` - User settings management
+- `/api/settings/autonomous/status` - Autonomous mode status
+- `/api/settings/autonomous/toggle` - Toggle autonomous mode
+- `/api/agent-teams` - Team CRUD operations
+- `/api/agent-teams/templates` - Team templates
+- `/api/agent-teams/{id}/execute` - Execute team workflow
