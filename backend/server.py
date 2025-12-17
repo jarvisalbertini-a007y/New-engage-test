@@ -54,6 +54,11 @@ app.include_router(onboarding_router, prefix="/api/onboarding", tags=["Onboardin
 app.include_router(prospects_router, prefix="/api/prospects", tags=["Prospects"])
 app.include_router(content_router, prefix="/api/content", tags=["Content"])
 app.include_router(command_router, prefix="/api/command", tags=["Command Center"])
+app.include_router(universal_chat_router, prefix="/api/chat", tags=["Universal Chat"])
+app.include_router(micro_agents_router, prefix="/api/micro-agents", tags=["Micro Agents"])
+app.include_router(knowledge_router, prefix="/api/knowledge", tags=["Knowledge Base"])
+app.include_router(workflow_templates_router, prefix="/api/workflow-templates", tags=["Workflow Templates"])
+app.include_router(smart_onboarding_router, prefix="/api/smart-onboarding", tags=["Smart Onboarding"])
 
 @app.get("/api/health")
 async def health_check():
