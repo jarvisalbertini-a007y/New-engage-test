@@ -111,25 +111,27 @@ async def execute_action(
 # ============== ACTION IMPLEMENTATIONS ==============
 
 async def action_find_prospects(params: dict, user: dict, db) -> dict:
-    """Actually find prospects using AI"""
+    """Actually find prospects using AI with web research"""
     criteria = params.get("criteria", "")
     count = params.get("count", 10)
     
-    # Use AI to generate realistic prospects based on criteria
-    prompt = f"""Generate {count} realistic B2B sales prospects matching these criteria: {criteria}
+    # Use AI to research the web and find real prospects
+    prompt = f"""Search the internet and find {count} REAL B2B sales prospects matching: {criteria}
 
-For each prospect, provide:
-- firstName, lastName
-- title (job title)
-- company (company name)
-- email (realistic business email)
-- linkedinUrl (linkedin profile URL pattern)
+Research actual companies and executives. For each prospect, provide:
+- firstName, lastName (real names you find)
+- title (actual job title)
+- company (real company name)
+- email (construct realistic email: firstname.lastname@companydomain.com)
+- linkedinUrl (pattern: linkedin.com/in/firstname-lastname)
 - industry
-- companySize (e.g., "51-200")
-- icpScore (0-100 match score)
-- signals (list of buying signals detected)
+- companySize (estimate based on company)
+- icpScore (0-100 how well they match the criteria)
+- signals (buying signals: hiring, funding, expansion, etc.)
+- source (how you found them)
 
-Return as JSON array. Make the data realistic and varied."""
+Focus on finding REAL companies and realistic executive profiles.
+Return as JSON array."""
 
     ai_response = await call_ai(prompt)
     
