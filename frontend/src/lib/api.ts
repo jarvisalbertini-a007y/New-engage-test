@@ -223,4 +223,35 @@ export const api = {
   
   // Email Analytics
   getEmailAnalytics: () => apiRequest('GET', '/api/integrations/email/analytics'),
+
+  // Google Integration
+  getGoogleStatus: () => apiRequest('GET', '/api/google/status'),
+  initGoogleOAuth: (data: { client_id: string; client_secret: string }) =>
+    apiRequest('POST', '/api/google/oauth/init', data),
+  disconnectGoogle: () => apiRequest('DELETE', '/api/google/oauth/disconnect'),
+  
+  // Gmail
+  sendGmail: (data: { to: string; subject: string; body: string; htmlBody?: string; prospectId?: string }) =>
+    apiRequest('POST', '/api/google/gmail/send', data),
+  getGmailInbox: (maxResults?: number, query?: string) =>
+    apiRequest('GET', `/api/google/gmail/inbox?max_results=${maxResults || 20}&query=${query || ''}`),
+  getGmailThreads: (prospectEmail: string) =>
+    apiRequest('GET', `/api/google/gmail/threads?prospect_email=${prospectEmail}`),
+  trackGmailReplies: () => apiRequest('GET', '/api/google/gmail/track-replies'),
+  
+  // Google Calendar
+  getCalendarEvents: (days?: number) =>
+    apiRequest('GET', `/api/google/calendar/events?days=${days || 7}`),
+  scheduleMeeting: (data: { 
+    summary: string; 
+    attendeeEmail: string; 
+    startTime: string; 
+    durationMinutes?: number;
+    description?: string;
+    prospectId?: string;
+  }) => apiRequest('POST', '/api/google/calendar/schedule', data),
+  
+  // Google Contacts
+  getGoogleContacts: () => apiRequest('GET', '/api/google/contacts'),
+  syncContactsToProspects: () => apiRequest('POST', '/api/google/contacts/sync-to-prospects'),
 };
