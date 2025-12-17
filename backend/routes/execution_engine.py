@@ -31,7 +31,7 @@ async def call_ai(prompt: str, system_instruction: str = None) -> str:
             system_message=system_msg
         )
         
-        response = await llm.send_message(prompt)
+        response = await llm.send_message(UserMessage(content=prompt))
         return response
     except Exception as e:
         print(f"AI call error: {e}")
