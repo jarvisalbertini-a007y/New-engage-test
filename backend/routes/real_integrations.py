@@ -105,7 +105,7 @@ async def search_real_leads(
 async def parse_leads_from_search(search_result: str, criteria: str, count: int) -> list:
     """Parse AI search results into structured lead data"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         parse_prompt = f"""Parse this search result into structured lead data:
 
@@ -125,14 +125,17 @@ Extract {count} leads and return as JSON array with these fields for each:
 
 Return ONLY the JSON array, no other text."""
 
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=parse_prompt)]
+        session_id = f"parse-{uuid4()}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are a data parsing assistant. Return only JSON."
         )
         
+        response = await llm.chat([UserMessage(content=parse_prompt)])
+        
         # Extract JSON from response
-        content = response.message.content
+        content = response.message if hasattr(response, 'message') else str(response)
         json_match = re.search(r'\[.*\]', content, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
