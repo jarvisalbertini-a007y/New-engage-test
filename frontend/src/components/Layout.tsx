@@ -13,6 +13,7 @@ const navItems = [
   { path: '/approvals', label: 'Approvals', icon: '✅' },
   { path: '/knowledge', label: 'Knowledge Base', icon: '📚' },
   { path: '/prospects', label: 'Prospects', icon: '🎯' },
+  { path: '/integrations', label: 'Integrations', icon: '🔌' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
