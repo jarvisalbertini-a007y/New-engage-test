@@ -68,6 +68,7 @@ app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(agent_teams_router, prefix="/api/agent-teams", tags=["Agent Teams"])
 app.include_router(execution_router, prefix="/api/execute", tags=["Execution Engine"])
 app.include_router(integrations_router, prefix="/api/integrations", tags=["Integrations"])
+app.include_router(google_router, prefix="/api/google", tags=["Google Integration"])
 
 @app.get("/api/health")
 async def health_check():
