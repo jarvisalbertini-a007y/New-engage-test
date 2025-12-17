@@ -20,6 +20,7 @@ import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
 import KnowledgeBase from './pages/KnowledgeBase';
 import AgentTeams from './pages/AgentTeams';
+import ActivityDashboard from './pages/ActivityDashboard';
 
 const queryClient = new QueryClient();
 
