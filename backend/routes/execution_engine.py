@@ -18,21 +18,21 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 # ============== ACTION EXECUTION ==============
 
 async def call_ai(prompt: str, system_instruction: str = None) -> str:
-    """Call Gemini AI"""
+    """Call Gemini AI using LlmChat"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
-        messages = []
-        if system_instruction:
-            messages.append(Message(role="system", content=system_instruction))
-        messages.append(Message(role="user", content=prompt))
+        session_id = f"exec-{uuid4()}"
+        system_msg = system_instruction or "You are a helpful sales AI assistant."
         
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=messages
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=system_msg
         )
-        return response.message.content
+        
+        response = await llm.chat([UserMessage(content=prompt)])
+        return response.message if hasattr(response, 'message') else str(response)
     except Exception as e:
         print(f"AI call error: {e}")
         return None
