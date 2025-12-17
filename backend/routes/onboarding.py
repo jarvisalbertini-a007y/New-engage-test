@@ -35,7 +35,7 @@ async def get_onboarding_profile(current_user: dict = Depends(get_current_user))
             "updatedAt": now.isoformat()
         }
         await db.onboarding_profiles.insert_one(profile)
-        del profile["_id"] if "_id" in profile else None
+        profile.pop("_id", None)
     
     return profile
 
@@ -63,7 +63,7 @@ async def create_onboarding_profile(
     }
     
     await db.onboarding_profiles.insert_one(profile)
-    del profile["_id"] if "_id" in profile else None
+    profile.pop("_id", None)
     return profile
 
 @router.put("/profile")

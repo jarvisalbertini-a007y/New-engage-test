@@ -49,7 +49,7 @@ async def create_workflow(workflow_data: WorkflowCreate, current_user: dict = De
     }
     
     await db.workflows.insert_one(workflow)
-    del workflow["_id"] if "_id" in workflow else None
+    workflow.pop("_id", None)
     return workflow
 
 @router.get("/templates")
@@ -143,7 +143,7 @@ async def execute_workflow(
         {"$set": execution}
     )
     
-    del execution["_id"] if "_id" in execution else None
+    execution.pop("_id", None)
     return execution
 
 @router.get("/{workflow_id}/executions")

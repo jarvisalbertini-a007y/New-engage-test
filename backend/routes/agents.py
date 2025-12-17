@@ -99,7 +99,7 @@ async def create_agent(agent_data: AgentCreate, current_user: dict = Depends(get
     }
     
     await db.agents.insert_one(agent)
-    del agent["_id"] if "_id" in agent else None
+    agent.pop("_id", None)
     return agent
 
 @router.get("/{agent_id}")
@@ -183,7 +183,7 @@ async def execute_agent(
         {"$set": execution}
     )
     
-    del execution["_id"] if "_id" in execution else None
+    execution.pop("_id", None)
     return execution
 
 @router.get("/{agent_id}/executions")

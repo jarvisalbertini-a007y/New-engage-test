@@ -44,7 +44,7 @@ async def create_company(company_data: CompanyCreate, current_user: dict = Depen
     }
     
     await db.companies.insert_one(company)
-    del company["_id"] if "_id" in company else None
+    company.pop("_id", None)
     return company
 
 @router.get("/companies/{company_id}")
@@ -104,7 +104,7 @@ async def create_prospect(prospect_data: ProspectCreate, current_user: dict = De
     }
     
     await db.prospects.insert_one(prospect)
-    del prospect["_id"] if "_id" in prospect else None
+    prospect.pop("_id", None)
     return prospect
 
 @router.get("/{prospect_id}")
@@ -181,7 +181,7 @@ async def import_prospects(
             "updatedAt": now.isoformat()
         }
         await db.prospects.insert_one(prospect)
-        del prospect["_id"] if "_id" in prospect else None
+        prospect.pop("_id", None)
         created.append(prospect)
     
     return {"imported": len(created), "prospects": created}
