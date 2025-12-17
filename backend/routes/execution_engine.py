@@ -22,7 +22,7 @@ async def call_ai(prompt: str, system_instruction: str = None) -> str:
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         
-        session_id = f"exec-{uuid4()}"
+        session_id = f"exec-{str(uuid4())[:8]}"
         system_msg = system_instruction or "You are a helpful sales AI assistant."
         
         llm = LlmChat(
