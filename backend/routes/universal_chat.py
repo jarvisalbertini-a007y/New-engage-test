@@ -112,12 +112,18 @@ Current intent: {intent}
     # Parse any actions from response
     actions = parse_actions(ai_response)
     
-    # Execute immediate actions if any
+    # Execute immediate actions if any - NOW ACTUALLY DOES THINGS
     executed_actions = []
     for action in actions:
         result = await execute_action(action, current_user, db)
         if result:
             executed_actions.append(result)
+    
+    # If no explicit actions but intent requires execution, execute based on intent
+    if not executed_actions and intent in ["prospect_search", "research", "generate_content"]:
+        auto_action = await auto_execute_intent(intent, message, current_user, db)
+        if auto_action:
+            executed_actions.append(auto_action)
     
     # Generate suggestions based on context
     suggestions = generate_suggestions(intent, context)
