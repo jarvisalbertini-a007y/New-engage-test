@@ -21,6 +21,7 @@ import Settings from './pages/Settings';
 import KnowledgeBase from './pages/KnowledgeBase';
 import AgentTeams from './pages/AgentTeams';
 import ActivityDashboard from './pages/ActivityDashboard';
+import Integrations from './pages/Integrations';
 
 const queryClient = new QueryClient();
 
