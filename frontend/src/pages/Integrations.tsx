@@ -384,6 +384,8 @@ export default function Integrations() {
                             onClick={() => {
                               if (integration.id === 'sendgrid') {
                                 setShowSendgridForm(true);
+                              } else if (integration.id === 'google') {
+                                setShowGoogleForm(true);
                               }
                             }}
                           >
