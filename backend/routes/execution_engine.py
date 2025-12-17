@@ -608,7 +608,7 @@ async def run_autonomous_cycle(user_id: str, session_id: str):
                         "approverId": user_id,
                         "type": "send",
                         "title": f"Approve email to {p.get('firstName', '')} at {p.get('company', '')}",
-                        "description": f"Review AI-drafted email before sending",
+                        "description": "Review AI-drafted email before sending",
                         "content": draft,
                         "context": {"prospect": p},
                         "status": "pending",
