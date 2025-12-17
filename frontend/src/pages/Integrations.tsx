@@ -19,6 +19,11 @@ export default function Integrations() {
     queryFn: () => api.getIntegrations()
   });
 
+  const { data: googleStatus } = useQuery({
+    queryKey: ['googleStatus'],
+    queryFn: () => api.getGoogleStatus()
+  });
+
   const saveSendgridMutation = useMutation({
     mutationFn: (data: { api_key: string; from_email: string }) =>
       api.saveSendgridIntegration(data),
