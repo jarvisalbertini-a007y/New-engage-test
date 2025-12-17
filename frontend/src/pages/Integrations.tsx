@@ -41,6 +41,24 @@ export default function Integrations() {
     }
   });
 
+  const initGoogleOAuthMutation = useMutation({
+    mutationFn: (data: { client_id: string; client_secret: string }) =>
+      api.initGoogleOAuth(data),
+    onSuccess: (data) => {
+      // Redirect to Google OAuth
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    }
+  });
+
+  const disconnectGoogleMutation = useMutation({
+    mutationFn: () => api.disconnectGoogle(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['googleStatus'] });
+    }
+  });
+
   const integrationsList = [
     {
       id: 'sendgrid',
