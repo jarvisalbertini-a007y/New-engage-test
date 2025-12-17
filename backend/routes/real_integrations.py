@@ -41,7 +41,7 @@ Return structured data about 10 real prospects."""
             system_message="You are a B2B sales research assistant."
         )
         
-        response = await llm.send_message(search_prompt)
+        response = await llm.send_message(UserMessage(content=search_prompt))
         return response
     except Exception as e:
         print(f"Web search error: {e}")
