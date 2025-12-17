@@ -93,6 +93,7 @@ function AppRoutes() {
         <Route path="/chat" element={<UniversalChat />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/activity" element={<ActivityDashboard />} />
+        <Route path="/integrations" element={<Integrations />} />
       </Route>
     </Routes>
   );
