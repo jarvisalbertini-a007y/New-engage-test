@@ -288,32 +288,59 @@ export default function Integrations() {
       )}
 
       {/* Active Integrations */}
-      {integrations?.sendgrid_configured && (
+      {(integrations?.sendgrid_configured || googleStatus?.connected) && (
         <Card className="mb-8 border-green-200 bg-green-50">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <span>✅</span> Active Integrations
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📧</span>
-                <div>
-                  <h4 className="font-medium">SendGrid</h4>
-                  <p className="text-sm text-gray-500">
-                    API Key: {integrations.sendgrid_api_key}
-                  </p>
+          <CardContent className="space-y-3">
+            {/* Google Integration */}
+            {googleStatus?.connected && (
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                <div className="flex items-center gap-3">
+                  {googleStatus.picture && (
+                    <img src={googleStatus.picture} alt="" className="w-8 h-8 rounded-full" />
+                  )}
+                  <div>
+                    <h4 className="font-medium">Google Workspace</h4>
+                    <p className="text-sm text-gray-500">
+                      {googleStatus.email} • Gmail, Calendar, Contacts
+                    </p>
+                  </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnectGoogleMutation.mutate()}
+                >
+                  Disconnect
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => removeSendgridMutation.mutate()}
-              >
-                Disconnect
-              </Button>
-            </div>
+            )}
+            
+            {/* SendGrid Integration */}
+            {integrations?.sendgrid_configured && (
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📧</span>
+                  <div>
+                    <h4 className="font-medium">SendGrid</h4>
+                    <p className="text-sm text-gray-500">
+                      API Key: {integrations.sendgrid_api_key}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeSendgridMutation.mutate()}
+                >
+                  Disconnect
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
