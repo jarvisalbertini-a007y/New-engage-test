@@ -5,10 +5,11 @@ import { Button } from './ui/button';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/activity', label: 'Activity', icon: '⚡' },
   { path: '/chat', label: 'AI Chat', icon: '💬' },
   { path: '/agents', label: 'Agents', icon: '🤖' },
   { path: '/agent-teams', label: 'Agent Teams', icon: '👥' },
-  { path: '/workflow-builder', label: 'Workflows', icon: '⚡' },
+  { path: '/workflow-builder', label: 'Workflows', icon: '🔄' },
   { path: '/approvals', label: 'Approvals', icon: '✅' },
   { path: '/knowledge', label: 'Knowledge Base', icon: '📚' },
   { path: '/prospects', label: 'Prospects', icon: '🎯' },
