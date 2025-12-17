@@ -21,7 +21,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 async def search_web(query: str) -> str:
     """Search the web using AI with web search capability"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         search_prompt = f"""Search the internet and find real companies and people matching this criteria: {query}
 
@@ -33,13 +33,16 @@ Focus on finding:
 - Company websites and domains
 
 Return structured data about 10 real prospects."""
-        
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=search_prompt)]
+
+        session_id = f"search-{uuid4()}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are a B2B sales research assistant."
         )
-        return response.message.content
+        
+        response = await llm.chat([UserMessage(content=search_prompt)])
+        return response.message if hasattr(response, 'message') else str(response)
     except Exception as e:
         print(f"Web search error: {e}")
         return None
