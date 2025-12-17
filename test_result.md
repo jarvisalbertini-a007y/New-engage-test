@@ -45,6 +45,23 @@ SalesFlow AI is an NLP-first autonomous sales engagement platform combining feat
 ## Current Status
 - Backend: RUNNING with all new routes
 - Frontend: RUNNING with new pages
+- **Routing Bug FIXED**: Direct navigation to protected routes now works correctly
+
+## Recent Fix Applied
+- Fixed `AppRoutes` component in `/app/frontend/src/App.tsx` to wait for auth loading state before rendering routes
+- This prevents premature redirects during page refresh or direct URL navigation
+
+## Pages to Test
+1. `/` - Landing page (unauthenticated)
+2. `/login` - Login page
+3. `/register` - Registration page  
+4. `/dashboard` - Main dashboard (authenticated)
+5. `/chat` - AI Chat Command Center (authenticated)
+6. `/workflow-builder` - Workflow Builder with templates (authenticated)
+7. `/agents` - Agent management (authenticated)
+8. `/workflows` - Workflows list (authenticated)
+9. `/prospects` - Prospects management (authenticated)
+10. `/command` - Command center (authenticated)
 
 ## Key Features to Verify
 1. NLP chat commands work and return intelligent responses
