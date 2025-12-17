@@ -69,13 +69,13 @@ export default function Integrations() {
       category: 'Email'
     },
     {
-      id: 'gmail',
-      name: 'Gmail / Google Workspace',
-      description: 'Send emails directly from your Gmail account',
-      icon: '✉️',
-      configured: integrations?.gmail_configured,
+      id: 'google',
+      name: 'Google Workspace',
+      description: 'Gmail, Calendar, and Contacts integration',
+      icon: '🔷',
+      configured: googleStatus?.connected,
       category: 'Email',
-      comingSoon: true
+      comingSoon: false
     },
     {
       id: 'apollo',
