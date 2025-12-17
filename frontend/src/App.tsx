@@ -16,6 +16,10 @@ import WorkflowBuilder from './pages/WorkflowBuilder';
 import Prospects from './pages/Prospects';
 import Command from './pages/Command';
 import UniversalChat from './pages/UniversalChat';
+import Approvals from './pages/Approvals';
+import Settings from './pages/Settings';
+import KnowledgeBase from './pages/KnowledgeBase';
+import AgentTeams from './pages/AgentTeams';
 
 const queryClient = new QueryClient();
 
