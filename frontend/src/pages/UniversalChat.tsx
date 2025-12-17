@@ -257,40 +257,41 @@ export default function UniversalChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-white">
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Tell me what you want to do... (e.g., 'Find 20 CTOs at fintech startups')"
-            className="flex-1 text-lg py-6"
-            disabled={chatMutation.isPending}
-          />
-          <Button 
-            type="submit" 
-            disabled={!input.trim() || chatMutation.isPending}
-            className="px-8 bg-violet-600 hover:bg-violet-700"
-          >
-            Send
-          </Button>
-        </form>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="text-xs text-gray-400">Quick actions:</span>
-          {[
-            'Find prospects',
-            'Create sequence',
-            'Draft email',
-            'Research company'
-          ].map((action) => (
-            <button
-              key={action}
-              onClick={() => setInput(action)}
-              className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
+        {/* Input */}
+        <div className="p-4 border-t bg-white">
+          <form onSubmit={handleSubmit} className="flex gap-3">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Tell me what you want to do... (e.g., 'Find 20 CTOs at fintech startups')"
+              className="flex-1 text-lg py-6"
+              disabled={chatMutation.isPending}
+            />
+            <Button 
+              type="submit" 
+              disabled={!input.trim() || chatMutation.isPending}
+              className="px-8 bg-violet-600 hover:bg-violet-700"
             >
-              {action}
-            </button>
-          ))}
+              Send
+            </Button>
+          </form>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="text-xs text-gray-400">Quick actions:</span>
+            {[
+              'Find prospects',
+              'Create sequence',
+              'Draft email',
+              'Research company'
+            ].map((action) => (
+              <button
+                key={action}
+                onClick={() => setInput(action)}
+                className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
