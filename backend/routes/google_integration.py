@@ -39,6 +39,10 @@ def get_frontend_url():
     """Get frontend URL for redirects"""
     return os.environ.get("FRONTEND_URL", "https://smart-salesbot.preview.emergentagent.com")
 
+def get_backend_url():
+    """Get backend URL for OAuth callbacks"""
+    return os.environ.get("BACKEND_URL", "https://smart-salesbot.preview.emergentagent.com")
+
 
 async def get_google_creds(user_id: str, db) -> Optional[Credentials]:
     """Get Google credentials for a user"""
