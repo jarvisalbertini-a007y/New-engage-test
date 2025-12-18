@@ -172,7 +172,7 @@ export default function Integrations() {
                   <li>Create a new project or select existing</li>
                   <li>Enable Gmail, Calendar, and Contacts APIs</li>
                   <li>Create OAuth 2.0 credentials (Web Application)</li>
-                  <li>Add redirect URI: <code className="bg-blue-100 px-1">{window.location.origin}/api/google/oauth/callback</code></li>
+                  <li>Add redirect URI: <code className="bg-blue-100 px-1 text-xs break-all">{process.env.REACT_APP_BACKEND_URL}/api/google/oauth/callback</code></li>
                 </ol>
               </div>
               <div>
