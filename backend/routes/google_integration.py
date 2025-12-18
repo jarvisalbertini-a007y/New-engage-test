@@ -112,8 +112,8 @@ async def init_google_oauth(
         "createdAt": datetime.now(timezone.utc).isoformat()
     })
     
-    # Build OAuth URL
-    redirect_uri = f"{get_frontend_url()}/api/google/oauth/callback"
+    # Build OAuth URL - callback goes through /api which routes to backend
+    redirect_uri = f"{get_backend_url()}/api/google/oauth/callback"
     
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
