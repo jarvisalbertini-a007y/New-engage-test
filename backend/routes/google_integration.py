@@ -150,7 +150,7 @@ async def google_oauth_callback(
     client_id = oauth_state["client_id"]
     client_secret = oauth_state["client_secret"]
     user_id = oauth_state["userId"]
-    redirect_uri = f"{get_frontend_url()}/api/google/oauth/callback"
+    redirect_uri = f"{get_backend_url()}/api/google/oauth/callback"
     
     # Exchange code for tokens
     try:
