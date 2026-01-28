@@ -97,6 +97,7 @@ function AppRoutes() {
         <Route path="/activity" element={<ActivityDashboard />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/meetings" element={<Meetings />} />
+        <Route path="/autonomous" element={<AutonomousProspecting />} />
       </Route>
     </Routes>
   );
