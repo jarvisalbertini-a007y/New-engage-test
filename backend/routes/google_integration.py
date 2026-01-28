@@ -21,8 +21,10 @@ from routes.auth import get_current_user
 
 router = APIRouter()
 
-# Google OAuth Configuration
-# Users need to provide their own Google OAuth credentials
+# Google OAuth Configuration - App-level credentials (set by admin)
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
 GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -35,13 +37,9 @@ GOOGLE_SCOPES = [
 ]
 
 
-def get_frontend_url():
-    """Get frontend URL for redirects"""
-    return os.environ.get("FRONTEND_URL", "https://smart-salesbot.preview.emergentagent.com")
-
-def get_backend_url():
-    """Get backend URL for OAuth callbacks"""
-    return os.environ.get("BACKEND_URL", "https://smart-salesbot.preview.emergentagent.com")
+def get_base_url():
+    """Get base URL for OAuth redirects"""
+    return os.environ.get("BASE_URL", "https://smart-salesbot.preview.emergentagent.com")
 
 
 async def get_google_creds(user_id: str, db) -> Optional[Credentials]:
