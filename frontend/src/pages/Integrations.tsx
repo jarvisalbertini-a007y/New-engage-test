@@ -39,8 +39,7 @@ export default function Integrations() {
   });
 
   const initGoogleOAuthMutation = useMutation({
-    mutationFn: (data: { client_id: string; client_secret: string }) =>
-      api.initGoogleOAuth(data),
+    mutationFn: () => api.initGoogleOAuth(),
     onSuccess: (data) => {
       // Redirect to Google OAuth
       if (data.authUrl) {
