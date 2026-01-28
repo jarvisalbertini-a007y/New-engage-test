@@ -24,6 +24,7 @@ import ActivityDashboard from './pages/ActivityDashboard';
 import Integrations from './pages/Integrations';
 import Meetings from './pages/Meetings';
 import AutonomousProspecting from './pages/AutonomousProspecting';
+import EmailOptimization from './pages/EmailOptimization';
 
 const queryClient = new QueryClient();
 
