@@ -27,6 +27,7 @@ export default function Prospects() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [emailForm, setEmailForm] = useState({ subject: '', body: '' });
+  const [emailProvider, setEmailProvider] = useState<'gmail' | 'sendgrid'>('gmail');
   const [meetingForm, setMeetingForm] = useState({ 
     summary: '', 
     startTime: '', 
@@ -51,6 +52,11 @@ export default function Prospects() {
     queryFn: () => api.getGoogleStatus()
   });
 
+  const { data: integrations } = useQuery({
+    queryKey: ['integrations'],
+    queryFn: () => api.getIntegrations()
+  });
+
   const { data: emailHistory = [] } = useQuery({
     queryKey: ['emailHistory', selectedProspect?.id],
     queryFn: () => api.getEmailAnalytics(),
@@ -66,7 +72,7 @@ export default function Prospects() {
     },
   });
 
-  const sendEmailMutation = useMutation({
+  const sendGmailMutation = useMutation({
     mutationFn: () => api.sendGmail({
       to: selectedProspect!.email,
       subject: emailForm.subject,
