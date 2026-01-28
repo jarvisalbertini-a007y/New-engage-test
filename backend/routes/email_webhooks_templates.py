@@ -659,6 +659,9 @@ async def create_template(
     
     await db.email_templates.insert_one(template)
     
+    # Remove MongoDB _id before returning
+    template.pop("_id", None)
+    
     return {"success": True, "template": template}
 
 
