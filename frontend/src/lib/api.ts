@@ -304,4 +304,45 @@ export const api = {
     apiRequest('POST', `/api/autonomous/send-approved/${draftId}`, data),
   bulkApproveEmails: (data: { draftIds: string[]; action: string }) =>
     apiRequest('POST', '/api/autonomous/bulk-approve', data),
+
+  // Email Optimization & A/B Testing
+  trackEmailOpen: (data: { emailId: string; draftId?: string; variationId?: string }) =>
+    apiRequest('POST', '/api/email-optimization/track/open', data),
+  trackEmailClick: (data: { emailId: string; draftId?: string; variationId?: string; linkUrl?: string }) =>
+    apiRequest('POST', '/api/email-optimization/track/click', data),
+  trackEmailReply: (data: { emailId: string; draftId?: string; variationId?: string; sentiment?: string }) =>
+    apiRequest('POST', '/api/email-optimization/track/reply', data),
+  
+  // A/B Testing
+  createABTest: (data: {
+    name?: string;
+    testType: string;
+    draftId?: string;
+    subject?: string;
+    body?: string;
+    variationCount?: number;
+    autoSelectWinner?: boolean;
+    winnerCriteria?: string;
+  }) => apiRequest('POST', '/api/email-optimization/ab-test/create', data),
+  getABTest: (testId: string) => apiRequest('GET', `/api/email-optimization/ab-test/${testId}`),
+  listABTests: (status?: string) => 
+    apiRequest('GET', `/api/email-optimization/ab-tests${status ? `?status=${status}` : ''}`),
+  selectABTestWinner: (testId: string, winnerId?: string) =>
+    apiRequest('POST', `/api/email-optimization/ab-test/${testId}/select-winner`, { winnerId }),
+  
+  // Email Optimization
+  optimizeEmail: (data: {
+    subject: string;
+    body: string;
+    industry?: string;
+    title?: string;
+    focus?: string;
+  }) => apiRequest('POST', '/api/email-optimization/optimize', data),
+  getOptimizationInsights: () => apiRequest('GET', '/api/email-optimization/insights'),
+  autoOptimizeDraft: (draftId: string, applyChanges?: boolean) =>
+    apiRequest('POST', '/api/email-optimization/auto-optimize-draft', { draftId, applyChanges }),
+  autoCreateABTest: (draftId: string, testType?: string) =>
+    apiRequest('POST', '/api/email-optimization/auto-create-test', { draftId, testType }),
+  getOptimizationHistory: (limit?: number) =>
+    apiRequest('GET', `/api/email-optimization/optimization-history?limit=${limit || 20}`),
 };
