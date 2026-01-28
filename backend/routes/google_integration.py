@@ -39,7 +39,7 @@ GOOGLE_SCOPES = [
 
 def get_base_url():
     """Get base URL for OAuth redirects"""
-    return os.environ.get("BASE_URL", "https://smart-salesbot.preview.emergentagent.com")
+    return os.environ.get("BASE_URL", "https://salesai-flow.preview.emergentagent.com")
 
 
 async def get_google_creds(user_id: str, db) -> Optional[Credentials]:
