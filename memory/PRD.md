@@ -16,7 +16,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - **Frontend:** React, TypeScript, Vite, TailwindCSS, shadcn/ui, TanStack Query
 - **Database:** MongoDB
 - **AI Integration:** Gemini API via `emergentintegrations` library (Emergent LLM Key)
-- **External Integrations:** Google OAuth 2.0 (Gmail, Calendar, Contacts), SendGrid (setup started)
+- **External Integrations:** Google OAuth 2.0 (Gmail, Calendar, Contacts), SendGrid
 
 ## Architecture
 ```
@@ -26,19 +26,20 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 │   │   ├── auth.py, agents.py, prospects.py, ...
 │   │   ├── universal_chat.py      # NLP command center
 │   │   ├── execution_engine.py    # Autonomous actions
-│   │   ├── real_integrations.py   # Web search/scraping
+│   │   ├── real_integrations.py   # Web search/scraping + SendGrid
 │   │   ├── google_integration.py  # Gmail/Calendar APIs
 │   │   ├── smart_onboarding.py    # AI-powered onboarding
 │   │   ├── knowledge.py           # RAG knowledge base
 │   │   ├── micro_agents.py        # Specialized agents
-│   │   └── workflow_templates.py  # Workflow generation
+│   │   └── workflow_templates.py  # Workflow generation (NLP)
 │   └── server.py
 └── frontend/
     ├── src/
     │   ├── pages/
     │   │   ├── Dashboard.tsx, UniversalChat.tsx, ...
-    │   │   ├── Prospects.tsx (Gmail/Calendar buttons)
-    │   │   ├── Integrations.tsx (Google Connect)
+    │   │   ├── Prospects.tsx (Gmail/SendGrid email + Calendar buttons)
+    │   │   ├── Meetings.tsx (NEW - Calendar view)
+    │   │   ├── Integrations.tsx (Google + SendGrid)
     │   │   └── ActivityDashboard.tsx
     │   └── lib/api.ts
     └── App.tsx
@@ -51,54 +52,74 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - `GET/POST /api/google/oauth/*` - Google OAuth flow
 - `POST /api/google/gmail/send` - Send emails via Gmail
 - `POST /api/google/calendar/schedule` - Schedule meetings
+- `GET /api/google/calendar/events` - View calendar events
+- `POST /api/integrations/email/send` - Send via SendGrid
 - `POST /api/integrations/search-leads` - AI-powered lead search
 - `POST /api/knowledge/query` - RAG queries
+- `POST /api/workflow-templates/generate-from-nlp` - NLP workflow generation
 
 ## Database Collections
 - `users` - User accounts with Google credentials
 - `prospects` - Lead database with ICP scores
 - `actions` - Autonomous action logs
-- `email_sends` - Email tracking
+- `email_sends` - Email tracking (Gmail + SendGrid)
 - `scheduled_meetings` - Calendar events
+- `user_integrations` - SendGrid API keys, Google tokens
 
 ---
 
 ## What's Been Implemented
 
-### Session: January 28, 2026
+### Session: January 28, 2026 (Part 1)
 
 **P0 - LLM API Migration (COMPLETE)**
 - ✅ Updated all 5 files using old `emergentintegrations` API to new pattern
 - Files updated: `smart_onboarding.py`, `knowledge.py`, `universal_chat.py`, `workflow_templates.py`, `micro_agents.py`
-- Old pattern: `chat(emergent_api_key=..., model=ModelType.GEMINI_2_0_FLASH, messages=[Message(...)])`
-- New pattern: `LlmChat(api_key=..., session_id=..., system_message=...).send_message(UserMessage(text=...))`
-
-**P1 - Linting Fixes (COMPLETE)**
-- ✅ Fixed all bare `except:` clauses across 6 files
-- ✅ Fixed unused variable warnings
 
 **P0 - Google Integration (VERIFIED WORKING)**
 - ✅ Google OAuth one-click flow fully functional
 - ✅ Gmail send endpoint: `POST /api/google/gmail/send`
 - ✅ Calendar schedule endpoint: `POST /api/google/calendar/schedule`
-- ✅ Frontend UI with email/calendar modals on Prospects page
-- ✅ Credentials stored in backend/.env
+
+### Session: January 28, 2026 (Part 2)
+
+**P1 - Full SendGrid Email Integration (COMPLETE)**
+- ✅ SendGrid email send with tracking: `POST /api/integrations/email/send`
+- ✅ Prospects page now supports both Gmail and SendGrid providers
+- ✅ Users can choose email provider when composing emails
+- ✅ "Connect Email" button when no provider configured
+
+**P2 - Dedicated Meetings/Calendar Page (COMPLETE)**
+- ✅ New `/meetings` route with Meetings.tsx page
+- ✅ View upcoming calendar events grouped by date
+- ✅ Schedule new meetings with Google Meet link generation
+- ✅ Stats cards: upcoming meetings, today's meetings, meetings with Meet links
+- ✅ "Connect Google Calendar" prompt when not connected
+- ✅ Navigation link added to sidebar
+
+**P2 - NLP Workflow Generation (VERIFIED WORKING)**
+- ✅ `POST /api/workflow-templates/generate-from-nlp` endpoint works correctly
+- ✅ Generates complete workflow JSON from natural language description
 
 **Testing Results:**
-- Backend: 19/19 tests passed (100%)
-- Frontend: All pages functional (100%)
-- Test report: `/app/test_reports/iteration_1.json`
+- Iteration 1: Backend 19/19 (100%), Frontend 100%
+- Iteration 2: Backend 12/12 (100%), Frontend 100%
+- Test reports: `/app/test_reports/iteration_1.json`, `/app/test_reports/iteration_2.json`
 
 ---
 
 ## Backlog
 
 ### P1 - Upcoming
-- [ ] Full SendGrid Integration (email sending/tracking for non-Gmail users)
-- [ ] Dedicated Calendar/Meetings page
-- [ ] Debug NLP workflow generation endpoint
+- [ ] Full end-to-end SendGrid email flow testing (with real API key)
+- [ ] Email tracking webhooks for opens/clicks
 
-### P2 - Data Integrations
+### P2 - Enhancements
+- [ ] Email templates library for AI personalization
+- [ ] Meeting reminder notifications
+- [ ] Calendar sync with external calendars
+
+### P3 - Data Integrations (ON HOLD per user request)
 - [ ] Apollo.io integration (UI placeholder exists)
 - [ ] Clearbit integration (UI placeholder exists)
 - [ ] Crunchbase integration (UI placeholder exists)
