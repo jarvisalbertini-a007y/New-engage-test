@@ -9,9 +9,6 @@ export default function Integrations() {
   const [sendgridKey, setSendgridKey] = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [showSendgridForm, setShowSendgridForm] = useState(false);
-  const [showGoogleForm, setShowGoogleForm] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState('');
-  const [googleClientSecret, setGoogleClientSecret] = useState('');
   const queryClient = useQueryClient();
 
   const { data: integrations, isLoading } = useQuery({
