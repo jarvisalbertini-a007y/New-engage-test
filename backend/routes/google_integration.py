@@ -57,8 +57,8 @@ async def get_google_creds(user_id: str, db) -> Optional[Credentials]:
         token=tokens.get("access_token"),
         refresh_token=tokens.get("refresh_token"),
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=tokens.get("client_id"),
-        client_secret=tokens.get("client_secret"),
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
         scopes=GOOGLE_SCOPES
     )
     
@@ -85,37 +85,32 @@ async def get_google_creds(user_id: str, db) -> Optional[Credentials]:
 
 @router.post("/oauth/init")
 async def init_google_oauth(
-    request: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Initialize Google OAuth flow - user provides their Google OAuth credentials"""
-    client_id = request.get("client_id")
-    client_secret = request.get("client_secret")
+    """Initialize Google OAuth flow - simple one-click for users"""
     
-    if not client_id or not client_secret:
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(
-            status_code=400, 
-            detail="Google OAuth Client ID and Client Secret are required"
+            status_code=500, 
+            detail="Google integration not configured. Please contact the administrator."
         )
     
     db = get_db()
     
-    # Store credentials temporarily for the OAuth flow
+    # Store state for the OAuth flow
     state = str(uuid4())
     await db.oauth_states.insert_one({
         "state": state,
         "userId": current_user["id"],
-        "client_id": client_id,
-        "client_secret": client_secret,
         "createdAt": datetime.now(timezone.utc).isoformat()
     })
     
-    # Build OAuth URL - callback goes through /api which routes to backend
-    redirect_uri = f"{get_backend_url()}/api/google/oauth/callback"
+    # Build OAuth URL
+    redirect_uri = f"{get_base_url()}/api/google/oauth/callback"
     
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={client_id}&"
+        f"client_id={GOOGLE_CLIENT_ID}&"
         f"redirect_uri={redirect_uri}&"
         f"response_type=code&"
         f"scope={' '.join(GOOGLE_SCOPES)}&"
@@ -126,8 +121,7 @@ async def init_google_oauth(
     
     return {
         "authUrl": auth_url,
-        "state": state,
-        "message": "Redirect user to authUrl to complete Google authorization"
+        "state": state
     }
 
 
@@ -145,10 +139,8 @@ async def google_oauth_callback(
     if not oauth_state:
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
     
-    client_id = oauth_state["client_id"]
-    client_secret = oauth_state["client_secret"]
     user_id = oauth_state["userId"]
-    redirect_uri = f"{get_backend_url()}/api/google/oauth/callback"
+    redirect_uri = f"{get_base_url()}/api/google/oauth/callback"
     
     # Exchange code for tokens
     try:
@@ -158,8 +150,8 @@ async def google_oauth_callback(
                 "https://oauth2.googleapis.com/token",
                 data={
                     "code": code,
-                    "client_id": client_id,
-                    "client_secret": client_secret,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
                     "redirect_uri": redirect_uri,
                     "grant_type": "authorization_code"
                 }
@@ -178,15 +170,13 @@ async def google_oauth_callback(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"OAuth error: {str(e)}")
     
-    # Save tokens
+    # Save tokens (but NOT client_id/secret - those are app-level)
     await db.user_integrations.update_one(
         {"userId": user_id},
         {"$set": {
             "google_tokens": {
                 "access_token": tokens.get("access_token"),
                 "refresh_token": tokens.get("refresh_token"),
-                "client_id": client_id,
-                "client_secret": client_secret,
                 "expiry": None,
                 "email": user_info.get("email"),
                 "name": user_info.get("name"),
@@ -203,7 +193,7 @@ async def google_oauth_callback(
     await db.oauth_states.delete_one({"state": state})
     
     # Redirect back to integrations page
-    return RedirectResponse(url=f"{get_frontend_url()}/integrations?google=connected")
+    return RedirectResponse(url=f"{get_base_url()}/integrations?google=connected")
 
 
 @router.delete("/oauth/disconnect")
