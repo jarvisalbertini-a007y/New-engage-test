@@ -25,6 +25,7 @@ import Integrations from './pages/Integrations';
 import Meetings from './pages/Meetings';
 import AutonomousProspecting from './pages/AutonomousProspecting';
 import EmailOptimization from './pages/EmailOptimization';
+import EmailTemplates from './pages/EmailTemplates';
 
 const queryClient = new QueryClient();
 
