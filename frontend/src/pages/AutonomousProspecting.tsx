@@ -237,13 +237,13 @@ export default function AutonomousProspecting() {
                 </div>
               </div>
               <div className="flex items-center gap-6">
-                <Badge className={phaseColors[session.currentPhase] || phaseColors.initializing}>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${phaseColors[session.currentPhase] || phaseColors.initializing}`}>
                   {(() => {
                     const Icon = phaseIcons[session.currentPhase] || RefreshCw;
                     return <Icon className="w-3 h-3 mr-1" />;
                   })()}
                   {session.currentPhase}
-                </Badge>
+                </span>
                 <div className="text-right">
                   <p className="text-2xl font-bold">{session.stats.cyclesCompleted}</p>
                   <p className="text-xs text-gray-400">Cycles</p>
