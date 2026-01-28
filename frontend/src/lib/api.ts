@@ -345,4 +345,34 @@ export const api = {
     apiRequest('POST', '/api/email-optimization/auto-create-test', { draftId, testType }),
   getOptimizationHistory: (limit?: number) =>
     apiRequest('GET', `/api/email-optimization/optimization-history?limit=${limit || 20}`),
+
+  // Email Templates
+  getTemplateCategories: () => apiRequest('GET', '/api/email-templates/templates/categories'),
+  getTemplates: (category?: string) => 
+    apiRequest('GET', `/api/email-templates/templates${category ? `?category=${category}` : ''}`),
+  getTemplate: (templateId: string) => 
+    apiRequest('GET', `/api/email-templates/templates/${templateId}`),
+  createTemplate: (data: {
+    name: string;
+    description?: string;
+    category: string;
+    subject: string;
+    body: string;
+    bestFor?: string[];
+  }) => apiRequest('POST', '/api/email-templates/templates', data),
+  updateTemplate: (templateId: string, data: any) =>
+    apiRequest('PUT', `/api/email-templates/templates/${templateId}`, data),
+  deleteTemplate: (templateId: string) =>
+    apiRequest('DELETE', `/api/email-templates/templates/${templateId}`),
+  personalizeTemplate: (templateId: string, data: { prospectId?: string; variables?: any }) =>
+    apiRequest('POST', `/api/email-templates/templates/${templateId}/personalize`, data),
+  generateTemplate: (data: {
+    description: string;
+    category?: string;
+    tone?: string;
+    targetAudience?: string;
+    goal?: string;
+  }) => apiRequest('POST', '/api/email-templates/templates/generate', data),
+  createDraftFromTemplate: (templateId: string, data: { prospectId: string; variables?: any }) =>
+    apiRequest('POST', `/api/email-templates/templates/${templateId}/create-draft`, data),
 };
