@@ -348,7 +348,7 @@ export default function AutonomousProspecting() {
               </label>
               <Slider
                 value={[config.maxCyclesPerDay]}
-                onValueChange={([v]) => setConfig(c => ({ ...c, maxCyclesPerDay: v }))}
+                onValueChange={([v]: number[]) => setConfig(c => ({ ...c, maxCyclesPerDay: v }))}
                 min={1}
                 max={20}
                 step={1}
