@@ -166,7 +166,7 @@ export default function AutonomousProspecting() {
 
   const { data: pendingApprovals } = useQuery({
     queryKey: ['pending-approvals'],
-    queryFn: api.getPendingApprovals
+    queryFn: api.getAutonomousApprovals
   });
 
   const { data: runHistory } = useQuery({
