@@ -26,6 +26,7 @@ from routes.execution_engine import router as execution_router
 from routes.real_integrations import router as integrations_router
 from routes.google_integration import router as google_router
 from routes.autonomous_prospecting import router as autonomous_router
+from routes.email_optimization import router as email_optimization_router
 from database import connect_db, close_db
 
 @asynccontextmanager
