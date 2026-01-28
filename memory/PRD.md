@@ -27,20 +27,17 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 │   │   ├── universal_chat.py            # NLP command center
 │   │   ├── execution_engine.py          # Autonomous actions
 │   │   ├── autonomous_prospecting.py    # Meta-cognitive prospecting + Schedules + Approvals
+│   │   ├── email_optimization.py        # NEW: AI email optimization + A/B testing
 │   │   ├── real_integrations.py         # Web search/scraping + SendGrid
 │   │   ├── google_integration.py        # Gmail/Calendar APIs
-│   │   ├── smart_onboarding.py          # AI-powered onboarding
-│   │   ├── knowledge.py                 # RAG knowledge base
-│   │   ├── micro_agents.py              # Specialized agents
-│   │   └── workflow_templates.py        # Workflow generation (NLP)
+│   │   └── ...
 │   └── server.py
 └── frontend/
     ├── src/
     │   ├── pages/
     │   │   ├── Dashboard.tsx, UniversalChat.tsx, ...
-    │   │   ├── AutonomousProspecting.tsx  # Full autonomous AI page with tabs
-    │   │   ├── Prospects.tsx
-    │   │   ├── Meetings.tsx
+    │   │   ├── AutonomousProspecting.tsx  # Autonomous AI page
+    │   │   ├── EmailOptimization.tsx      # NEW: Email optimization page
     │   │   └── ...
     │   └── lib/api.ts
     └── App.tsx
@@ -48,119 +45,111 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ## Key API Endpoints
 
+### Email Optimization & A/B Testing (NEW)
+- `POST /api/email-optimization/optimize` - AI-powered email optimization
+- `POST /api/email-optimization/ab-test/create` - Create A/B test with AI variations
+- `GET /api/email-optimization/ab-test/{id}` - Get test details with results
+- `GET /api/email-optimization/ab-tests` - List all A/B tests
+- `POST /api/email-optimization/ab-test/{id}/select-winner` - Select winner
+- `GET /api/email-optimization/insights` - Get optimization insights & recommendations
+- `POST /api/email-optimization/track/open` - Track email open
+- `POST /api/email-optimization/track/click` - Track email click
+- `POST /api/email-optimization/track/reply` - Track email reply
+- `POST /api/email-optimization/auto-optimize-draft` - Auto-optimize draft (autonomous)
+- `GET /api/email-optimization/optimization-history` - Get optimization history
+
 ### Autonomous Prospecting
-- `GET /api/autonomous/competitor-sources` - List competitor platforms for learning
-- `POST /api/autonomous/loops/discovery` - Find new prospects (meta-cognitive)
+- `POST /api/autonomous/loops/discovery` - Find new prospects
 - `POST /api/autonomous/loops/research` - Deep research on companies
-- `POST /api/autonomous/loops/outreach` - Generate personalized emails
+- `POST /api/autonomous/loops/outreach` - Generate personalized emails (with auto-optimization)
 - `POST /api/autonomous/loops/learning` - Learn from competitor platforms
 - `POST /api/autonomous/start` - Start full autonomous engine
-- `POST /api/autonomous/stop` - Stop autonomous engine
-- `GET /api/autonomous/status` - Current status and activity
-- `GET /api/autonomous/learnings` - Accumulated learnings
-
-### Scheduled Runs (NEW)
-- `POST /api/autonomous/schedule` - Create a scheduled run
-- `GET /api/autonomous/schedules` - List all schedules
-- `PUT /api/autonomous/schedule/{id}` - Update a schedule
-- `DELETE /api/autonomous/schedule/{id}` - Delete a schedule
-- `POST /api/autonomous/schedule/{id}/run-now` - Trigger schedule manually
-- `GET /api/autonomous/history` - Get run history
-
-### Approval Workflow (NEW)
-- `GET /api/autonomous/pending-approvals` - Get email drafts pending approval
-- `POST /api/autonomous/approve/{id}` - Approve/reject/edit email draft
-- `POST /api/autonomous/send-approved/{id}` - Send approved email
-- `POST /api/autonomous/bulk-approve` - Bulk approve emails
-
-### Existing Endpoints
-- `POST /api/auth/register, /api/auth/login` - Authentication
-- `POST /api/chat/message` - AI Command Center
-- `POST /api/google/gmail/send` - Send emails via Gmail
-- `POST /api/google/calendar/schedule` - Schedule meetings
-- `POST /api/integrations/email/send` - Send via SendGrid
-- `POST /api/knowledge/query` - RAG queries
+- `POST /api/autonomous/schedule` - Create scheduled run
+- `GET /api/autonomous/pending-approvals` - Get drafts for approval
+- `POST /api/autonomous/approve/{id}` - Approve/reject email
 
 ## Database Collections
-- `users` - User accounts with Google credentials
-- `prospects` - Lead database with ICP scores
-- `autonomous_sessions` - Autonomous engine sessions
-- `autonomous_activity` - Activity logs from autonomous cycles
-- `autonomous_learnings` - Accumulated learnings from competitor analysis
+- `users`, `prospects`, `autonomous_sessions`, `autonomous_activity`
+- `email_drafts` - AI-generated email drafts
+- `email_sends` - Email tracking (opens, clicks, replies)
+- `email_events` - Detailed event tracking for A/B tests
+- `ab_tests` - A/B test configurations
+- `ab_test_results` - Per-variation results
+- `optimization_history` - Past email optimizations
 - `scheduled_runs` - Scheduled prospecting runs
-- `company_research` - Deep company research profiles
-- `email_drafts` - AI-generated email drafts with approval status
-- `email_sends` - Email tracking (Gmail + SendGrid)
-- `workflow_approvals` - Approval records
 
 ---
 
 ## What's Been Implemented
 
-### Session: January 28, 2026 (Part 4) - SCHEDULED RUNS & APPROVAL WORKFLOW
+### Session: January 28, 2026 (Part 5) - EMAIL OPTIMIZATION & A/B TESTING
 
-**Scheduled Autonomous Runs (COMPLETE)**
-- ✅ Create schedules with name, frequency (daily/weekly/hourly), time, and day-of-week selection
-- ✅ Automatic next run calculation
-- ✅ Manual "Run Now" trigger for any schedule
-- ✅ Schedule management (update, pause, delete)
-- ✅ Stats tracking (total runs, prospects found)
+**AI-Powered Email Optimization (COMPLETE)**
+- ✅ Analyze historical performance data (open rates, click rates, reply rates)
+- ✅ Identify patterns from successful emails (opening styles, length, CTAs)
+- ✅ AI optimization with confidence score and predicted improvement percentage
+- ✅ List of specific changes made and reasoning
+- ✅ Integration with autonomous outreach loop (auto-optimization)
 
-**Approval Workflow (COMPLETE)**
-- ✅ View all pending email drafts in dedicated tab
-- ✅ Quality scores displayed for each draft
-- ✅ Approve, Edit, or Reject individual emails
-- ✅ Bulk approve multiple emails at once
-- ✅ Send approved emails via Gmail or SendGrid
-- ✅ Prospect context (name, company, title, email) shown with each draft
+**A/B Testing Framework (COMPLETE)**
+- ✅ Create A/B tests with AI-generated variations:
+  - Subject line tests (different psychological angles)
+  - Body tests (shorter, story-based, data-driven approaches)
+  - CTA tests (calendar, question, resource sharing approaches)
+  - Full email tests (completely different approaches)
+- ✅ Track performance per variation (opens, clicks, replies, rates)
+- ✅ Auto-select winner based on criteria (replies, clicks, opens)
+- ✅ Manual winner selection option
 
-**Run History (COMPLETE)**
-- ✅ View history of all autonomous runs
-- ✅ Status indicators (running, complete, stopped)
-- ✅ Stats per run (prospects, researched, drafts, cycles)
+**Performance Tracking (COMPLETE)**
+- ✅ Track email opens, clicks, and replies
+- ✅ Attribution to A/B test variations
+- ✅ Sentiment tracking for replies (positive, negative, neutral)
 
-**Enhanced Frontend (COMPLETE)**
-- ✅ Tab-based navigation: Engine | Schedules | Approvals (with count badge) | History
-- ✅ Schedule creation form with frequency selection
-- ✅ Email approval cards with action buttons
-- ✅ Real-time activity feed
+**Insights & Recommendations (COMPLETE)**
+- ✅ Performance summary (total sent, open/click/reply rates)
+- ✅ Successful pattern analysis (opening styles, optimal lengths)
+- ✅ AI-powered recommendations with priority levels
+- ✅ A/B test learnings aggregation
 
-**Testing Results (Iteration 4):**
-- Backend: 100% (10/10 new endpoints)
-- Frontend: 100% (all tabs, forms, buttons)
-- Test report: `/app/test_reports/iteration_4.json`
+**Reusable Component Design (COMPLETE)**
+- ✅ Manual use: `/email-optimization` page with all features
+- ✅ Autonomous use: `auto-optimize-draft` and `auto-create-test` endpoints
+- ✅ Integrated into autonomous outreach loop
+
+**Testing Results (Iteration 5):**
+- Backend: 100% (22/22 tests passed)
+- Frontend: 100% (all tabs, forms, optimization display)
+- Test report: `/app/test_reports/iteration_5.json`
 
 ### Previous Sessions
 
-**Part 3 - Autonomous Prospecting Mode (COMPLETE)**
-- ✅ Meta-Cognitive Framework: DECOMPOSE → SOLVE → VERIFY → SYNTHESIZE → REFLECT
-- ✅ 4 Independent Automation Loops: Discovery, Research, Outreach, Learning
-- ✅ Competitor Intelligence: Gong, Outreach, ZoomInfo, SalesLoft, Apollo.io, Regie.ai
+**Part 4 - Scheduled Runs & Approval Workflow (COMPLETE)**
+- ✅ Scheduled autonomous runs
+- ✅ Email approval workflow
+- ✅ Run history
 
-**Part 1-2 (COMPLETE)**
-- ✅ LLM API Migration, Google Integration, SendGrid, Meetings Page
+**Part 3 - Autonomous Prospecting Mode (COMPLETE)**
+- ✅ Meta-Cognitive Framework with 4 loops
+- ✅ Competitor intelligence from 6 platforms
 
 ---
 
 ## Backlog
 
 ### P1 - Upcoming
-- [ ] Notification system when autonomous cycle completes
-- [ ] Email open/click tracking webhooks
+- [ ] Webhook endpoints for external email tracking (Mailgun, SendGrid)
+- [ ] Email template library with categories
 
 ### P2 - Enhancements
-- [ ] Email templates library for AI personalization
-- [ ] A/B testing in autonomous mode (test subject lines, body variations)
-- [ ] Advanced schedule options (timezone, blackout dates)
-
-### P3 - Data Integrations (ON HOLD)
-- [ ] Apollo.io direct integration
-- [ ] Clearbit integration
-- [ ] Crunchbase integration
+- [ ] Campaign-level A/B testing (test across multiple prospects)
+- [ ] Time-based send optimization (best time to send)
+- [ ] Advanced analytics dashboard
 
 ### P3 - Advanced Features (Future)
 - [ ] Multi-agent team orchestration
-- [ ] Campaign analytics dashboard
+- [ ] Predictive lead scoring with ML
+- [ ] Campaign ROI tracking
 
 ---
 
