@@ -715,16 +715,48 @@ Return JSON with:
             # Select best variation
             best = max(verified_variations, key=lambda x: x.get("qualityScore", 0))
             
+            # Auto-optimize using historical performance data
+            optimized_subject = best.get("subject")
+            optimized_body = best.get("body")
+            optimization_applied = False
+            
+            try:
+                from routes.email_optimization import get_email_performance_insights, analyze_successful_emails
+                
+                # Get performance data for optimization
+                performance = await get_email_performance_insights(user_id, db)
+                patterns = await analyze_successful_emails(user_id, db)
+                
+                # If we have enough data, apply learnings
+                if performance.get("totalSent", 0) >= 10 and patterns.get("sampleCount", 0) >= 3:
+                    # Apply learned patterns
+                    avg_body_len = patterns.get("avgBodyLength", 100)
+                    current_body_len = len(optimized_body.split())
+                    
+                    # Truncate if too long based on successful patterns
+                    if current_body_len > avg_body_len * 1.5:
+                        words = optimized_body.split()
+                        optimized_body = " ".join(words[:int(avg_body_len)])
+                        optimization_applied = True
+                    
+                    # Ensure subject is concise
+                    if len(optimized_subject) > 50:
+                        optimized_subject = optimized_subject[:47] + "..."
+                        optimization_applied = True
+            except Exception as e:
+                print(f"Auto-optimization skipped: {e}")
+            
             # Save draft
             draft = {
                 "id": str(uuid4()),
                 "userId": user_id,
                 "loopId": loop_id,
                 "prospectId": prospect.get("id"),
-                "subject": best.get("subject"),
-                "body": best.get("body"),
+                "subject": optimized_subject,
+                "body": optimized_body,
                 "angle": best.get("angle"),
                 "qualityScore": best.get("qualityScore"),
+                "optimized": optimization_applied,
                 "status": "draft",
                 "createdAt": datetime.now(timezone.utc).isoformat()
             }
