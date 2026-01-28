@@ -22,6 +22,7 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import AgentTeams from './pages/AgentTeams';
 import ActivityDashboard from './pages/ActivityDashboard';
 import Integrations from './pages/Integrations';
+import Meetings from './pages/Meetings';
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/activity" element={<ActivityDashboard />} />
         <Route path="/integrations" element={<Integrations />} />
+        <Route path="/meetings" element={<Meetings />} />
       </Route>
     </Routes>
   );
