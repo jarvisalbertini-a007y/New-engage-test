@@ -203,16 +203,50 @@ export default function Prospects() {
                 <span>✉️</span> Send Email to {selectedProspect.firstName}
               </CardTitle>
               <CardDescription>
-                Sending via Gmail to {selectedProspect.email}
+                Sending to {selectedProspect.email}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Provider Selection */}
+              {(googleStatus?.connected || integrations?.sendgrid_configured) && (
+                <div>
+                  <label className="text-sm font-medium">Send via</label>
+                  <div className="flex gap-2 mt-1">
+                    {googleStatus?.connected && (
+                      <Button
+                        variant={emailProvider === 'gmail' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setEmailProvider('gmail')}
+                        data-testid="gmail-provider-btn"
+                      >
+                        🔷 Gmail
+                      </Button>
+                    )}
+                    {integrations?.sendgrid_configured && (
+                      <Button
+                        variant={emailProvider === 'sendgrid' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setEmailProvider('sendgrid')}
+                        data-testid="sendgrid-provider-btn"
+                      >
+                        📧 SendGrid
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {emailProvider === 'gmail' 
+                      ? `Sending from ${googleStatus?.email}` 
+                      : 'Sending via SendGrid with tracking'}
+                  </p>
+                </div>
+              )}
               <div className="flex justify-end">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => draftEmailMutation.mutate()}
                   disabled={draftEmailMutation.isPending}
+                  data-testid="ai-draft-btn"
                 >
                   {draftEmailMutation.isPending ? '🤖 Drafting...' : '🤖 AI Draft Email'}
                 </Button>
@@ -224,6 +258,7 @@ export default function Prospects() {
                   onChange={(e) => setEmailForm(f => ({ ...f, subject: e.target.value }))}
                   placeholder="Email subject..."
                   className="mt-1"
+                  data-testid="email-subject-input"
                 />
               </div>
               <div>
@@ -233,6 +268,7 @@ export default function Prospects() {
                   onChange={(e) => setEmailForm(f => ({ ...f, body: e.target.value }))}
                   placeholder="Write your email..."
                   className="mt-1 w-full p-3 border rounded-lg min-h-[200px]"
+                  data-testid="email-body-input"
                 />
               </div>
               <div className="flex gap-2 pt-2">
@@ -240,10 +276,11 @@ export default function Prospects() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => sendEmailMutation.mutate()}
-                  disabled={!emailForm.subject || !emailForm.body || sendEmailMutation.isPending}
+                  onClick={handleSendEmail}
+                  disabled={!emailForm.subject || !emailForm.body || isSendingEmail}
+                  data-testid="send-email-btn"
                 >
-                  {sendEmailMutation.isPending ? 'Sending...' : '📤 Send via Gmail'}
+                  {isSendingEmail ? 'Sending...' : `📤 Send via ${emailProvider === 'gmail' ? 'Gmail' : 'SendGrid'}`}
                 </Button>
               </div>
             </CardContent>
