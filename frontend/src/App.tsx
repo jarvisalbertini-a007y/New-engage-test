@@ -101,6 +101,7 @@ function AppRoutes() {
         <Route path="/meetings" element={<Meetings />} />
         <Route path="/autonomous" element={<AutonomousProspecting />} />
         <Route path="/email-optimization" element={<EmailOptimization />} />
+        <Route path="/email-templates" element={<EmailTemplates />} />
       </Route>
     </Routes>
   );
