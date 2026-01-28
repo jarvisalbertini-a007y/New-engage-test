@@ -325,32 +325,30 @@ export default function AutonomousProspecting() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center justify-between">
-                Prospects per Cycle
-                <span className="text-blue-400">{config.prospectsPerCycle}</span>
-              </label>
-              <Slider
-                value={[config.prospectsPerCycle]}
-                onValueChange={([v]: number[]) => setConfig(c => ({ ...c, prospectsPerCycle: v }))}
+              <label className="text-sm font-medium">Prospects per Cycle</label>
+              <Input
+                type="number"
+                value={config.prospectsPerCycle}
+                onChange={(e) => setConfig(c => ({ ...c, prospectsPerCycle: parseInt(e.target.value) || 10 }))}
                 min={5}
                 max={50}
                 step={5}
                 disabled={isRunning}
+                className="bg-gray-800 border-gray-700"
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center justify-between">
-                Max Cycles per Day
-                <span className="text-blue-400">{config.maxCyclesPerDay}</span>
-              </label>
-              <Slider
-                value={[config.maxCyclesPerDay]}
-                onValueChange={([v]: number[]) => setConfig(c => ({ ...c, maxCyclesPerDay: v }))}
+              <label className="text-sm font-medium">Max Cycles per Day</label>
+              <Input
+                type="number"
+                value={config.maxCyclesPerDay}
+                onChange={(e) => setConfig(c => ({ ...c, maxCyclesPerDay: parseInt(e.target.value) || 5 }))}
                 min={1}
                 max={20}
                 step={1}
                 disabled={isRunning}
+                className="bg-gray-800 border-gray-700"
               />
             </div>
             
@@ -359,10 +357,12 @@ export default function AutonomousProspecting() {
                 <p className="font-medium">Continuous Learning</p>
                 <p className="text-sm text-gray-400">Learn from competitor platforms</p>
               </div>
-              <Switch
+              <input
+                type="checkbox"
                 checked={config.learningEnabled}
-                onCheckedChange={(v: boolean) => setConfig(c => ({ ...c, learningEnabled: v }))}
+                onChange={(e) => setConfig(c => ({ ...c, learningEnabled: e.target.checked }))}
                 disabled={isRunning}
+                className="w-5 h-5 rounded bg-gray-800 border-gray-600"
               />
             </div>
             
@@ -371,10 +371,12 @@ export default function AutonomousProspecting() {
                 <p className="font-medium">Auto-Approve Emails</p>
                 <p className="text-sm text-gray-400">Send without manual review</p>
               </div>
-              <Switch
+              <input
+                type="checkbox"
                 checked={config.autoApprove}
-                onCheckedChange={(v: boolean) => setConfig(c => ({ ...c, autoApprove: v }))}
+                onChange={(e) => setConfig(c => ({ ...c, autoApprove: e.target.checked }))}
                 disabled={isRunning}
+                className="w-5 h-5 rounded bg-gray-800 border-gray-600"
               />
             </div>
           </CardContent>
