@@ -62,7 +62,7 @@ interface ABTest {
 interface Optimization {
   original: { subject: string; body: string };
   optimized: { subject: string; body: string };
-  changes: string[];
+  changes: (string | { change: string; why?: string })[];
   predictedImprovement: number;
   confidence: number;
 }
