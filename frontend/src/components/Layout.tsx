@@ -7,6 +7,7 @@ const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/activity', label: 'Activity', icon: '⚡' },
   { path: '/chat', label: 'AI Chat', icon: '💬' },
+  { path: '/autonomous', label: 'Autonomous AI', icon: '🧠' },
   { path: '/agents', label: 'Agents', icon: '🤖' },
   { path: '/agent-teams', label: 'Agent Teams', icon: '👥' },
   { path: '/workflow-builder', label: 'Workflows', icon: '🔄' },
