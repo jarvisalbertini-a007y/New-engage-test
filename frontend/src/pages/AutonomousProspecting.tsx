@@ -363,7 +363,7 @@ export default function AutonomousProspecting() {
               </div>
               <Switch
                 checked={config.learningEnabled}
-                onCheckedChange={(v) => setConfig(c => ({ ...c, learningEnabled: v }))}
+                onCheckedChange={(v: boolean) => setConfig(c => ({ ...c, learningEnabled: v }))}
                 disabled={isRunning}
               />
             </div>
