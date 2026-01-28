@@ -266,6 +266,8 @@ export const api = {
   getLearnings: (limit?: number) => 
     apiRequest('GET', `/api/autonomous/learnings?limit=${limit || 20}`),
   getCompetitorSources: () => apiRequest('GET', '/api/autonomous/competitor-sources'),
+  getRunHistory: (limit?: number) =>
+    apiRequest('GET', `/api/autonomous/history?limit=${limit || 20}`),
   
   // Individual Loops
   runDiscoveryLoop: (params: { count?: number; context?: string }) =>
@@ -276,4 +278,30 @@ export const api = {
     apiRequest('POST', '/api/autonomous/loops/outreach', params),
   runLearningLoop: (params?: any) =>
     apiRequest('POST', '/api/autonomous/loops/learning', params || {}),
+
+  // Scheduled Runs
+  createScheduledRun: (data: {
+    name?: string;
+    scheduleType?: string;
+    runTime?: string;
+    daysOfWeek?: number[];
+    timezone?: string;
+    config?: any;
+  }) => apiRequest('POST', '/api/autonomous/schedule', data),
+  getScheduledRuns: () => apiRequest('GET', '/api/autonomous/schedules'),
+  updateScheduledRun: (scheduleId: string, data: any) =>
+    apiRequest('PUT', `/api/autonomous/schedule/${scheduleId}`, data),
+  deleteScheduledRun: (scheduleId: string) =>
+    apiRequest('DELETE', `/api/autonomous/schedule/${scheduleId}`),
+  runScheduleNow: (scheduleId: string) =>
+    apiRequest('POST', `/api/autonomous/schedule/${scheduleId}/run-now`, {}),
+
+  // Approval Workflow
+  getPendingApprovals: () => apiRequest('GET', '/api/autonomous/pending-approvals'),
+  approveEmailDraft: (draftId: string, data: { action: string; reason?: string; editedContent?: any }) =>
+    apiRequest('POST', `/api/autonomous/approve/${draftId}`, data),
+  sendApprovedEmail: (draftId: string, data: { provider: string }) =>
+    apiRequest('POST', `/api/autonomous/send-approved/${draftId}`, data),
+  bulkApproveEmails: (data: { draftIds: string[]; action: string }) =>
+    apiRequest('POST', '/api/autonomous/bulk-approve', data),
 };
