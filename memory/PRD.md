@@ -3,150 +3,138 @@
 ## Original Problem Statement
 Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform that minimizes user clicks and maximizes automation.
 
-## Core Requirements
-1. **AI/NLP First Interface:** Conversational command center as primary interaction method
-2. **Smart Onboarding:** Auto-research company from user's email to propose ICP and initial sales strategy
-3. **Agentic Architecture:** Specialized micro-agents with RAG on knowledge base
-4. **Autonomous Workflows:** Pre-built, editable workflow templates with human-in-the-loop approvals
-5. **Self-Improvement:** AI autonomously runs, prospects, and optimizes performance
-6. **Real-World Integration:** Connect to real data sources and action platforms (email, calendar)
-
 ## Tech Stack
 - **Backend:** Python, FastAPI, Motor (async MongoDB)
 - **Frontend:** React, TypeScript, Vite, TailwindCSS, shadcn/ui, TanStack Query
 - **Database:** MongoDB
-- **AI Integration:** Gemini API via `emergentintegrations` library (Emergent LLM Key)
-- **External Integrations:** Google OAuth 2.0 (Gmail, Calendar, Contacts), SendGrid
+- **AI Integration:** Gemini API via `emergentintegrations` (Emergent LLM Key)
+- **External Integrations:** Google OAuth 2.0, SendGrid, Mailgun
 
 ## Architecture
 ```
 /app/
-├── backend/
-│   ├── routes/
-│   │   ├── auth.py, agents.py, prospects.py, ...
-│   │   ├── universal_chat.py            # NLP command center
-│   │   ├── execution_engine.py          # Autonomous actions
-│   │   ├── autonomous_prospecting.py    # Meta-cognitive prospecting + Schedules + Approvals
-│   │   ├── email_optimization.py        # NEW: AI email optimization + A/B testing
-│   │   ├── real_integrations.py         # Web search/scraping + SendGrid
-│   │   ├── google_integration.py        # Gmail/Calendar APIs
-│   │   └── ...
-│   └── server.py
-└── frontend/
-    ├── src/
-    │   ├── pages/
-    │   │   ├── Dashboard.tsx, UniversalChat.tsx, ...
-    │   │   ├── AutonomousProspecting.tsx  # Autonomous AI page
-    │   │   ├── EmailOptimization.tsx      # NEW: Email optimization page
-    │   │   └── ...
-    │   └── lib/api.ts
-    └── App.tsx
+├── backend/routes/
+│   ├── autonomous_prospecting.py    # Meta-cognitive prospecting + Schedules + Approvals
+│   ├── email_optimization.py        # AI email optimization + A/B testing
+│   ├── email_webhooks_templates.py  # Webhooks + Template library
+│   ├── universal_chat.py            # NLP command center
+│   ├── google_integration.py        # Gmail/Calendar APIs
+│   └── ...
+└── frontend/src/pages/
+    ├── AutonomousProspecting.tsx    # Autonomous AI page
+    ├── EmailOptimization.tsx        # Email optimization page
+    ├── EmailTemplates.tsx           # Template library page
+    └── ...
 ```
-
-## Key API Endpoints
-
-### Email Optimization & A/B Testing (NEW)
-- `POST /api/email-optimization/optimize` - AI-powered email optimization
-- `POST /api/email-optimization/ab-test/create` - Create A/B test with AI variations
-- `GET /api/email-optimization/ab-test/{id}` - Get test details with results
-- `GET /api/email-optimization/ab-tests` - List all A/B tests
-- `POST /api/email-optimization/ab-test/{id}/select-winner` - Select winner
-- `GET /api/email-optimization/insights` - Get optimization insights & recommendations
-- `POST /api/email-optimization/track/open` - Track email open
-- `POST /api/email-optimization/track/click` - Track email click
-- `POST /api/email-optimization/track/reply` - Track email reply
-- `POST /api/email-optimization/auto-optimize-draft` - Auto-optimize draft (autonomous)
-- `GET /api/email-optimization/optimization-history` - Get optimization history
-
-### Autonomous Prospecting
-- `POST /api/autonomous/loops/discovery` - Find new prospects
-- `POST /api/autonomous/loops/research` - Deep research on companies
-- `POST /api/autonomous/loops/outreach` - Generate personalized emails (with auto-optimization)
-- `POST /api/autonomous/loops/learning` - Learn from competitor platforms
-- `POST /api/autonomous/start` - Start full autonomous engine
-- `POST /api/autonomous/schedule` - Create scheduled run
-- `GET /api/autonomous/pending-approvals` - Get drafts for approval
-- `POST /api/autonomous/approve/{id}` - Approve/reject email
-
-## Database Collections
-- `users`, `prospects`, `autonomous_sessions`, `autonomous_activity`
-- `email_drafts` - AI-generated email drafts
-- `email_sends` - Email tracking (opens, clicks, replies)
-- `email_events` - Detailed event tracking for A/B tests
-- `ab_tests` - A/B test configurations
-- `ab_test_results` - Per-variation results
-- `optimization_history` - Past email optimizations
-- `scheduled_runs` - Scheduled prospecting runs
 
 ---
 
 ## What's Been Implemented
 
-### Session: January 28, 2026 (Part 5) - EMAIL OPTIMIZATION & A/B TESTING
+### Session: January 28, 2026
 
-**AI-Powered Email Optimization (COMPLETE)**
-- ✅ Analyze historical performance data (open rates, click rates, reply rates)
-- ✅ Identify patterns from successful emails (opening styles, length, CTAs)
-- ✅ AI optimization with confidence score and predicted improvement percentage
-- ✅ List of specific changes made and reasoning
-- ✅ Integration with autonomous outreach loop (auto-optimization)
+#### Part 6 - EMAIL WEBHOOKS & TEMPLATE LIBRARY (COMPLETE)
 
-**A/B Testing Framework (COMPLETE)**
-- ✅ Create A/B tests with AI-generated variations:
-  - Subject line tests (different psychological angles)
-  - Body tests (shorter, story-based, data-driven approaches)
-  - CTA tests (calendar, question, resource sharing approaches)
-  - Full email tests (completely different approaches)
-- ✅ Track performance per variation (opens, clicks, replies, rates)
-- ✅ Auto-select winner based on criteria (replies, clicks, opens)
-- ✅ Manual winner selection option
+**Webhook Endpoints for External Email Tracking**
+- ✅ **SendGrid Webhook**: `/api/email-templates/webhook/sendgrid`
+  - Events: delivered, open, click, bounce, spamreport, unsubscribe
+  - Batch event support
+- ✅ **Mailgun Webhook**: `/api/email-templates/webhook/mailgun`
+  - Events: delivered, opened, clicked, bounced, complained, unsubscribed
+  - Form data format support
+- ✅ **Generic Webhook**: `/api/email-templates/webhook/generic`
+  - Requires authentication
+  - Standardized event format
+- ✅ Automatic A/B test result updates from webhook events
 
-**Performance Tracking (COMPLETE)**
-- ✅ Track email opens, clicks, and replies
-- ✅ Attribution to A/B test variations
-- ✅ Sentiment tracking for replies (positive, negative, neutral)
+**Email Template Library**
+- ✅ **6 Categories**: Cold Outreach, Follow-Up, Meeting Request, Value Proposition, Social Proof, Breakup
+- ✅ **8 Pre-built Templates** with variable placeholders:
+  - The Observation Opener (42% open, 8% reply)
+  - The Question Opener (38% open, 6% reply)
+  - The Gentle Bump, The Value Add (follow-ups)
+  - The Direct Ask (meeting request)
+  - The Problem-Solution (value prop)
+  - The Case Study (social proof)
+  - The Final Attempt (breakup)
+- ✅ **Template CRUD**: Create, read, update, delete custom templates
+- ✅ **Auto-extract variables** from `{{variable}}` syntax
+- ✅ **AI Template Generation**: Generate new templates from description
+  - Tone options: professional, casual, friendly, urgent
+  - Goal options: book meeting, get reply, share resource
+- ✅ **AI Template Personalization**: Fill variables using prospect data
+- ✅ **Draft Creation**: Create email draft from template for specific prospect
 
-**Insights & Recommendations (COMPLETE)**
-- ✅ Performance summary (total sent, open/click/reply rates)
-- ✅ Successful pattern analysis (opening styles, optimal lengths)
-- ✅ AI-powered recommendations with priority levels
-- ✅ A/B test learnings aggregation
+**Frontend Template Library UI**
+- ✅ 3-column layout: Categories | Templates | Preview
+- ✅ Category filtering with template counts
+- ✅ Template cards with open rate, reply rate, variable count
+- ✅ Live variable substitution in preview
+- ✅ AI Generate form with tone/category/goal options
+- ✅ Create Template form
 
-**Reusable Component Design (COMPLETE)**
-- ✅ Manual use: `/email-optimization` page with all features
-- ✅ Autonomous use: `auto-optimize-draft` and `auto-create-test` endpoints
-- ✅ Integrated into autonomous outreach loop
+**Testing Results (Iteration 6):**
+- Backend: 100% (32/32 tests passed)
+- Frontend: 100% (all components working)
+- Test report: `/app/test_reports/iteration_6.json`
 
-**Testing Results (Iteration 5):**
-- Backend: 100% (22/22 tests passed)
-- Frontend: 100% (all tabs, forms, optimization display)
-- Test report: `/app/test_reports/iteration_5.json`
+#### Part 5 - EMAIL OPTIMIZATION & A/B TESTING (COMPLETE)
+- ✅ AI-powered email optimization based on historical performance
+- ✅ A/B testing with AI-generated variations
+- ✅ Performance tracking (opens, clicks, replies)
+- ✅ Insights and recommendations
 
-### Previous Sessions
-
-**Part 4 - Scheduled Runs & Approval Workflow (COMPLETE)**
-- ✅ Scheduled autonomous runs
-- ✅ Email approval workflow
+#### Part 4 - SCHEDULED RUNS & APPROVAL WORKFLOW (COMPLETE)
+- ✅ Scheduled autonomous runs (daily/weekly/hourly)
+- ✅ Email approval workflow (approve/reject/edit)
 - ✅ Run history
 
-**Part 3 - Autonomous Prospecting Mode (COMPLETE)**
-- ✅ Meta-Cognitive Framework with 4 loops
-- ✅ Competitor intelligence from 6 platforms
+#### Part 3 - AUTONOMOUS PROSPECTING MODE (COMPLETE)
+- ✅ Meta-Cognitive Framework: DECOMPOSE → SOLVE → VERIFY → SYNTHESIZE → REFLECT
+- ✅ 4 Automation Loops: Discovery, Research, Outreach, Learning
+- ✅ Competitor Intelligence from 6 platforms
+
+---
+
+## Key API Endpoints
+
+### Email Templates
+- `POST /api/email-templates/webhook/sendgrid` - SendGrid webhook
+- `POST /api/email-templates/webhook/mailgun` - Mailgun webhook
+- `POST /api/email-templates/webhook/generic` - Generic webhook (auth required)
+- `GET /api/email-templates/templates/categories` - List categories
+- `GET /api/email-templates/templates` - List templates
+- `POST /api/email-templates/templates` - Create custom template
+- `POST /api/email-templates/templates/{id}/personalize` - AI personalize
+- `POST /api/email-templates/templates/generate` - AI generate template
+- `POST /api/email-templates/templates/{id}/create-draft` - Create draft
+
+### Email Optimization
+- `POST /api/email-optimization/optimize` - AI optimize email
+- `POST /api/email-optimization/ab-test/create` - Create A/B test
+- `GET /api/email-optimization/insights` - Get insights
+
+### Autonomous Prospecting
+- `POST /api/autonomous/loops/discovery` - Find prospects
+- `POST /api/autonomous/loops/research` - Research companies
+- `POST /api/autonomous/loops/outreach` - Generate emails
+- `POST /api/autonomous/loops/learning` - Learn from competitors
+- `POST /api/autonomous/schedule` - Create scheduled run
+- `GET /api/autonomous/pending-approvals` - Get drafts for approval
 
 ---
 
 ## Backlog
 
 ### P1 - Upcoming
-- [ ] Webhook endpoints for external email tracking (Mailgun, SendGrid)
-- [ ] Email template library with categories
+- [ ] Campaign-level A/B testing across multiple prospects
+- [ ] Time-based send optimization (best time to send)
 
 ### P2 - Enhancements
-- [ ] Campaign-level A/B testing (test across multiple prospects)
-- [ ] Time-based send optimization (best time to send)
 - [ ] Advanced analytics dashboard
+- [ ] Template performance tracking by industry/title
 
-### P3 - Advanced Features (Future)
+### P3 - Future
 - [ ] Multi-agent team orchestration
 - [ ] Predictive lead scoring with ML
 - [ ] Campaign ROI tracking
