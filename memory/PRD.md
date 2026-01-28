@@ -26,7 +26,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 │   │   ├── auth.py, agents.py, prospects.py, ...
 │   │   ├── universal_chat.py            # NLP command center
 │   │   ├── execution_engine.py          # Autonomous actions
-│   │   ├── autonomous_prospecting.py    # NEW: Meta-cognitive prospecting
+│   │   ├── autonomous_prospecting.py    # Meta-cognitive prospecting + Schedules + Approvals
 │   │   ├── real_integrations.py         # Web search/scraping + SendGrid
 │   │   ├── google_integration.py        # Gmail/Calendar APIs
 │   │   ├── smart_onboarding.py          # AI-powered onboarding
@@ -38,7 +38,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
     ├── src/
     │   ├── pages/
     │   │   ├── Dashboard.tsx, UniversalChat.tsx, ...
-    │   │   ├── AutonomousProspecting.tsx  # NEW: Autonomous AI page
+    │   │   ├── AutonomousProspecting.tsx  # Full autonomous AI page with tabs
     │   │   ├── Prospects.tsx
     │   │   ├── Meetings.tsx
     │   │   └── ...
@@ -48,7 +48,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ## Key API Endpoints
 
-### Autonomous Prospecting (NEW)
+### Autonomous Prospecting
 - `GET /api/autonomous/competitor-sources` - List competitor platforms for learning
 - `POST /api/autonomous/loops/discovery` - Find new prospects (meta-cognitive)
 - `POST /api/autonomous/loops/research` - Deep research on companies
@@ -59,11 +59,23 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - `GET /api/autonomous/status` - Current status and activity
 - `GET /api/autonomous/learnings` - Accumulated learnings
 
+### Scheduled Runs (NEW)
+- `POST /api/autonomous/schedule` - Create a scheduled run
+- `GET /api/autonomous/schedules` - List all schedules
+- `PUT /api/autonomous/schedule/{id}` - Update a schedule
+- `DELETE /api/autonomous/schedule/{id}` - Delete a schedule
+- `POST /api/autonomous/schedule/{id}/run-now` - Trigger schedule manually
+- `GET /api/autonomous/history` - Get run history
+
+### Approval Workflow (NEW)
+- `GET /api/autonomous/pending-approvals` - Get email drafts pending approval
+- `POST /api/autonomous/approve/{id}` - Approve/reject/edit email draft
+- `POST /api/autonomous/send-approved/{id}` - Send approved email
+- `POST /api/autonomous/bulk-approve` - Bulk approve emails
+
 ### Existing Endpoints
 - `POST /api/auth/register, /api/auth/login` - Authentication
 - `POST /api/chat/message` - AI Command Center
-- `POST /api/execute/execute-action` - Autonomous execution
-- `GET/POST /api/google/oauth/*` - Google OAuth flow
 - `POST /api/google/gmail/send` - Send emails via Gmail
 - `POST /api/google/calendar/schedule` - Schedule meetings
 - `POST /api/integrations/email/send` - Send via SendGrid
@@ -75,58 +87,71 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - `autonomous_sessions` - Autonomous engine sessions
 - `autonomous_activity` - Activity logs from autonomous cycles
 - `autonomous_learnings` - Accumulated learnings from competitor analysis
+- `scheduled_runs` - Scheduled prospecting runs
 - `company_research` - Deep company research profiles
-- `email_drafts` - AI-generated email drafts
+- `email_drafts` - AI-generated email drafts with approval status
 - `email_sends` - Email tracking (Gmail + SendGrid)
+- `workflow_approvals` - Approval records
 
 ---
 
 ## What's Been Implemented
 
-### Session: January 28, 2026 (Part 3) - AUTONOMOUS PROSPECTING
+### Session: January 28, 2026 (Part 4) - SCHEDULED RUNS & APPROVAL WORKFLOW
 
-**P0 - Autonomous Prospecting Mode (COMPLETE)**
-- ✅ Meta-Cognitive Framework: DECOMPOSE → SOLVE → VERIFY → SYNTHESIZE → REFLECT
-- ✅ 4 Independent Automation Loops:
-  - **Discovery Loop:** Find new prospects using AI research
-  - **Research Loop:** Deep company/prospect analysis
-  - **Outreach Loop:** Generate personalized email drafts
-  - **Learning Loop:** Analyze competitor platforms for techniques
-- ✅ Competitor Intelligence Sources: Gong, Outreach, ZoomInfo, SalesLoft, Apollo.io, Regie.ai
-- ✅ Full Autonomous Engine: Combines all loops in continuous cycle
-- ✅ New Frontend Page: `/autonomous` with configuration, loop controls, activity feed, learning sources
+**Scheduled Autonomous Runs (COMPLETE)**
+- ✅ Create schedules with name, frequency (daily/weekly/hourly), time, and day-of-week selection
+- ✅ Automatic next run calculation
+- ✅ Manual "Run Now" trigger for any schedule
+- ✅ Schedule management (update, pause, delete)
+- ✅ Stats tracking (total runs, prospects found)
 
-**Testing Results (Iteration 3):**
-- Backend: 100% (9/9 endpoints working)
-- Frontend: 100% (all components render correctly)
-- Test report: `/app/test_reports/iteration_3.json`
+**Approval Workflow (COMPLETE)**
+- ✅ View all pending email drafts in dedicated tab
+- ✅ Quality scores displayed for each draft
+- ✅ Approve, Edit, or Reject individual emails
+- ✅ Bulk approve multiple emails at once
+- ✅ Send approved emails via Gmail or SendGrid
+- ✅ Prospect context (name, company, title, email) shown with each draft
+
+**Run History (COMPLETE)**
+- ✅ View history of all autonomous runs
+- ✅ Status indicators (running, complete, stopped)
+- ✅ Stats per run (prospects, researched, drafts, cycles)
+
+**Enhanced Frontend (COMPLETE)**
+- ✅ Tab-based navigation: Engine | Schedules | Approvals (with count badge) | History
+- ✅ Schedule creation form with frequency selection
+- ✅ Email approval cards with action buttons
+- ✅ Real-time activity feed
+
+**Testing Results (Iteration 4):**
+- Backend: 100% (10/10 new endpoints)
+- Frontend: 100% (all tabs, forms, buttons)
+- Test report: `/app/test_reports/iteration_4.json`
 
 ### Previous Sessions
 
-**P0 - LLM API Migration (COMPLETE)**
-- ✅ Updated 5 files to new `emergentintegrations` API
+**Part 3 - Autonomous Prospecting Mode (COMPLETE)**
+- ✅ Meta-Cognitive Framework: DECOMPOSE → SOLVE → VERIFY → SYNTHESIZE → REFLECT
+- ✅ 4 Independent Automation Loops: Discovery, Research, Outreach, Learning
+- ✅ Competitor Intelligence: Gong, Outreach, ZoomInfo, SalesLoft, Apollo.io, Regie.ai
 
-**P0 - Google Integration (VERIFIED WORKING)**
-- ✅ Gmail send, Calendar schedule
-
-**P1 - SendGrid Integration (COMPLETE)**
-- ✅ Email send with tracking
-
-**P2 - Meetings Page (COMPLETE)**
-- ✅ Calendar view, meeting scheduling
+**Part 1-2 (COMPLETE)**
+- ✅ LLM API Migration, Google Integration, SendGrid, Meetings Page
 
 ---
 
 ## Backlog
 
 ### P1 - Upcoming
-- [ ] Full end-to-end SendGrid email flow testing
-- [ ] Email tracking webhooks for opens/clicks
+- [ ] Notification system when autonomous cycle completes
+- [ ] Email open/click tracking webhooks
 
 ### P2 - Enhancements
 - [ ] Email templates library for AI personalization
-- [ ] Meeting reminder notifications
-- [ ] A/B testing optimization in autonomous mode
+- [ ] A/B testing in autonomous mode (test subject lines, body variations)
+- [ ] Advanced schedule options (timezone, blackout dates)
 
 ### P3 - Data Integrations (ON HOLD)
 - [ ] Apollo.io direct integration
@@ -135,7 +160,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ### P3 - Advanced Features (Future)
 - [ ] Multi-agent team orchestration
-- [ ] Advanced self-improvement loop
+- [ ] Campaign analytics dashboard
 
 ---
 
