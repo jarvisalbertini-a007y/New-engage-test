@@ -375,7 +375,7 @@ export default function AutonomousProspecting() {
               </div>
               <Switch
                 checked={config.autoApprove}
-                onCheckedChange={(v) => setConfig(c => ({ ...c, autoApprove: v }))}
+                onCheckedChange={(v: boolean) => setConfig(c => ({ ...c, autoApprove: v }))}
                 disabled={isRunning}
               />
             </div>
