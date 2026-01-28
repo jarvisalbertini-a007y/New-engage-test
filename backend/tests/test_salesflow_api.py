@@ -420,8 +420,9 @@ class TestIntegrations:
     
     def test_get_integrations(self):
         """Test getting integrations status"""
+        # Note: endpoint is /api/integrations/integrations due to router prefix
         response = requests.get(
-            f"{BASE_URL}/api/integrations",
+            f"{BASE_URL}/api/integrations/integrations",
             headers=self.headers
         )
         assert response.status_code == 200
