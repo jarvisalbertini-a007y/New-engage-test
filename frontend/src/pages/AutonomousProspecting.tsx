@@ -564,9 +564,9 @@ export default function AutonomousProspecting() {
                     className="p-3 rounded-lg bg-gray-800/50 border border-gray-700"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-foreground">
                         {learning.loopType}
-                      </Badge>
+                      </span>
                       <span className="text-xs text-gray-500">
                         {formatDate(learning.createdAt)}
                       </span>
