@@ -145,7 +145,7 @@ async def execute_micro_agent(
 async def run_micro_agent(agent_type: str, input_data: dict, model: str) -> dict:
     """Run a specific micro agent"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         # Build prompt based on agent type
         prompts = {
@@ -165,13 +165,15 @@ async def run_micro_agent(agent_type: str, input_data: dict, model: str) -> dict
         
         prompt = prompts.get(agent_type, f"Process this input: {input_data}")
         
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=prompt)]
+        session_id = f"micro-{agent_type[:6]}-{str(uuid4())[:6]}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=f"You are a specialized {agent_type.replace('_', ' ')} micro-agent."
         )
+        response = await llm.send_message(UserMessage(text=prompt))
         
-        return {"output": response.message.content, "status": "success"}
+        return {"output": response, "status": "success"}
         
     except Exception as e:
         return {"output": str(e), "status": "error"}

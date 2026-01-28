@@ -93,7 +93,7 @@ async def upload_knowledge(
 async def extract_knowledge(content: str, category: str) -> dict:
     """Use AI to extract structured knowledge from content"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         extraction_prompts = {
             "company_info": "Extract company information: name, industry, size, products/services, key differentiators, target customers.",
@@ -112,21 +112,23 @@ Content:
 
 Return as structured JSON."""
         
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=prompt)]
+        session_id = f"kb-{str(uuid4())[:8]}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are a knowledge extraction assistant."
         )
+        response_text = await llm.send_message(UserMessage(text=prompt))
         
         # Try to parse JSON from response
         try:
             import re
-            json_match = re.search(r'```json\s*({.*?})\s*```', response.message.content, re.DOTALL)
+            json_match = re.search(r'```json\s*({.*?})\s*```', response_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(1))
-            return {"summary": response.message.content}
+            return {"summary": response_text}
         except:
-            return {"summary": response.message.content}
+            return {"summary": response_text}
             
     except Exception as e:
         return {"error": str(e), "summary": content[:500]}
@@ -232,7 +234,7 @@ async def query_knowledge(
     
     # Use AI to answer based on context
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         prompt = f"""Based on the following knowledge base documents, answer this question:
 
@@ -243,14 +245,16 @@ Knowledge Base:
 
 Provide a comprehensive answer using information from the documents. Cite which documents you used."""
         
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=prompt)]
+        session_id = f"rag-{str(uuid4())[:8]}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are a knowledge base assistant. Answer questions based on the provided documents."
         )
+        response_text = await llm.send_message(UserMessage(text=prompt))
         
         return {
-            "answer": response.message.content,
+            "answer": response_text,
             "sources": [{"id": d["id"], "name": d["name"], "category": d["category"]} for d in docs[:5]]
         }
         

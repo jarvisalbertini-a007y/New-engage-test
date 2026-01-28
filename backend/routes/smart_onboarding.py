@@ -100,7 +100,7 @@ async def start_smart_onboarding(
 async def research_company_and_user(domain: str, email: str, name_parts: dict) -> dict:
     """Use AI to research company and user from email domain"""
     try:
-        from emergentintegrations.llm.chat import chat, Message, ModelType
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         prompt = f"""Research this company and user for sales engagement purposes.
 
@@ -163,15 +163,16 @@ Provide comprehensive research in JSON format:
 
 Be specific and realistic based on the domain. If unknown, make educated guesses based on domain patterns."""
         
-        response = await chat(
-            emergent_api_key=EMERGENT_LLM_KEY,
-            model=ModelType.GEMINI_2_0_FLASH,
-            messages=[Message(role="user", content=prompt)]
+        session_id = f"onboard-{str(uuid4())[:8]}"
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message="You are an expert company researcher for sales purposes."
         )
+        content = await llm.send_message(UserMessage(text=prompt))
         
         # Parse JSON from response
         import json
-        content = response.message.content
         
         # Try to extract JSON
         json_match = re.search(r'```json\s*({.*?})\s*```', content, re.DOTALL)
