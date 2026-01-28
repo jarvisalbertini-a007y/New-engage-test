@@ -253,4 +253,27 @@ export const api = {
   // Google Contacts
   getGoogleContacts: () => apiRequest('GET', '/api/google/contacts'),
   syncContactsToProspects: () => apiRequest('POST', '/api/google/contacts/sync-to-prospects'),
+
+  // Autonomous Prospecting
+  startAutonomousProspecting: (config?: { 
+    prospectsPerCycle?: number; 
+    learningEnabled?: boolean;
+    autoApprove?: boolean;
+    maxCyclesPerDay?: number;
+  }) => apiRequest('POST', '/api/autonomous/start', config || {}),
+  stopAutonomousProspecting: () => apiRequest('POST', '/api/autonomous/stop', {}),
+  getAutonomousProspectingStatus: () => apiRequest('GET', '/api/autonomous/status'),
+  getLearnings: (limit?: number) => 
+    apiRequest('GET', `/api/autonomous/learnings?limit=${limit || 20}`),
+  getCompetitorSources: () => apiRequest('GET', '/api/autonomous/competitor-sources'),
+  
+  // Individual Loops
+  runDiscoveryLoop: (params: { count?: number; context?: string }) =>
+    apiRequest('POST', '/api/autonomous/loops/discovery', params),
+  runResearchLoop: (params: { prospectIds?: string[]; count?: number }) =>
+    apiRequest('POST', '/api/autonomous/loops/research', params),
+  runOutreachLoop: (params: { prospectIds?: string[]; count?: number }) =>
+    apiRequest('POST', '/api/autonomous/loops/outreach', params),
+  runLearningLoop: (params?: any) =>
+    apiRequest('POST', '/api/autonomous/loops/learning', params || {}),
 };
