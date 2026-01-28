@@ -384,7 +384,7 @@ export default function EmailOptimization() {
                         {optimization.changes.map((change, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm">
                             <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                            <span>{change}</span>
+                            <span>{typeof change === 'string' ? change : (change as any).change || JSON.stringify(change)}</span>
                           </li>
                         ))}
                       </ul>
