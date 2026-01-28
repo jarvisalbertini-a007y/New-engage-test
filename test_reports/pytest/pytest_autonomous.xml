@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="12" skipped="0" tests="14" time="3.251" timestamp="2026-01-28T20:21:34.360440+00:00" hostname="agent-env-10dae244-636c-46e3-b2e3-e4189384f4d8"><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_get_competitor_sources" time="0.375" /><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_get_autonomous_status" time="0.312"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:70: in test_get_autonomous_status
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_get_learnings" time="0.285"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:88: in test_get_learnings
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_discovery_loop" time="0.275"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:102: in test_discovery_loop
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_research_loop" time="0.278"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:128: in test_research_loop
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_outreach_loop" time="0.300"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:147: in test_outreach_loop
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_learning_loop" time="0.272"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:166: in test_learning_loop
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_start_autonomous_engine" time="0.272"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:198: in test_start_autonomous_engine
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_stop_autonomous_engine" time="0.285"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:221: in test_stop_autonomous_engine
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingEndpoints" name="test_status_after_stop" time="0.287"><failure message="AssertionError: Expected 200, got 401&#10;assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_autonomous_prospecting.py:239: in test_status_after_stop
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 401
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingAuth" name="test_competitor_sources_no_auth_required" time="0.038" /><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingAuth" name="test_status_requires_auth" time="0.042"><failure message="AssertionError: Expected 401, got 403&#10;assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">tests/test_autonomous_prospecting.py:259: in test_status_requires_auth
+    assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+E   AssertionError: Expected 401, got 403
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingAuth" name="test_loops_require_auth" time="0.046"><failure message="AssertionError: /api/autonomous/loops/discovery should require auth, got 403&#10;assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">tests/test_autonomous_prospecting.py:273: in test_loops_require_auth
+    assert response.status_code == 401, f"{endpoint} should require auth, got {response.status_code}"
+E   AssertionError: /api/autonomous/loops/discovery should require auth, got 403
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="tests.test_autonomous_prospecting.TestAutonomousProspectingAuth" name="test_start_stop_require_auth" time="0.040"><failure message="AssertionError: start should require auth&#10;assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">tests/test_autonomous_prospecting.py:280: in test_start_stop_require_auth
+    assert start_response.status_code == 401, "start should require auth"
+E   AssertionError: start should require auth
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase></testsuite></testsuites>
