@@ -297,7 +297,7 @@ export const api = {
     apiRequest('POST', `/api/autonomous/schedule/${scheduleId}/run-now`, {}),
 
   // Approval Workflow
-  getPendingApprovals: () => apiRequest('GET', '/api/autonomous/pending-approvals'),
+  getAutonomousApprovals: () => apiRequest('GET', '/api/autonomous/pending-approvals'),
   approveEmailDraft: (draftId: string, data: { action: string; reason?: string; editedContent?: any }) =>
     apiRequest('POST', `/api/autonomous/approve/${draftId}`, data),
   sendApprovedEmail: (draftId: string, data: { provider: string }) =>
