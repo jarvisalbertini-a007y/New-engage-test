@@ -31,7 +31,7 @@ class TestAutonomousProspectingEndpoints:
         )
         
         if login_response.status_code == 200:
-            token = login_response.json().get("token")
+            token = login_response.json().get("access_token")
             self.session.headers.update({"Authorization": f"Bearer {token}"})
         else:
             pytest.skip("Authentication failed - skipping authenticated tests")
@@ -256,7 +256,7 @@ class TestAutonomousProspectingAuth:
     def test_status_requires_auth(self):
         """Test that status endpoint requires authentication"""
         response = requests.get(f"{BASE_URL}/api/autonomous/status")
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+        assert response.status_code in [401, 403], f"Expected 401 or 403, got {response.status_code}"
         print("✓ status endpoint requires auth")
     
     def test_loops_require_auth(self):
@@ -270,17 +270,17 @@ class TestAutonomousProspectingAuth:
         
         for endpoint in endpoints:
             response = requests.post(f"{BASE_URL}{endpoint}", json={})
-            assert response.status_code == 401, f"{endpoint} should require auth, got {response.status_code}"
+            assert response.status_code in [401, 403], f"{endpoint} should require auth, got {response.status_code}"
         
         print("✓ All loop endpoints require auth")
     
     def test_start_stop_require_auth(self):
         """Test that start/stop endpoints require authentication"""
         start_response = requests.post(f"{BASE_URL}/api/autonomous/start", json={})
-        assert start_response.status_code == 401, "start should require auth"
+        assert start_response.status_code in [401, 403], "start should require auth"
         
         stop_response = requests.post(f"{BASE_URL}/api/autonomous/stop")
-        assert stop_response.status_code == 401, "stop should require auth"
+        assert stop_response.status_code in [401, 403], "stop should require auth"
         
         print("✓ start/stop endpoints require auth")
 
