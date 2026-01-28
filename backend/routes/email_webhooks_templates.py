@@ -989,6 +989,9 @@ async def create_draft_from_template(
     
     await db.email_drafts.insert_one(draft)
     
+    # Remove MongoDB _id before returning
+    draft.pop("_id", None)
+    
     return {
         "success": True,
         "draftId": draft["id"],
