@@ -117,15 +117,6 @@ export default function Integrations() {
       configured: false,
       category: 'Notifications',
       comingSoon: true
-    },
-    {
-      id: 'calendar',
-      name: 'Google Calendar',
-      description: 'Sync meetings and schedule follow-ups',
-      icon: '📅',
-      configured: false,
-      category: 'Scheduling',
-      comingSoon: true
     }
   ];
 
