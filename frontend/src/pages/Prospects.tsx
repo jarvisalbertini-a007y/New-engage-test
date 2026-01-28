@@ -87,6 +87,31 @@ export default function Prospects() {
     }
   });
 
+  const sendSendgridMutation = useMutation({
+    mutationFn: () => api.sendEmail({
+      to: selectedProspect!.email,
+      subject: emailForm.subject,
+      body: emailForm.body,
+      prospectId: selectedProspect!.id
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['emailHistory'] });
+      setShowEmailModal(false);
+      setEmailForm({ subject: '', body: '' });
+    }
+  });
+
+  const handleSendEmail = () => {
+    if (emailProvider === 'gmail') {
+      sendGmailMutation.mutate();
+    } else {
+      sendSendgridMutation.mutate();
+    }
+  };
+
+  const isSendingEmail = sendGmailMutation.isPending || sendSendgridMutation.isPending;
+
   const scheduleMeetingMutation = useMutation({
     mutationFn: () => api.scheduleMeeting({
       summary: meetingForm.summary || `Meeting with ${selectedProspect!.firstName}`,
