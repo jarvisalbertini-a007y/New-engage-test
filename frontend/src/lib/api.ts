@@ -226,8 +226,7 @@ export const api = {
 
   // Google Integration
   getGoogleStatus: () => apiRequest('GET', '/api/google/status'),
-  initGoogleOAuth: (data: { client_id: string; client_secret: string }) =>
-    apiRequest('POST', '/api/google/oauth/init', data),
+  initGoogleOAuth: () => apiRequest('POST', '/api/google/oauth/init', {}),
   disconnectGoogle: () => apiRequest('DELETE', '/api/google/oauth/disconnect'),
   
   // Gmail
