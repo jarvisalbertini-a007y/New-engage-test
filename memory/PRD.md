@@ -134,4 +134,4 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 ## Test Credentials
 - Email: `test@salesflow.com`
 - Password: `test123`
-- API Base: `https://salesai-flow.preview.emergentagent.com`
+- API Base: `https://salesflow-ai-3.preview.emergentagent.com`
