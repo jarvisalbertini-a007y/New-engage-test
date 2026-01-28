@@ -1206,3 +1206,505 @@ async def get_competitor_sources():
         {"id": key, **value}
         for key, value in COMPETITOR_SOURCES.items()
     ]
+
+
+
+# ============== SCHEDULED AUTONOMOUS RUNS ==============
+
+@router.post("/schedule")
+async def create_scheduled_run(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a scheduled autonomous run"""
+    db = get_db()
+    
+    schedule_type = request.get("scheduleType", "daily")  # daily, weekly, hourly, custom
+    run_time = request.get("runTime", "09:00")  # HH:MM format
+    days_of_week = request.get("daysOfWeek", [0, 1, 2, 3, 4])  # Mon-Fri by default
+    config = request.get("config", {})
+    
+    schedule = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "name": request.get("name", "Scheduled Prospecting"),
+        "scheduleType": schedule_type,
+        "runTime": run_time,
+        "daysOfWeek": days_of_week,
+        "timezone": request.get("timezone", "UTC"),
+        "config": {
+            "prospectsPerCycle": config.get("prospectsPerCycle", 10),
+            "learningEnabled": config.get("learningEnabled", True),
+            "autoApprove": config.get("autoApprove", False),
+            "maxCyclesPerDay": config.get("maxCyclesPerDay", 5),
+            "notifyOnComplete": config.get("notifyOnComplete", True)
+        },
+        "status": "active",
+        "lastRunAt": None,
+        "nextRunAt": calculate_next_run(run_time, days_of_week, schedule_type),
+        "totalRuns": 0,
+        "totalProspectsFound": 0,
+        "totalEmailsDrafted": 0,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.scheduled_runs.insert_one(schedule)
+    schedule.pop("_id", None)
+    
+    return {
+        "success": True,
+        "schedule": schedule,
+        "message": f"Scheduled to run {schedule_type} at {run_time}"
+    }
+
+
+def calculate_next_run(run_time: str, days_of_week: list, schedule_type: str) -> str:
+    """Calculate the next scheduled run time"""
+    now = datetime.now(timezone.utc)
+    hour, minute = map(int, run_time.split(":"))
+    
+    if schedule_type == "hourly":
+        # Next hour
+        next_run = now.replace(minute=minute, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += timedelta(hours=1)
+    elif schedule_type == "daily" or schedule_type == "weekly":
+        # Find next matching day
+        next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += timedelta(days=1)
+        
+        # For weekly, find next matching weekday
+        if schedule_type == "weekly" and days_of_week:
+            while next_run.weekday() not in days_of_week:
+                next_run += timedelta(days=1)
+    else:
+        # Default to next day at specified time
+        next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += timedelta(days=1)
+    
+    return next_run.isoformat()
+
+
+@router.get("/schedules")
+async def get_scheduled_runs(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all scheduled runs for user"""
+    db = get_db()
+    
+    schedules = await db.scheduled_runs.find(
+        {"userId": current_user["id"]},
+        {"_id": 0}
+    ).sort("createdAt", -1).to_list(50)
+    
+    return schedules
+
+
+@router.put("/schedule/{schedule_id}")
+async def update_scheduled_run(
+    schedule_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a scheduled run"""
+    db = get_db()
+    
+    update_data = {
+        "updatedAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if "status" in request:
+        update_data["status"] = request["status"]
+    if "runTime" in request:
+        update_data["runTime"] = request["runTime"]
+    if "daysOfWeek" in request:
+        update_data["daysOfWeek"] = request["daysOfWeek"]
+    if "config" in request:
+        update_data["config"] = request["config"]
+    if "name" in request:
+        update_data["name"] = request["name"]
+    
+    # Recalculate next run
+    schedule = await db.scheduled_runs.find_one(
+        {"id": schedule_id, "userId": current_user["id"]}
+    )
+    if schedule:
+        run_time = request.get("runTime", schedule.get("runTime", "09:00"))
+        days = request.get("daysOfWeek", schedule.get("daysOfWeek", [0,1,2,3,4]))
+        stype = schedule.get("scheduleType", "daily")
+        update_data["nextRunAt"] = calculate_next_run(run_time, days, stype)
+    
+    result = await db.scheduled_runs.update_one(
+        {"id": schedule_id, "userId": current_user["id"]},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    return {"success": True, "message": "Schedule updated"}
+
+
+@router.delete("/schedule/{schedule_id}")
+async def delete_scheduled_run(
+    schedule_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a scheduled run"""
+    db = get_db()
+    
+    result = await db.scheduled_runs.delete_one(
+        {"id": schedule_id, "userId": current_user["id"]}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    return {"success": True, "message": "Schedule deleted"}
+
+
+@router.post("/schedule/{schedule_id}/run-now")
+async def run_schedule_now(
+    schedule_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
+    """Manually trigger a scheduled run immediately"""
+    db = get_db()
+    
+    schedule = await db.scheduled_runs.find_one(
+        {"id": schedule_id, "userId": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # Create session from schedule config
+    session = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "scheduleId": schedule_id,
+        "status": "running",
+        "config": schedule.get("config", {}),
+        "stats": {
+            "cyclesCompleted": 0,
+            "prospectsFound": 0,
+            "companiesResearched": 0,
+            "emailsDrafted": 0,
+            "techniquesLearned": 0
+        },
+        "currentPhase": "initializing",
+        "triggeredBy": "manual",
+        "startedAt": datetime.now(timezone.utc).isoformat(),
+        "lastActivityAt": datetime.now(timezone.utc).isoformat()
+    }
+    await db.autonomous_sessions.insert_one(session)
+    
+    # Update schedule
+    await db.scheduled_runs.update_one(
+        {"id": schedule_id},
+        {"$set": {
+            "lastRunAt": datetime.now(timezone.utc).isoformat(),
+            "nextRunAt": calculate_next_run(
+                schedule.get("runTime", "09:00"),
+                schedule.get("daysOfWeek", [0,1,2,3,4]),
+                schedule.get("scheduleType", "daily")
+            )
+        },
+        "$inc": {"totalRuns": 1}}
+    )
+    
+    # Run in background
+    background_tasks.add_task(
+        run_autonomous_cycle_v2,
+        current_user["id"],
+        session["id"],
+        db
+    )
+    
+    return {
+        "success": True,
+        "sessionId": session["id"],
+        "message": "Scheduled run triggered"
+    }
+
+
+# ============== APPROVAL WORKFLOW ==============
+
+@router.get("/pending-approvals")
+async def get_pending_approvals(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get email drafts pending approval"""
+    db = get_db()
+    
+    # Get drafts with status 'pending_approval'
+    drafts = await db.email_drafts.find(
+        {"userId": current_user["id"], "status": {"$in": ["draft", "pending_approval"]}},
+        {"_id": 0}
+    ).sort("createdAt", -1).limit(50).to_list(50)
+    
+    # Enrich with prospect data
+    enriched_drafts = []
+    for draft in drafts:
+        prospect = None
+        if draft.get("prospectId"):
+            prospect = await db.prospects.find_one(
+                {"id": draft["prospectId"]},
+                {"_id": 0, "firstName": 1, "lastName": 1, "email": 1, "company": 1, "title": 1}
+            )
+        
+        enriched_drafts.append({
+            **draft,
+            "prospect": prospect
+        })
+    
+    return enriched_drafts
+
+
+@router.post("/approve/{draft_id}")
+async def approve_email_draft(
+    draft_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve an email draft for sending"""
+    db = get_db()
+    
+    action = request.get("action", "approve")  # approve, reject, edit
+    edited_content = request.get("editedContent", {})
+    
+    draft = await db.email_drafts.find_one(
+        {"id": draft_id, "userId": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    
+    if action == "approve":
+        # Update draft status
+        await db.email_drafts.update_one(
+            {"id": draft_id},
+            {"$set": {
+                "status": "approved",
+                "approvedAt": datetime.now(timezone.utc).isoformat(),
+                "approvedBy": current_user["id"]
+            }}
+        )
+        
+        # Create approval record
+        await db.workflow_approvals.insert_one({
+            "id": str(uuid4()),
+            "userId": current_user["id"],
+            "approverId": current_user["id"],
+            "type": "email_send",
+            "draftId": draft_id,
+            "status": "approved",
+            "createdAt": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {"success": True, "status": "approved", "message": "Email approved for sending"}
+    
+    elif action == "reject":
+        await db.email_drafts.update_one(
+            {"id": draft_id},
+            {"$set": {
+                "status": "rejected",
+                "rejectedAt": datetime.now(timezone.utc).isoformat(),
+                "rejectionReason": request.get("reason", "")
+            }}
+        )
+        
+        return {"success": True, "status": "rejected", "message": "Email rejected"}
+    
+    elif action == "edit":
+        # Update with edited content
+        update_data = {
+            "status": "edited",
+            "editedAt": datetime.now(timezone.utc).isoformat()
+        }
+        if edited_content.get("subject"):
+            update_data["subject"] = edited_content["subject"]
+        if edited_content.get("body"):
+            update_data["body"] = edited_content["body"]
+        
+        await db.email_drafts.update_one(
+            {"id": draft_id},
+            {"$set": update_data}
+        )
+        
+        return {"success": True, "status": "edited", "message": "Email updated"}
+    
+    raise HTTPException(status_code=400, detail="Invalid action")
+
+
+@router.post("/send-approved/{draft_id}")
+async def send_approved_email(
+    draft_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Send an approved email via configured provider"""
+    db = get_db()
+    
+    draft = await db.email_drafts.find_one(
+        {"id": draft_id, "userId": current_user["id"], "status": {"$in": ["approved", "edited"]}},
+        {"_id": 0}
+    )
+    
+    if not draft:
+        raise HTTPException(status_code=404, detail="Approved draft not found")
+    
+    # Get prospect email
+    prospect = await db.prospects.find_one(
+        {"id": draft.get("prospectId")},
+        {"_id": 0}
+    )
+    
+    if not prospect or not prospect.get("email"):
+        raise HTTPException(status_code=400, detail="Prospect email not found")
+    
+    provider = request.get("provider", "gmail")  # gmail or sendgrid
+    
+    # Check for Google integration
+    if provider == "gmail":
+        user_doc = await db.users.find_one({"id": current_user["id"]})
+        if not user_doc or not user_doc.get("google_credentials"):
+            raise HTTPException(
+                status_code=400,
+                detail="Gmail not connected. Connect Google in Integrations first."
+            )
+        
+        # Send via Gmail (using google_integration route)
+        from routes.google_integration import send_email_via_gmail
+        
+        result = await send_email_via_gmail(
+            user_doc["google_credentials"],
+            prospect["email"],
+            draft["subject"],
+            draft["body"],
+            draft.get("prospectId"),
+            current_user["id"],
+            db
+        )
+        
+        if result.get("success"):
+            # Update draft status
+            await db.email_drafts.update_one(
+                {"id": draft_id},
+                {"$set": {
+                    "status": "sent",
+                    "sentAt": datetime.now(timezone.utc).isoformat(),
+                    "sentVia": "gmail"
+                }}
+            )
+            
+            return {"success": True, "message": "Email sent via Gmail", "messageId": result.get("messageId")}
+        else:
+            return {"success": False, "error": result.get("error", "Failed to send")}
+    
+    elif provider == "sendgrid":
+        # Check for SendGrid integration
+        user_integrations = await db.user_integrations.find_one(
+            {"userId": current_user["id"]},
+            {"_id": 0}
+        )
+        
+        if not user_integrations or not user_integrations.get("sendgrid_api_key"):
+            raise HTTPException(
+                status_code=400,
+                detail="SendGrid not configured. Add API key in Integrations first."
+            )
+        
+        # Send via SendGrid
+        try:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail
+            
+            message = Mail(
+                from_email=user_integrations.get("from_email", current_user.get("email")),
+                to_emails=prospect["email"],
+                subject=draft["subject"],
+                html_content=f"<p>{draft['body']}</p>"
+            )
+            
+            sg = SendGridAPIClient(user_integrations["sendgrid_api_key"])
+            response = sg.send(message)
+            
+            if response.status_code in [200, 201, 202]:
+                await db.email_drafts.update_one(
+                    {"id": draft_id},
+                    {"$set": {
+                        "status": "sent",
+                        "sentAt": datetime.now(timezone.utc).isoformat(),
+                        "sentVia": "sendgrid"
+                    }}
+                )
+                
+                return {"success": True, "message": "Email sent via SendGrid"}
+            else:
+                return {"success": False, "error": f"SendGrid error: {response.status_code}"}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    raise HTTPException(status_code=400, detail="Invalid provider")
+
+
+@router.post("/bulk-approve")
+async def bulk_approve_emails(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve multiple email drafts at once"""
+    db = get_db()
+    
+    draft_ids = request.get("draftIds", [])
+    action = request.get("action", "approve")
+    
+    if not draft_ids:
+        raise HTTPException(status_code=400, detail="No drafts specified")
+    
+    results = []
+    for draft_id in draft_ids:
+        try:
+            result = await approve_email_draft(
+                draft_id,
+                {"action": action},
+                current_user
+            )
+            results.append({"draftId": draft_id, "success": True, "status": result.get("status")})
+        except Exception as e:
+            results.append({"draftId": draft_id, "success": False, "error": str(e)})
+    
+    approved_count = len([r for r in results if r.get("success")])
+    
+    return {
+        "success": True,
+        "approvedCount": approved_count,
+        "totalCount": len(draft_ids),
+        "results": results
+    }
+
+
+# ============== RUN HISTORY ==============
+
+@router.get("/history")
+async def get_run_history(
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get history of autonomous runs"""
+    db = get_db()
+    
+    sessions = await db.autonomous_sessions.find(
+        {"userId": current_user["id"]},
+        {"_id": 0}
+    ).sort("startedAt", -1).limit(limit).to_list(limit)
+    
+    return sessions
