@@ -452,32 +452,42 @@ export default function Prospects() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-1">
-                          {googleStatus?.connected ? (
+                          {(googleStatus?.connected || integrations?.sendgrid_configured) ? (
                             <>
                               <Button 
                                 size="sm" 
                                 variant="outline"
                                 onClick={() => {
                                   setSelectedProspect(prospect);
+                                  // Default to gmail if connected, otherwise sendgrid
+                                  setEmailProvider(googleStatus?.connected ? 'gmail' : 'sendgrid');
                                   setShowEmailModal(true);
                                 }}
+                                data-testid={`email-btn-${prospect.id}`}
                               >
                                 ✉️
                               </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedProspect(prospect);
-                                  setShowMeetingModal(true);
-                                }}
-                              >
-                                📅
-                              </Button>
+                              {googleStatus?.connected && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedProspect(prospect);
+                                    setShowMeetingModal(true);
+                                  }}
+                                  data-testid={`meeting-btn-${prospect.id}`}
+                                >
+                                  📅
+                                </Button>
+                              )}
                             </>
                           ) : (
-                            <Button size="sm" variant="ghost" disabled>
-                              Connect Google
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => window.location.href = '/integrations'}
+                            >
+                              Connect Email
                             </Button>
                           )}
                           {prospect.linkedinUrl && (
