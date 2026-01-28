@@ -315,11 +315,17 @@ export default function Integrations() {
                               if (integration.id === 'sendgrid') {
                                 setShowSendgridForm(true);
                               } else if (integration.id === 'google') {
-                                setShowGoogleForm(true);
+                                // Direct OAuth - just click and go
+                                initGoogleOAuthMutation.mutate();
                               }
                             }}
+                            disabled={integration.id === 'google' && initGoogleOAuthMutation.isPending}
                           >
-                            Connect
+                            {integration.id === 'google' && initGoogleOAuthMutation.isPending 
+                              ? 'Connecting...' 
+                              : integration.id === 'google' 
+                                ? 'Connect with Google' 
+                                : 'Connect'}
                           </Button>
                         )}
                       </div>
