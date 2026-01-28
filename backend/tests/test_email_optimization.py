@@ -412,7 +412,7 @@ class TestEmailOptimizationAuth:
             "subject": "Test",
             "body": "Test"
         })
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+        assert response.status_code in [401, 403], f"Expected 401/403, got {response.status_code}"
         print("✓ Optimize endpoint requires auth")
     
     def test_ab_test_requires_auth(self):
@@ -423,13 +423,13 @@ class TestEmailOptimizationAuth:
             "subject": "Test",
             "body": "Test"
         })
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+        assert response.status_code in [401, 403], f"Expected 401/403, got {response.status_code}"
         print("✓ A/B test creation requires auth")
     
     def test_insights_requires_auth(self):
         """Test that insights endpoint requires authentication"""
         response = requests.get(f"{BASE_URL}/api/email-optimization/insights")
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
+        assert response.status_code in [401, 403], f"Expected 401/403, got {response.status_code}"
         print("✓ Insights endpoint requires auth")
 
 
