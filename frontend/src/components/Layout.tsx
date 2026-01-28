@@ -9,6 +9,7 @@ const navItems = [
   { path: '/chat', label: 'AI Chat', icon: '💬' },
   { path: '/autonomous', label: 'Autonomous AI', icon: '🧠' },
   { path: '/email-optimization', label: 'Email Optimizer', icon: '✨' },
+  { path: '/email-templates', label: 'Templates', icon: '📝' },
   { path: '/agents', label: 'Agents', icon: '🤖' },
   { path: '/agent-teams', label: 'Agent Teams', icon: '👥' },
   { path: '/workflow-builder', label: 'Workflows', icon: '🔄' },
