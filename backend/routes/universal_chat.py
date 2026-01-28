@@ -178,9 +178,9 @@ def parse_actions(response: str) -> List[dict]:
                 action = json.loads(match)
                 if "action" in action:
                     actions.append(action)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 pass
-    except:
+    except (json.JSONDecodeError, ValueError, TypeError):
         pass
     return actions
 

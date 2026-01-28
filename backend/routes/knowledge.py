@@ -127,7 +127,7 @@ Return as structured JSON."""
             if json_match:
                 return json.loads(json_match.group(1))
             return {"summary": response_text}
-        except:
+        except (json.JSONDecodeError, ValueError):
             return {"summary": response_text}
             
     except Exception as e:

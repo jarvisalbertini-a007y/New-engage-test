@@ -182,7 +182,7 @@ Be specific and realistic based on the domain. If unknown, make educated guesses
         # Try parsing entire response
         try:
             return json.loads(content)
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
         
         # Fallback response

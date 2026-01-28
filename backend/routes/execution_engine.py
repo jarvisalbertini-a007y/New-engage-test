@@ -143,7 +143,7 @@ Return as JSON array."""
             json_match = re.search(r'\[.*\]', ai_response, re.DOTALL)
             if json_match:
                 prospects = json.loads(json_match.group())
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
     
     # If AI fails, generate sample prospects
@@ -212,7 +212,7 @@ Return as structured JSON."""
             if json_match:
                 research = json.loads(json_match.group())
                 research["company"] = company_name
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
     
     # Save research to database
@@ -270,7 +270,7 @@ Return JSON with: subject, body, callToAction, estimatedOpenRate (0-100), person
             json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
             if json_match:
                 email = json.loads(json_match.group())
-        except:
+        except (json.JSONDecodeError, ValueError):
             email["body"] = ai_response
     
     # Save draft
@@ -332,7 +332,7 @@ Return as JSON."""
             json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
             if json_match:
                 scoring = json.loads(json_match.group())
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
     
     # Update prospect with score
@@ -548,7 +548,8 @@ async def run_autonomous_cycle(user_id: str, session_id: str):
             return
         
         settings = session.get("settings", {})
-        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        # User info can be used for personalization in future
+        _ = await db.users.find_one({"id": user_id}, {"_id": 0})
         
         # Step 1: Find new prospects
         if settings.get("prospectingEnabled", True):
