@@ -531,9 +531,9 @@ export default function AutonomousProspecting() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {source.learn_topics.slice(0, 2).map((topic, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
+                      <span key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">
                         {topic.replace(/_/g, ' ')}
-                      </Badge>
+                      </span>
                     ))}
                   </div>
                 </div>
