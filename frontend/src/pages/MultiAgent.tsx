@@ -135,7 +135,7 @@ export default function MultiAgent() {
   });
 
   const createTeamMutation = useMutation({
-    mutationFn: (data: typeof teamForm) => api.createAgentTeam(data),
+    mutationFn: (data: typeof teamForm) => api.createCustomAgentTeam(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['custom-teams'] });
       setShowTeamForm(false);
