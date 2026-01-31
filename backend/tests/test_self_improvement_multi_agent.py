@@ -56,7 +56,7 @@ class TestSelfImprovementStatus:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_get_status_requires_auth(self):
@@ -102,7 +102,7 @@ class TestSelfImprovementAnalysis:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_run_analysis_requires_auth(self):
@@ -150,7 +150,7 @@ class TestSelfImprovementRules:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_get_rules_requires_auth(self):
@@ -212,7 +212,7 @@ class TestSelfImprovementApplyToEmail:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_apply_requires_auth(self):
@@ -272,7 +272,7 @@ class TestSelfImprovementPhrases:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_get_phrases_requires_auth(self):
@@ -311,7 +311,7 @@ class TestSelfImprovementHistory:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_get_history_requires_auth(self):
@@ -382,7 +382,7 @@ class TestMultiAgentExecuteSingle:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_execute_single_requires_auth(self):
@@ -453,7 +453,7 @@ class TestMultiAgentExecuteMulti:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_execute_multi_requires_auth(self):
@@ -511,7 +511,7 @@ class TestMultiAgentTasks:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_list_tasks_requires_auth(self):
@@ -554,7 +554,7 @@ class TestMultiAgentTeams:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_create_team_requires_auth(self):
@@ -662,7 +662,7 @@ class TestMultiAgentChat:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_chat_requires_auth(self):
@@ -733,7 +733,7 @@ class TestMultiAgentHistory:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed")
     
     def test_history_requires_auth(self):
