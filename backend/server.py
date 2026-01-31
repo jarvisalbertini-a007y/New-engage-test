@@ -77,6 +77,8 @@ app.include_router(google_router, prefix="/api/google", tags=["Google Integratio
 app.include_router(autonomous_router, prefix="/api/autonomous", tags=["Autonomous Prospecting"])
 app.include_router(email_optimization_router, prefix="/api/email-optimization", tags=["Email Optimization"])
 app.include_router(email_templates_router, prefix="/api/email-templates", tags=["Email Templates"])
+app.include_router(self_improvement_router, prefix="/api/self-improvement", tags=["Self Improvement"])
+app.include_router(multi_agent_router, prefix="/api/multi-agent", tags=["Multi Agent"])
 
 @app.get("/api/health")
 async def health_check():
