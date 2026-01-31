@@ -375,4 +375,38 @@ export const api = {
   }) => apiRequest('POST', '/api/email-templates/templates/generate', data),
   createDraftFromTemplate: (templateId: string, data: { prospectId: string; variables?: any }) =>
     apiRequest('POST', `/api/email-templates/templates/${templateId}/create-draft`, data),
+
+  // Self-Improvement
+  getSelfImprovementStatus: () => apiRequest('GET', '/api/self-improvement/status'),
+  runPerformanceAnalysis: () => apiRequest('POST', '/api/self-improvement/analyze', {}),
+  applyLearningsToEmail: (data: { subject: string; body: string; draftId?: string }) =>
+    apiRequest('POST', '/api/self-improvement/apply-to-draft', data),
+  getImprovementRules: (activeOnly?: boolean) =>
+    apiRequest('GET', `/api/self-improvement/rules?active_only=${activeOnly !== false}`),
+  updateImprovementRule: (ruleId: string, data: { active?: boolean; priority?: string; target?: number }) =>
+    apiRequest('PUT', `/api/self-improvement/rules/${ruleId}`, data),
+  getWinningPhrases: () => apiRequest('GET', '/api/self-improvement/phrases'),
+  getImprovementHistory: (limit?: number) =>
+    apiRequest('GET', `/api/self-improvement/improvement-history?limit=${limit || 20}`),
+  submitImprovementFeedback: (data: { draftId: string; outcome: string; gotReply?: boolean; notes?: string }) =>
+    apiRequest('POST', '/api/self-improvement/feedback', data),
+
+  // Multi-Agent
+  getAgentTypes: () => apiRequest('GET', '/api/multi-agent/types'),
+  executeSingleAgent: (data: { agentType: string; task: string; context?: any }) =>
+    apiRequest('POST', '/api/multi-agent/execute-single', data),
+  executeMultiAgentTask: (data: { goal: string; async?: boolean }) =>
+    apiRequest('POST', '/api/multi-agent/execute-multi', data),
+  getMultiAgentTask: (taskId: string) => apiRequest('GET', `/api/multi-agent/task/${taskId}`),
+  listMultiAgentTasks: (status?: string) =>
+    apiRequest('GET', `/api/multi-agent/tasks${status ? `?status=${status}` : ''}`),
+  createAgentTeam: (data: { name: string; description?: string; agents: string[] }) =>
+    apiRequest('POST', '/api/multi-agent/team/create', data),
+  getCustomTeams: () => apiRequest('GET', '/api/multi-agent/teams'),
+  executeAgentTeam: (teamId: string, data: { goal: string; inputs?: any }) =>
+    apiRequest('POST', `/api/multi-agent/team/${teamId}/execute`, data),
+  getAgentExecutionHistory: (agentType?: string, limit?: number) =>
+    apiRequest('GET', `/api/multi-agent/history?${agentType ? `agent_type=${agentType}&` : ''}limit=${limit || 20}`),
+  agentChat: (data: { agentType: string; message: string; sessionId?: string }) =>
+    apiRequest('POST', '/api/multi-agent/chat', data),
 };
