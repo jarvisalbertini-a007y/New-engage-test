@@ -257,9 +257,9 @@ export default function SelfImprovement() {
                       </div>
                       {session.performance && (
                         <div className="flex items-center gap-4 text-sm">
-                          <span>{session.performance.totalEmails} emails</span>
-                          <span className="text-green-600">{session.performance.highPerformers} successful</span>
-                          <span>{session.performance.replyRate.toFixed(1)}% reply rate</span>
+                          <span>{session.performance.totalEmails || 0} emails</span>
+                          <span className="text-green-600">{session.performance.highPerformers || 0} successful</span>
+                          <span>{(session.performance.replyRate ?? 0).toFixed(1)}% reply rate</span>
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2">
