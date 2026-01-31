@@ -163,6 +163,28 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - `POST /api/email-templates/templates/generate` - AI generate template
 - `POST /api/email-templates/templates/{id}/create-draft` - Create draft
 
+### Self-Improvement
+- `GET /api/self-improvement/status` - Get learning status & metrics
+- `POST /api/self-improvement/analyze` - Run comprehensive analysis
+- `GET /api/self-improvement/rules` - Get improvement rules
+- `PUT /api/self-improvement/rules/{id}` - Update rule (toggle active)
+- `POST /api/self-improvement/apply-to-draft` - Apply learnings to email
+- `GET /api/self-improvement/phrases` - Get winning phrases
+- `GET /api/self-improvement/improvement-history` - Get improvement history
+- `POST /api/self-improvement/feedback` - Submit outcome feedback
+
+### Multi-Agent
+- `GET /api/multi-agent/types` - Get 5 agent types
+- `POST /api/multi-agent/execute-single` - Execute with single agent
+- `POST /api/multi-agent/execute-multi` - Execute with multiple agents
+- `GET /api/multi-agent/task/{id}` - Get task status/results
+- `GET /api/multi-agent/tasks` - List multi-agent tasks
+- `POST /api/multi-agent/team/create` - Create custom team
+- `GET /api/multi-agent/teams` - List custom teams
+- `POST /api/multi-agent/team/{id}/execute` - Execute team workflow
+- `POST /api/multi-agent/chat` - Chat with agent
+- `GET /api/multi-agent/history` - Get execution history
+
 ### Email Optimization
 - `POST /api/email-optimization/optimize` - AI optimize email
 - `POST /api/email-optimization/ab-test/create` - Create A/B test
@@ -180,16 +202,19 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ## Backlog
 
+### P0 - Immediate
+- [ ] SendGrid API integration for actual email sending
+- [ ] Real data source integrations (Apollo.io, Clearbit, Crunchbase)
+
 ### P1 - Upcoming
 - [ ] Campaign-level A/B testing across multiple prospects
 - [ ] Time-based send optimization (best time to send)
 
-### P2 - Enhancements
-- [ ] Advanced analytics dashboard
-- [ ] Template performance tracking by industry/title
+### P2 - Enhancements (COMPLETED)
+- [x] ~~Advanced Self-Improvement Loop~~ ✅
+- [x] ~~Multi-Agent Architecture~~ ✅
 
 ### P3 - Future
-- [ ] Multi-agent team orchestration
 - [ ] Predictive lead scoring with ML
 - [ ] Campaign ROI tracking
 
