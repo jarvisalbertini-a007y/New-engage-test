@@ -714,7 +714,7 @@ export default function MultiAgent() {
                   </CardContent>
                 </Card>
               );
-            })}
+            })
           )}
         </div>
       )}
