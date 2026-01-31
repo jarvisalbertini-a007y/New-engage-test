@@ -104,6 +104,8 @@ function AppRoutes() {
         <Route path="/autonomous" element={<AutonomousProspecting />} />
         <Route path="/email-optimization" element={<EmailOptimization />} />
         <Route path="/email-templates" element={<EmailTemplates />} />
+        <Route path="/self-improvement" element={<SelfImprovement />} />
+        <Route path="/multi-agent" element={<MultiAgent />} />
       </Route>
     </Routes>
   );
