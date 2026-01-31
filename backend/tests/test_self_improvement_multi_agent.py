@@ -29,7 +29,7 @@ class TestAuthentication:
             json={"email": TEST_EMAIL, "password": TEST_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("token")
+            return response.json().get("access_token")
         pytest.skip("Authentication failed - skipping authenticated tests")
     
     def test_login_success(self):
@@ -40,7 +40,7 @@ class TestAuthentication:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "token" in data
+        assert "access_token" in data
         assert "user" in data
         print(f"Login successful, user: {data['user'].get('email')}")
 
