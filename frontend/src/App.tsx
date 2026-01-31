@@ -26,6 +26,8 @@ import Meetings from './pages/Meetings';
 import AutonomousProspecting from './pages/AutonomousProspecting';
 import EmailOptimization from './pages/EmailOptimization';
 import EmailTemplates from './pages/EmailTemplates';
+import SelfImprovement from './pages/SelfImprovement';
+import MultiAgent from './pages/MultiAgent';
 
 const queryClient = new QueryClient();
 
