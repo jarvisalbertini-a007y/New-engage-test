@@ -400,7 +400,7 @@ export const api = {
   getMultiAgentTask: (taskId: string) => apiRequest('GET', `/api/multi-agent/task/${taskId}`),
   listMultiAgentTasks: (status?: string) =>
     apiRequest('GET', `/api/multi-agent/tasks${status ? `?status=${status}` : ''}`),
-  createAgentTeam: (data: { name: string; description?: string; agents: string[] }) =>
+  createCustomAgentTeam: (data: { name: string; description?: string; agents: string[] }) =>
     apiRequest('POST', '/api/multi-agent/team/create', data),
   getCustomTeams: () => apiRequest('GET', '/api/multi-agent/teams'),
   executeAgentTeam: (teamId: string, data: { goal: string; inputs?: any }) =>
