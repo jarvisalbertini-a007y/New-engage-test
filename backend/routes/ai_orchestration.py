@@ -1139,3 +1139,375 @@ async def create_new_session(
     await db.ai_sessions.insert_one(session)
     
     return {"success": True, "sessionId": session_id}
+
+
+# ============== WORKFLOW & APPROVAL INTEGRATION ==============
+
+@router.post("/create-workflow")
+async def ai_create_workflow(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """AI-powered workflow creation from natural language"""
+    db = get_db()
+    
+    description = request.get("description", "")
+    name = request.get("name", "")
+    
+    if not description:
+        raise HTTPException(status_code=400, detail="Description required")
+    
+    # Use AI to generate workflow structure
+    prompt = f"""Create a sales workflow based on this description:
+
+DESCRIPTION: {description}
+
+Design a workflow with:
+- Appropriate trigger
+- Logical sequence of steps
+- Wait times where needed
+- Approval points for important actions
+- Branch conditions if applicable
+
+Return JSON:
+{{
+    "name": "Workflow name",
+    "description": "Brief description",
+    "trigger": {{"type": "manual|schedule|event", "config": {{}}}},
+    "nodes": [
+        {{"id": "node_1", "type": "trigger|email|wait|approval|branch|action|end", "label": "Display label", "config": {{}}}}
+    ],
+    "edges": [
+        {{"source": "node_1", "target": "node_2"}}
+    ],
+    "approvalPoints": ["node_ids that need approval"],
+    "estimatedDuration": "X days"
+}}"""
+    
+    workflow_data = None
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"workflow-{str(uuid4())[:8]}",
+            system_message="You are a sales workflow design expert."
+        )
+        
+        response = await llm.send_message(UserMessage(text=prompt))
+        if response:
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                workflow_data = json.loads(json_match.group())
+    except Exception as e:
+        print(f"Workflow generation error: {e}")
+    
+    if not workflow_data:
+        workflow_data = {
+            "name": name or "Generated Workflow",
+            "description": description,
+            "nodes": [
+                {"id": "1", "type": "trigger", "label": "Start"},
+                {"id": "2", "type": "action", "label": "Process"},
+                {"id": "3", "type": "end", "label": "End"}
+            ],
+            "edges": [{"source": "1", "target": "2"}, {"source": "2", "target": "3"}]
+        }
+    
+    # Save workflow
+    workflow = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "name": workflow_data.get("name", name or "AI Generated Workflow"),
+        "description": workflow_data.get("description", description),
+        "nodes": workflow_data.get("nodes", []),
+        "edges": workflow_data.get("edges", []),
+        "trigger": workflow_data.get("trigger", {"type": "manual"}),
+        "approvalPoints": workflow_data.get("approvalPoints", []),
+        "category": "ai_generated",
+        "status": "draft",
+        "aiGenerated": True,
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.workflows.insert_one(workflow)
+    
+    return {
+        "success": True,
+        "workflow": {k: v for k, v in workflow.items() if k != "_id"},
+        "message": f"Workflow '{workflow['name']}' created with {len(workflow['nodes'])} steps"
+    }
+
+
+@router.get("/pending-approvals-unified")
+async def get_unified_pending_approvals(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all pending approvals from various sources (plans, workflows, emails)"""
+    db = get_db()
+    
+    # Get pending plans
+    pending_plans = await db.pending_plans.find(
+        {"userId": current_user["id"], "status": "pending_approval"},
+        {"_id": 0}
+    ).to_list(50)
+    
+    # Get pending workflow approvals
+    pending_workflows = await db.approvals.find(
+        {"userId": current_user["id"], "status": "pending"},
+        {"_id": 0}
+    ).to_list(50)
+    
+    # Get pending email drafts
+    pending_emails = await db.email_drafts.find(
+        {"userId": current_user["id"], "status": "pending_approval"},
+        {"_id": 0}
+    ).to_list(50)
+    
+    # Combine and format
+    all_approvals = []
+    
+    for plan in pending_plans:
+        all_approvals.append({
+            "id": plan["id"],
+            "type": "plan",
+            "title": f"Plan: {plan.get('plan', {}).get('summary', 'Execution Plan')[:50]}",
+            "description": plan.get("originalMessage", "")[:100],
+            "content": plan.get("plan"),
+            "createdAt": plan.get("createdAt"),
+            "source": "ai_orchestration"
+        })
+    
+    for approval in pending_workflows:
+        all_approvals.append({
+            "id": approval["id"],
+            "type": approval.get("type", "workflow"),
+            "title": approval.get("title", "Workflow Approval"),
+            "description": approval.get("description", ""),
+            "content": approval.get("content"),
+            "context": approval.get("context"),
+            "createdAt": approval.get("createdAt"),
+            "source": "workflow"
+        })
+    
+    for email in pending_emails:
+        all_approvals.append({
+            "id": email["id"],
+            "type": "email",
+            "title": f"Email: {email.get('subject', 'Draft')[:40]}",
+            "description": f"To: {email.get('recipientEmail', 'Unknown')}",
+            "content": {"subject": email.get("subject"), "body": email.get("body")},
+            "createdAt": email.get("createdAt"),
+            "source": "email_draft"
+        })
+    
+    # Sort by creation date
+    all_approvals.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+    
+    return all_approvals
+
+
+@router.post("/approve-item/{item_id}")
+async def approve_unified_item(
+    item_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve any pending item (plan, workflow, email)"""
+    db = get_db()
+    
+    item_type = request.get("type", "plan")
+    action = request.get("action", "approve")  # approve or reject
+    comment = request.get("comment", "")
+    
+    if item_type == "plan":
+        if action == "approve":
+            return await handle_plan_approval(item_id, current_user, db)
+        else:
+            return await handle_plan_rejection(item_id, current_user, db)
+    
+    elif item_type == "workflow" or item_type == "action" or item_type == "content":
+        result = await db.approvals.update_one(
+            {"id": item_id, "userId": current_user["id"]},
+            {
+                "$set": {
+                    "status": "approved" if action == "approve" else "rejected",
+                    "respondedAt": datetime.now(timezone.utc).isoformat(),
+                    "comment": comment
+                }
+            }
+        )
+        return {"success": result.modified_count > 0, "action": action}
+    
+    elif item_type == "email":
+        new_status = "approved" if action == "approve" else "rejected"
+        result = await db.email_drafts.update_one(
+            {"id": item_id, "userId": current_user["id"]},
+            {
+                "$set": {
+                    "status": new_status,
+                    "approvedAt" if action == "approve" else "rejectedAt": datetime.now(timezone.utc).isoformat(),
+                    "approvalComment": comment
+                }
+            }
+        )
+        return {"success": result.modified_count > 0, "action": action}
+    
+    raise HTTPException(status_code=400, detail=f"Unknown item type: {item_type}")
+
+
+# ============== DOCUMENT UPLOAD FOR KNOWLEDGE BASE ==============
+
+@router.post("/knowledge/upload")
+async def upload_knowledge_document(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload and process document for knowledge base (base64 encoded)"""
+    db = get_db()
+    
+    content = request.get("content", "")  # Base64 or plain text
+    filename = request.get("filename", "document.txt")
+    name = request.get("name", filename)
+    category = request.get("category", "general")
+    description = request.get("description", "")
+    content_type = request.get("contentType", "text/plain")
+    
+    if not content:
+        raise HTTPException(status_code=400, detail="Content required")
+    
+    # Decode base64 if needed
+    text_content = content
+    file_size = len(content)
+    
+    if content_type != "text/plain" and "base64," in content:
+        import base64
+        try:
+            # Extract base64 data
+            base64_data = content.split("base64,")[1] if "base64," in content else content
+            decoded = base64.b64decode(base64_data)
+            text_content = decoded.decode('utf-8', errors='ignore')
+            file_size = len(decoded)
+        except:
+            text_content = content
+    
+    # Use AI to extract key information
+    extract_prompt = f"""Extract key information from this document for a sales knowledge base:
+
+DOCUMENT: {filename}
+CONTENT:
+{text_content[:5000]}
+
+Extract:
+- Summary
+- Key facts and data points
+- Companies, people, products mentioned
+- Actionable insights
+- Tags for categorization
+
+Return JSON:
+{{
+    "summary": "Brief summary",
+    "keyFacts": ["fact1", "fact2"],
+    "entities": {{"companies": [], "people": [], "products": []}},
+    "insights": ["insight1"],
+    "tags": ["tag1", "tag2"]
+}}"""
+    
+    extracted_data = {}
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"extract-{str(uuid4())[:8]}",
+            system_message="You are a document analysis expert."
+        )
+        
+        response = await llm.send_message(UserMessage(text=extract_prompt))
+        if response:
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                extracted_data = json.loads(json_match.group())
+    except Exception as e:
+        print(f"Extraction error: {e}")
+    
+    # Save document
+    doc = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "name": name,
+        "filename": filename,
+        "fileType": filename.split(".")[-1] if "." in filename else "txt",
+        "fileSize": file_size,
+        "category": category,
+        "description": description,
+        "content": text_content[:50000],  # Limit stored content
+        "extractedData": extracted_data,
+        "status": "processed",
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.knowledge_base.insert_one(doc)
+    
+    return {
+        "success": True,
+        "documentId": doc["id"],
+        "name": name,
+        "extractedData": extracted_data,
+        "message": f"Document '{name}' processed and added to knowledge base"
+    }
+
+
+# ============== VOICE INPUT TRANSCRIPTION ==============
+
+@router.post("/voice/transcribe")
+async def transcribe_voice_input(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Transcribe voice input to text.
+    Note: This is a placeholder for actual speech-to-text integration.
+    In production, integrate with OpenAI Whisper, Google Speech-to-Text, etc.
+    """
+    db = get_db()
+    
+    audio_data = request.get("audio", "")  # Base64 encoded audio
+    
+    if not audio_data:
+        raise HTTPException(status_code=400, detail="Audio data required")
+    
+    # For now, return a helpful message about integration
+    # In production, this would call a speech-to-text API
+    
+    return {
+        "success": True,
+        "transcription": "",
+        "message": "Voice transcription requires integration with a speech-to-text service (OpenAI Whisper, Google Speech-to-Text, etc.)",
+        "placeholder": True
+    }
+
+
+@router.get("/stats")
+async def get_ai_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get AI usage statistics for the user"""
+    db = get_db()
+    
+    # Count various metrics
+    sessions_count = await db.ai_sessions.count_documents({"userId": current_user["id"]})
+    plans_count = await db.pending_plans.count_documents({"userId": current_user["id"]})
+    completed_plans = await db.pending_plans.count_documents({"userId": current_user["id"], "status": "completed"})
+    knowledge_docs = await db.knowledge_base.count_documents({"userId": current_user["id"]})
+    learnings_count = await db.agent_learnings.count_documents({"userId": current_user["id"]})
+    
+    return {
+        "sessions": sessions_count,
+        "totalPlans": plans_count,
+        "completedPlans": completed_plans,
+        "knowledgeDocuments": knowledge_docs,
+        "agentLearnings": learnings_count,
+        "successRate": round((completed_plans / plans_count * 100) if plans_count > 0 else 0, 1)
+    }
