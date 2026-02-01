@@ -101,6 +101,7 @@ function AppRoutes() {
         <Route path="/agent-teams" element={<AgentTeams />} />
         <Route path="/workflows" element={<Workflows />} />
         <Route path="/workflow-builder" element={<WorkflowBuilder />} />
+        <Route path="/visual-workflow" element={<VisualWorkflowBuilder />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/knowledge" element={<KnowledgeBase />} />
         <Route path="/prospects" element={<Prospects />} />
