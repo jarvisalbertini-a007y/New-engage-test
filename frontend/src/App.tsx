@@ -28,6 +28,7 @@ import EmailOptimization from './pages/EmailOptimization';
 import EmailTemplates from './pages/EmailTemplates';
 import SelfImprovement from './pages/SelfImprovement';
 import MultiAgent from './pages/MultiAgent';
+import AICommandCenter from './pages/AICommandCenter';
 
 const queryClient = new QueryClient();
 
