@@ -1379,6 +1379,7 @@ async def upload_knowledge_document(
     # Decode base64 if needed
     text_content = content
     file_size = len(content)
+    file_ext = filename.split(".")[-1].lower() if "." in filename else "txt"
     
     if content_type != "text/plain" and "base64," in content:
         import base64
@@ -1386,8 +1387,24 @@ async def upload_knowledge_document(
             # Extract base64 data
             base64_data = content.split("base64,")[1] if "base64," in content else content
             decoded = base64.b64decode(base64_data)
-            text_content = decoded.decode('utf-8', errors='ignore')
             file_size = len(decoded)
+            
+            # Handle different file types
+            if file_ext == "pdf":
+                # Parse PDF
+                text_content = await parse_pdf_content(decoded)
+            else:
+                text_content = decoded.decode('utf-8', errors='ignore')
+        except Exception as e:
+            print(f"Decode error: {e}")
+            text_content = content
+    elif file_ext == "pdf" and not content.startswith("data:"):
+        # Raw base64 PDF without data URI prefix
+        import base64
+        try:
+            decoded = base64.b64decode(content)
+            file_size = len(decoded)
+            text_content = await parse_pdf_content(decoded)
         except:
             text_content = content
     
@@ -1438,7 +1455,7 @@ Return JSON:
         "userId": current_user["id"],
         "name": name,
         "filename": filename,
-        "fileType": filename.split(".")[-1] if "." in filename else "txt",
+        "fileType": file_ext,
         "fileSize": file_size,
         "category": category,
         "description": description,
@@ -1454,9 +1471,57 @@ Return JSON:
         "success": True,
         "documentId": doc["id"],
         "name": name,
+        "fileType": file_ext,
         "extractedData": extracted_data,
         "message": f"Document '{name}' processed and added to knowledge base"
     }
+
+
+async def parse_pdf_content(pdf_bytes: bytes) -> str:
+    """Parse PDF content and extract text"""
+    try:
+        import io
+        
+        # Try PyPDF2 first
+        try:
+            from PyPDF2 import PdfReader
+            
+            pdf_file = io.BytesIO(pdf_bytes)
+            reader = PdfReader(pdf_file)
+            
+            text_parts = []
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+            
+            return "\n\n".join(text_parts)
+        except ImportError:
+            pass
+        
+        # Fallback: try pdfplumber
+        try:
+            import pdfplumber
+            
+            pdf_file = io.BytesIO(pdf_bytes)
+            text_parts = []
+            
+            with pdfplumber.open(pdf_file) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+            
+            return "\n\n".join(text_parts)
+        except ImportError:
+            pass
+        
+        # If no PDF library available, return message
+        return "[PDF content - install PyPDF2 or pdfplumber for text extraction]"
+        
+    except Exception as e:
+        print(f"PDF parsing error: {e}")
+        return f"[PDF parsing error: {e}]"
 
 
 # ============== VOICE INPUT TRANSCRIPTION ==============
