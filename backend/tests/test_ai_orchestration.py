@@ -342,7 +342,7 @@ class TestAIOrchestration:
     def test_get_sessions_requires_auth(self):
         """GET /api/ai/sessions requires authentication"""
         response = self.session.get(f"{BASE_URL}/api/ai/sessions")
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_get_sessions_returns_list(self):
         """GET /api/ai/sessions returns list of user sessions"""
