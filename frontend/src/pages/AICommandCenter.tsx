@@ -45,7 +45,20 @@ import {
   Loader2,
   CircleDot,
   PanelRightOpen,
-  PanelRightClose
+  PanelRightClose,
+  Users,
+  Flame,
+  FlaskConical,
+  Award,
+  Percent,
+  ThumbsUp,
+  ThumbsDown,
+  Sliders,
+  Trophy,
+  BarChart2,
+  PieChart,
+  TrendingDown,
+  Beaker
 } from 'lucide-react';
 
 interface Message {
