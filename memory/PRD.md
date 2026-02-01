@@ -418,28 +418,34 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ## Backlog
 
-### P0 - Immediate (Completed ✅)
+### P0 - Completed ✅
 - [x] ~~**Background Agent Job Queue**~~: Implemented job queue with async background execution ✅
-- [x] ~~**Split-View Agent Console**~~: Replit-style panel with Jobs/Autonomy/Analytics tabs ✅
+- [x] ~~**Split-View Agent Console**~~: Replit-style panel with Jobs/Autonomy/Learning/Analytics tabs ✅
 - [x] ~~**Autonomy Level Configuration**~~: Per task type settings (full_auto, approval, notify, manual) ✅
-- [ ] SendGrid API integration for actual email sending
 
-### P1 - Upcoming (Enhanced Autonomy)
-- [ ] **Visual Workflow Builder Enhancement**: Make drag-drop fully interactive with node connections
-- [ ] **Agent Learning Visibility**: Show users what agents have learned and how they've improved
-- [ ] **NLP Agent Customization**: Allow users to modify agent behavior via natural language
+### P1 - Completed ✅
+- [x] ~~**Visual Workflow Builder Enhancement**~~: Full drag-drop with node connections, zoom, undo/redo ✅
+- [x] ~~**Agent Learning Visibility**~~: Learning history, by-agent stats, feedback system ✅
+- [x] ~~**NLP Agent Customization**~~: Natural language agent modification ✅
+
+### P2 - Upcoming
+- [ ] **SendGrid Email Integration**: Implement actual email sending from Approvals workflow
 - [ ] Real data source integrations (Apollo.io, Clearbit, Crunchbase)
+- [ ] Email notifications for agent completions
 - [ ] Campaign-level A/B testing across multiple prospects
 - [ ] Time-based send optimization (best time to send)
 
-### P2 - Future Enhancements
-- [ ] **Email Notifications**: Configurable email alerts for agent completions
+### P3 - Future Enhancements
 - [ ] **Agent Teams Management**: Custom team creation and workflow execution
 - [ ] Predictive lead scoring with ML
 - [ ] Campaign ROI tracking
 - [ ] Deprecate old standalone pages (/multi-agent, /self-improvement)
+- [ ] Knowledge graph visualization
 
 ### Completed
+- [x] ~~Visual Workflow Builder Enhancement~~ ✅ (Iteration 13)
+- [x] ~~Agent Learning Visibility~~ ✅ (Iteration 13)
+- [x] ~~NLP Agent Customization~~ ✅ (Iteration 13)
 - [x] ~~Background Agent Job Queue~~ ✅ (Iteration 12)
 - [x] ~~Split-View Agent Console~~ ✅ (Iteration 12)
 - [x] ~~Autonomy Level Configuration~~ ✅ (Iteration 12)
