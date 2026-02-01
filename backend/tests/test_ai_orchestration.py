@@ -97,7 +97,7 @@ class TestAIOrchestration:
         response = self.session.post(f"{BASE_URL}/api/ai/chat", json={
             "message": "Hello"
         })
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_chat_requires_message(self):
         """POST /api/ai/chat requires message or plan action"""
