@@ -508,4 +508,32 @@ export const api = {
   // Job Analytics
   getJobAnalytics: () =>
     apiRequest('GET', '/api/jobs/analytics/summary'),
+
+  // ============== AGENT LEARNING ==============
+  
+  // Learning History
+  getLearningHistory: (agentType?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (agentType) params.append('agent_type', agentType);
+    if (limit) params.append('limit', limit.toString());
+    return apiRequest('GET', `/api/jobs/learning/history?${params}`);
+  },
+  recordLearning: (data: { agentType: string; learningType: string; category: string; summary: string; details?: any; impact?: string }) =>
+    apiRequest('POST', '/api/jobs/learning/record', data),
+  getLearningSummary: () =>
+    apiRequest('GET', '/api/jobs/learning/summary'),
+  getAgentLearnings: (agentType: string) =>
+    apiRequest('GET', `/api/jobs/learning/agent/${agentType}`),
+  addLearningFeedback: (learningId: string, data: { feedback?: string; rating?: string }) =>
+    apiRequest('PUT', `/api/jobs/learning/${learningId}/feedback`, data),
+
+  // Agent Customization
+  getAgentCustomization: () =>
+    apiRequest('GET', '/api/jobs/agents/customization'),
+  updateAgentCustomization: (data: { agents?: Record<string, any>; globalSettings?: any }) =>
+    apiRequest('PUT', '/api/jobs/agents/customization', data),
+  customizeAgentNLP: (data: { instruction: string; agentType?: string }) =>
+    apiRequest('POST', '/api/jobs/agents/customize-nlp', data),
+  getCustomizationHistory: () =>
+    apiRequest('GET', '/api/jobs/agents/customization-history'),
 };
