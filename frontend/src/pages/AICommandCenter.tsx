@@ -231,8 +231,54 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
         }]);
       }
       queryClient.invalidateQueries({ queryKey: ['pending-plans'] });
+      refetchHistory();
     }
   });
+
+  // Delete session mutation
+  const deleteSessionMutation = useMutation({
+    mutationFn: (id: string) => api.deleteSession?.(id) || Promise.resolve(),
+    onSuccess: () => refetchHistory()
+  });
+
+  // Load session mutation
+  const loadSessionMutation = useMutation({
+    mutationFn: (id: string) => api.getSessionMessages?.(id) || Promise.resolve({ messages: [] }),
+    onSuccess: (data: any) => {
+      if (data.messages) {
+        setSessionId(data.sessionId);
+        setMessages(data.messages.map((m: any, i: number) => ({
+          id: `loaded-${i}`,
+          role: m.role,
+          content: m.content,
+          parsed: m.parsed,
+          timestamp: m.timestamp
+        })));
+      }
+    }
+  });
+
+  // Create new session
+  const startNewSession = () => {
+    const newId = `session-${Date.now()}`;
+    setSessionId(newId);
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: '',
+      parsed: {
+        type: 'response',
+        message: `Starting a new conversation. What would you like to accomplish?`,
+        suggestedActions: [
+          'Find new prospects',
+          'Research a company',
+          'Create outreach sequence',
+          'Analyze my performance'
+        ]
+      },
+      timestamp: new Date().toISOString()
+    }]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
