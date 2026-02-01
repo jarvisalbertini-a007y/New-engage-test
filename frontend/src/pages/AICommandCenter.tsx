@@ -534,8 +534,8 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900" data-testid="ai-command-center">
-      {/* Main Chat Area - Full Screen by Default */}
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''}`}>
+      {/* Main Chat Area */}
+      <div className={`flex flex-col flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''} ${showConsole ? 'mr-80' : ''}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-violet-600 to-indigo-600">
           <div className="flex items-center gap-3">
@@ -548,12 +548,28 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Running Jobs Indicator */}
+            {(activeJobs as any[])?.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 rounded-lg border border-emerald-400/30">
+                <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
+                <span className="text-sm text-emerald-100">{(activeJobs as any[]).length} jobs running</span>
+              </div>
+            )}
             {activities.length > 0 && activities[0].type?.includes('executing') && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-lg">
                 <RefreshCw className="w-4 h-4 text-white animate-spin" />
                 <span className="text-sm text-white">Agents working...</span>
               </div>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowConsole(!showConsole)}
+              className="text-white hover:bg-white/20"
+              title={showConsole ? "Hide Console" : "Show Console"}
+            >
+              {showConsole ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
