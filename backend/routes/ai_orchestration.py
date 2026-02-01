@@ -327,7 +327,15 @@ async def handle_plan_rejection(plan_id: str, user: dict, db) -> Dict:
 
 
 async def execute_approved_plan(plan_id: str, plan: Dict, context: AgentContext, user: dict, db):
-    """Execute an approved plan using the agent framework"""
+    """
+    Execute an approved plan using the agent framework.
+    
+    INTEGRATED FEATURES:
+    - Self-learning: Apply learned patterns to outreach steps
+    - Email optimization: Use A/B test insights
+    - Knowledge base: Inject relevant context
+    - Activity tracking: Real-time updates via WebSocket
+    """
     
     registry = AgentRegistry()
     registry.set_db_for_all(db)
@@ -347,6 +355,43 @@ async def execute_approved_plan(plan_id: str, plan: Dict, context: AgentContext,
         "message": f"Starting execution: {plan.get('summary', 'Your task')}"
     })
     
+    # ===== PRE-EXECUTION: Load learnings and knowledge =====
+    
+    # Get self-improvement rules for outreach optimization
+    improvement_rules = await db.improvement_rules.find(
+        {"userId": user["id"], "active": True},
+        {"_id": 0}
+    ).to_list(20)
+    
+    # Get relevant knowledge for context
+    knowledge_items = await db.knowledge_base.find(
+        {"userId": user["id"]},
+        {"_id": 0, "content": 1, "category": 1, "extractedData": 1}
+    ).limit(10).to_list(10)
+    
+    # Get winning phrases from learning sessions
+    phrases_session = await db.learning_sessions.find_one(
+        {"userId": user["id"], "type": "comprehensive_analysis"},
+        {"_id": 0, "phrases": 1},
+        sort=[("createdAt", -1)]
+    )
+    winning_phrases = phrases_session.get("phrases", {}) if phrases_session else {}
+    
+    # Inject into context
+    context.learnings = [
+        {"type": "rule", "data": rule} for rule in improvement_rules
+    ]
+    context.knowledge_context = knowledge_items
+    context.metadata["winning_phrases"] = winning_phrases
+    
+    await manager.broadcast_activity(user["id"], {
+        "type": "context_loaded",
+        "planId": plan_id,
+        "message": f"Loaded {len(improvement_rules)} learning rules, {len(knowledge_items)} knowledge items"
+    })
+    
+    # ===== EXECUTE STEPS =====
+    
     steps = plan.get("steps", [])
     
     for i, step in enumerate(steps):
@@ -364,13 +409,72 @@ async def execute_approved_plan(plan_id: str, plan: Dict, context: AgentContext,
             "progress": (i / len(steps)) * 100
         })
         
-        # Get and execute agent
+        # Get agent
         agent = registry.get_agent(agent_id)
         if not agent:
             agent = registry.get_agent("orchestrator")
         
         try:
+            # Execute step
             step_result = await agent.execute(task, context)
+            
+            # ===== POST-STEP: Apply optimizations for outreach =====
+            if agent_id == "outreach" and step_result.get("result"):
+                result_data = step_result["result"]
+                
+                # Auto-apply self-improvement to generated emails
+                if result_data.get("subject") and result_data.get("body") and improvement_rules:
+                    await manager.broadcast_activity(user["id"], {
+                        "type": "optimization_applied",
+                        "planId": plan_id,
+                        "stepId": step_id,
+                        "message": "Applying learned patterns to email..."
+                    })
+                    
+                    # Apply optimization via the self-improvement engine
+                    from routes.self_improvement import call_ai as call_self_improve_ai
+                    
+                    optimize_prompt = f"""Optimize this email using these learned patterns:
+
+EMAIL:
+Subject: {result_data.get('subject', '')}
+Body: {result_data.get('body', '')}
+
+LEARNED RULES:
+{json.dumps(improvement_rules[:5], indent=2)}
+
+WINNING PHRASES:
+{json.dumps(winning_phrases, indent=2) if winning_phrases else "None yet"}
+
+Apply the rules and return JSON:
+{{"subject": "optimized subject", "body": "optimized body", "optimizations_applied": ["list of changes"]}}"""
+                    
+                    try:
+                        optimized = await call_self_improve_ai(optimize_prompt)
+                        if optimized:
+                            json_match = re.search(r'\{.*\}', optimized, re.DOTALL)
+                            if json_match:
+                                opt_data = json.loads(json_match.group())
+                                result_data["subject"] = opt_data.get("subject", result_data["subject"])
+                                result_data["body"] = opt_data.get("body", result_data["body"])
+                                result_data["optimizations_applied"] = opt_data.get("optimizations_applied", [])
+                                step_result["result"] = result_data
+                    except Exception as e:
+                        print(f"Optimization error: {e}")
+            
+            # ===== Store learnings from step =====
+            if step_result.get("result"):
+                await db.agent_learnings.insert_one({
+                    "id": str(uuid4()),
+                    "userId": user["id"],
+                    "agentId": agent_id,
+                    "planId": plan_id,
+                    "stepId": step_id,
+                    "task": task,
+                    "resultSummary": str(step_result.get("result", {}))[:500],
+                    "createdAt": datetime.now(timezone.utc).isoformat()
+                })
+            
             results[step_id] = step_result
             context.add_result(step_id, step_result)
             
@@ -392,6 +496,62 @@ async def execute_approved_plan(plan_id: str, plan: Dict, context: AgentContext,
                 "stepId": step_id,
                 "error": str(e)
             })
+    
+    # ===== POST-EXECUTION: Update knowledge base with learnings =====
+    
+    # Extract key insights from results and save to knowledge
+    synthesis_prompt = f"""Analyze these execution results and extract key learnings:
+
+PLAN: {plan.get('summary', '')}
+RESULTS: {json.dumps(results, indent=2)[:2000]}
+
+Extract:
+1. What worked well
+2. What could be improved
+3. Key insights about prospects/companies
+4. Patterns to remember
+
+Return JSON:
+{{"learnings": ["list of learnings"], "insights": ["key insights"], "improvements": ["suggestions"]}}"""
+    
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"synthesis-{str(uuid4())[:8]}",
+            system_message="You are a learning extraction AI."
+        )
+        
+        synthesis = await llm.send_message(UserMessage(text=synthesis_prompt))
+        if synthesis:
+            json_match = re.search(r'\{.*\}', synthesis, re.DOTALL)
+            if json_match:
+                synthesis_data = json.loads(json_match.group())
+                
+                # Save to knowledge base as auto-generated learning
+                await db.knowledge_base.insert_one({
+                    "id": str(uuid4()),
+                    "userId": user["id"],
+                    "name": f"Plan Execution Learnings - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    "category": "auto_learnings",
+                    "content": json.dumps(synthesis_data),
+                    "extractedData": synthesis_data,
+                    "source": "plan_execution",
+                    "planId": plan_id,
+                    "fileType": "json",
+                    "fileSize": 0,
+                    "status": "processed",
+                    "createdAt": datetime.now(timezone.utc).isoformat()
+                })
+                
+                await manager.broadcast_activity(user["id"], {
+                    "type": "knowledge_updated",
+                    "planId": plan_id,
+                    "message": f"Saved {len(synthesis_data.get('learnings', []))} learnings to knowledge base"
+                })
+    except Exception as e:
+        print(f"Knowledge synthesis error: {e}")
     
     # Update plan as completed
     await db.pending_plans.update_one(
