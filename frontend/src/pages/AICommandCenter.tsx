@@ -445,10 +445,10 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                           Before I proceed, I have a few questions:
                         </p>
                         <ul className="space-y-1">
-                          {message.parsed.clarifyingQuestions.map((q, i) => (
+                          {message.parsed.clarifyingQuestions.map((q: any, i: number) => (
                             <li key={i} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
                               <span className="text-amber-500">{i + 1}.</span>
-                              {q}
+                              {typeof q === 'string' ? q : (q?.text || JSON.stringify(q))}
                             </li>
                           ))}
                         </ul>
