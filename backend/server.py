@@ -85,6 +85,8 @@ app.include_router(self_improvement_router, prefix="/api/self-improvement", tags
 app.include_router(multi_agent_router, prefix="/api/multi-agent", tags=["Multi Agent"])
 app.include_router(ai_orchestration_router, prefix="/api/ai", tags=["AI Orchestration"])
 app.include_router(autonomous_jobs_router, prefix="/api/jobs", tags=["Autonomous Jobs"])
+app.include_router(lead_scoring_router, prefix="/api/lead-scoring", tags=["Lead Scoring"])
+app.include_router(ab_testing_router, prefix="/api/ab-testing", tags=["A/B Testing"])
 
 @app.get("/api/health")
 async def health_check():
