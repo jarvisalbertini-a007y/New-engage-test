@@ -37,6 +37,16 @@ router = APIRouter()
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 
+def sanitize_mongo_doc(doc):
+    """Remove MongoDB _id from document to make it JSON serializable"""
+    if isinstance(doc, dict):
+        return {k: sanitize_mongo_doc(v) for k, v in doc.items() if k != '_id'}
+    elif isinstance(doc, list):
+        return [sanitize_mongo_doc(item) for item in doc]
+    else:
+        return doc
+
+
 # ============== ENUMS & DATA CLASSES ==============
 
 class AutonomyLevel(str, Enum):
