@@ -117,6 +117,12 @@ export default function AICommandCenter() {
     queryFn: () => api.getPendingPlans?.() || Promise.resolve([])
   });
 
+  // Fetch conversation history
+  const { data: conversationHistory, refetch: refetchHistory } = useQuery({
+    queryKey: ['conversation-history'],
+    queryFn: () => api.listConversationSessions?.(20) || Promise.resolve([])
+  });
+
   // Scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
