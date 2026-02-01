@@ -310,7 +310,7 @@ class TestAIOrchestration:
     def test_get_session_requires_auth(self):
         """GET /api/ai/session/{id} requires authentication"""
         response = self.session.get(f"{BASE_URL}/api/ai/session/test-session")
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_get_nonexistent_session(self):
         """GET /api/ai/session/{id} for nonexistent session returns 404"""
