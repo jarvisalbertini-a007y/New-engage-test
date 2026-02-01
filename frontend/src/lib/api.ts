@@ -409,4 +409,22 @@ export const api = {
     apiRequest('GET', `/api/multi-agent/history?${agentType ? `agent_type=${agentType}&` : ''}limit=${limit || 20}`),
   agentChat: (data: { agentType: string; message: string; sessionId?: string }) =>
     apiRequest('POST', '/api/multi-agent/chat', data),
+
+  // AI Orchestration (New Primary Interface)
+  aiChat: (data: { message?: string; sessionId?: string; approvePlanId?: string; rejectPlanId?: string }) =>
+    apiRequest('POST', '/api/ai/chat', data),
+  getAIAgents: () => apiRequest('GET', '/api/ai/agents'),
+  getAISession: (sessionId: string) => apiRequest('GET', `/api/ai/session/${sessionId}`),
+  getAISessions: () => apiRequest('GET', '/api/ai/sessions'),
+  getPendingPlans: () => apiRequest('GET', '/api/ai/plans/pending'),
+  getActivePlans: () => apiRequest('GET', '/api/ai/plans/active'),
+  getPlanStatus: (planId: string) => apiRequest('GET', `/api/ai/plan/${planId}`),
+  pausePlan: (planId: string) => apiRequest('POST', `/api/ai/plan/${planId}/pause`, {}),
+  resumePlan: (planId: string) => apiRequest('POST', `/api/ai/plan/${planId}/resume`, {}),
+  quickAction: (data: { agentId: string; task: string }) =>
+    apiRequest('POST', '/api/ai/quick-action', data),
+  getRecentActivity: (limit?: number) =>
+    apiRequest('GET', `/api/ai/activity/recent?limit=${limit || 20}`),
+  getSuggestions: (context?: string) =>
+    apiRequest('POST', '/api/ai/suggest', { context }),
 };
