@@ -773,6 +773,64 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
               </div>
             )}
 
+            {sidebarTab === 'approvals' && (
+              <div className="p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase">Pending Approvals</h3>
+                
+                {!unifiedApprovals || (unifiedApprovals as any[]).length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No pending approvals</p>
+                    <p className="text-xs mt-1">All caught up!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(unifiedApprovals as any[]).map((item: any) => (
+                      <div key={item.id} className="p-3 rounded-lg border bg-gray-50 dark:bg-gray-700/50">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              item.type === 'plan' ? 'bg-violet-100 text-violet-700' :
+                              item.type === 'email' ? 'bg-green-100 text-green-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {item.type}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            {item.createdAt ? formatTimestamp(item.createdAt) : ''}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium mb-1">{item.title}</p>
+                        <p className="text-xs text-gray-500 mb-3">{item.description}</p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approvalMutation.mutate({ itemId: item.id, type: item.type, action: 'approve' })}
+                            disabled={approvalMutation.isPending}
+                            className="flex-1 bg-green-600 hover:bg-green-700 h-8"
+                          >
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => approvalMutation.mutate({ itemId: item.id, type: item.type, action: 'reject' })}
+                            disabled={approvalMutation.isPending}
+                            className="flex-1 text-red-600 border-red-200 hover:bg-red-50 h-8"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {sidebarTab === 'history' && (
               <div className="p-4 space-y-3">
                 <div className="flex items-center justify-between mb-4">
