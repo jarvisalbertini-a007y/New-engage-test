@@ -3,6 +3,13 @@
 ## Original Problem Statement
 Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform that minimizes user clicks and maximizes automation. User operates primarily from a chat window while agents work autonomously in the background (like Emergent/Replit/Bolt for Sales).
 
+**Enhanced Vision (Feb 2026):** The platform should be like **Figma/Replit for Sales AI**:
+- **Split-view Interface**: Chat window + Agent status panel (like Replit's console)
+- **Configurable Autonomy**: Agents ask users their preferred autonomy level per task type (full auto, approval-based, configurable)
+- **NLP Agent Customization**: Users can modify agents via natural language, see learning history
+- **Background Autonomous Work**: Research, outreach, follow-ups, lead monitoring, meeting booking
+- **Dual Notifications**: In-app + email (customizable in settings)
+
 ## Tech Stack
 - **Backend:** Python, FastAPI, Motor (async MongoDB)
 - **Frontend:** React, TypeScript, Vite, TailwindCSS, shadcn/ui, TanStack Query
