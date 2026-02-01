@@ -107,6 +107,49 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - Frontend: 100% (all UI features working)
 - Test report: `/app/test_reports/iteration_13.json`
 
+#### P2: Agent Teams, Lead Scoring, A/B Testing (COMPLETE - Iteration 14)
+
+**Agent Teams with Parallel Execution**
+- ✅ `GET /api/agent-teams/templates` - Pre-built team templates
+- ✅ `POST /api/agent-teams` - Create custom teams
+- ✅ `POST /{team_id}/execute-parallel` - Parallel agent execution with asyncio.gather
+- ✅ `GET /api/agent-teams/analytics/summary` - Team usage analytics
+- ✅ Team templates: Outbound, Inbound, Nurture teams
+
+**Predictive Lead Scoring**
+- ✅ `GET /api/lead-scoring/config` - 6 customizable factors:
+  - Company Size (15% weight)
+  - Industry Fit (20% weight)
+  - Job Title/Seniority (20% weight)
+  - Engagement Score (25% weight)
+  - Budget Signals (10% weight)
+  - Timing (10% weight)
+- ✅ `POST /api/lead-scoring/score` - Score prospects (0-100) with breakdown
+- ✅ `PUT /api/lead-scoring/config/factor/{name}` - Adjust factor weights
+- ✅ `GET /api/lead-scoring/distribution` - Score distribution (hot/warm/nurture/cold)
+- ✅ `POST /api/lead-scoring/learn` - Record outcomes for AI learning
+- ✅ `GET /api/lead-scoring/model-accuracy` - Model performance metrics
+- ✅ `GET /api/lead-scoring/recommendations` - AI recommendations for model tuning
+
+**Campaign A/B Testing**
+- ✅ `POST /api/ab-testing/tests` - Create A/B tests for:
+  - Email subject lines
+  - Email body/CTA
+  - Send timing (time of day)
+  - Send day (day of week)
+  - Channels (email vs LinkedIn vs phone)
+- ✅ `POST /tests/{id}/start` - Start test with prospect segmentation
+- ✅ `POST /tests/{id}/record-event` - Record opens, clicks, replies, conversions
+- ✅ `POST /tests/{id}/complete` - Statistical significance with Z-score
+- ✅ `POST /api/ab-testing/suggest-test` - AI-powered test suggestions
+- ✅ `GET /api/ab-testing/analytics/summary` - Test analytics
+- ✅ Auto-apply winning variants
+
+**Testing Results (Iteration 14):**
+- Backend: 100% (23/23 tests passed)
+- Test report: `/app/test_reports/iteration_14.json`
+- Bug fixed: Agent team creation with auto-generated IDs
+
 #### P1: Enhanced Visual Workflow Builder (COMPLETE - Iteration 13)
 
 **Drag-Drop Canvas**
