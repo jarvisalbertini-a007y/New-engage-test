@@ -28,7 +28,10 @@ import {
   AlertCircle,
   Clock,
   Sparkles,
-  Menu
+  Menu,
+  Plus,
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 
 interface Message {
