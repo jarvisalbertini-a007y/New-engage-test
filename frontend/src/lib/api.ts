@@ -445,4 +445,24 @@ export const api = {
     apiRequest('DELETE', `/api/ai/session/${sessionId}`),
   createNewSession: () =>
     apiRequest('POST', '/api/ai/session/new', {}),
+  
+  // AI Workflow & Approval Integration
+  aiCreateWorkflow: (data: { description: string; name?: string }) =>
+    apiRequest('POST', '/api/ai/create-workflow', data),
+  getUnifiedApprovals: () =>
+    apiRequest('GET', '/api/ai/pending-approvals-unified'),
+  approveUnifiedItem: (itemId: string, data: { type: string; action: string; comment?: string }) =>
+    apiRequest('POST', `/api/ai/approve-item/${itemId}`, data),
+  
+  // Document Upload for Knowledge Base
+  uploadKnowledgeDocument: (data: { content: string; filename: string; name?: string; category?: string; description?: string; contentType?: string }) =>
+    apiRequest('POST', '/api/ai/knowledge/upload', data),
+  
+  // Voice Input (placeholder)
+  transcribeVoice: (data: { audio: string }) =>
+    apiRequest('POST', '/api/ai/voice/transcribe', data),
+  
+  // AI Stats
+  getAIStats: () =>
+    apiRequest('GET', '/api/ai/stats'),
 };
