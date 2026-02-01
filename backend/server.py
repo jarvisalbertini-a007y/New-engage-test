@@ -80,6 +80,7 @@ app.include_router(email_optimization_router, prefix="/api/email-optimization", 
 app.include_router(email_templates_router, prefix="/api/email-templates", tags=["Email Templates"])
 app.include_router(self_improvement_router, prefix="/api/self-improvement", tags=["Self Improvement"])
 app.include_router(multi_agent_router, prefix="/api/multi-agent", tags=["Multi Agent"])
+app.include_router(ai_orchestration_router, prefix="/api/ai", tags=["AI Orchestration"])
 
 @app.get("/api/health")
 async def health_check():
