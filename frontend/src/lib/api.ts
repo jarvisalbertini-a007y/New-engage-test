@@ -427,4 +427,22 @@ export const api = {
     apiRequest('GET', `/api/ai/activity/recent?limit=${limit || 20}`),
   getSuggestions: (context?: string) =>
     apiRequest('POST', '/api/ai/suggest', { context }),
+  
+  // Knowledge Base Integration
+  autoIngestKnowledge: (data: { content: string; category?: string; source?: string; name?: string }) =>
+    apiRequest('POST', '/api/ai/knowledge/auto-ingest', data),
+  searchKnowledge: (query: string, limit?: number) =>
+    apiRequest('GET', `/api/ai/knowledge/search?query=${encodeURIComponent(query)}&limit=${limit || 5}`),
+  queryKnowledgeRAG: (data: { query: string; categories?: string[] }) =>
+    apiRequest('POST', '/api/ai/knowledge/query-rag', data),
+  
+  // Conversation History
+  listConversationSessions: (limit?: number) =>
+    apiRequest('GET', `/api/ai/sessions/list?limit=${limit || 20}`),
+  getSessionMessages: (sessionId: string) =>
+    apiRequest('GET', `/api/ai/session/${sessionId}/messages`),
+  deleteSession: (sessionId: string) =>
+    apiRequest('DELETE', `/api/ai/session/${sessionId}`),
+  createNewSession: () =>
+    apiRequest('POST', '/api/ai/session/new', {}),
 };
