@@ -279,6 +279,72 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
     }
   });
 
+  // Unified approval mutation
+  const approvalMutation = useMutation({
+    mutationFn: ({ itemId, type, action }: { itemId: string; type: string; action: string }) =>
+      api.approveUnifiedItem?.(itemId, { type, action }) || Promise.resolve(),
+    onSuccess: () => {
+      refetchApprovals();
+      queryClient.invalidateQueries({ queryKey: ['pending-plans'] });
+    }
+  });
+
+  // File upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: (data: { content: string; filename: string; name: string; category: string }) =>
+      api.uploadKnowledgeDocument?.(data) || Promise.resolve({ success: false }),
+    onSuccess: (data: any) => {
+      if (data.success) {
+        setMessages(prev => [...prev, {
+          id: `system-${Date.now()}`,
+          role: 'assistant',
+          content: '',
+          parsed: {
+            type: 'response',
+            message: `Document "${data.name}" has been added to the knowledge base. ${data.extractedData?.summary ? `\n\nSummary: ${data.extractedData.summary}` : ''}`,
+            suggestedActions: ['Ask about this document', 'Upload another']
+          },
+          timestamp: new Date().toISOString()
+        }]);
+      }
+      setShowUpload(false);
+    }
+  });
+
+  // Handle file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = reader.result as string;
+      uploadMutation.mutate({
+        content,
+        filename: file.name,
+        name: file.name,
+        category: 'general'
+      });
+    };
+    reader.readAsText(file);
+  };
+
+  // Voice recording toggle (placeholder)
+  const toggleRecording = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      // In production, stop recording and transcribe
+    } else {
+      setIsRecording(true);
+      // In production, start recording
+      // For now, show a message
+      setTimeout(() => {
+        setIsRecording(false);
+        setInput(input + " [Voice input requires speech-to-text integration]");
+      }, 2000);
+    }
+  };
+
   // Create new session
   const startNewSession = () => {
     const newId = `session-${Date.now()}`;
