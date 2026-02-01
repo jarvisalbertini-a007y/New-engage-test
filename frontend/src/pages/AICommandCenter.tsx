@@ -548,10 +548,10 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                         {message.parsed.suggestedActions.map((action: any, idx: number) => (
                           <button
                             key={idx}
-                            onClick={() => handleSuggestionClick(typeof action === 'string' ? action : (action?.text || ''))}
+                            onClick={() => handleSuggestionClick(typeof action === 'string' ? action : (action?.label || action?.text || ''))}
                             className="px-3 py-1.5 text-sm bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-full hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
                           >
-                            {typeof action === 'string' ? action : (action?.text || JSON.stringify(action))}
+                            {typeof action === 'string' ? action : (action?.label || action?.text || JSON.stringify(action))}
                           </button>
                         ))}
                       </div>
