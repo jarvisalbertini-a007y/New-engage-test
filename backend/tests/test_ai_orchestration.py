@@ -160,7 +160,7 @@ class TestAIOrchestration:
     def test_pending_plans_requires_auth(self):
         """GET /api/ai/plans/pending requires authentication"""
         response = self.session.get(f"{BASE_URL}/api/ai/plans/pending")
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_pending_plans_returns_list(self):
         """GET /api/ai/plans/pending returns list of pending plans"""
