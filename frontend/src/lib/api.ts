@@ -465,4 +465,47 @@ export const api = {
   // AI Stats
   getAIStats: () =>
     apiRequest('GET', '/api/ai/stats'),
+
+  // ============== AUTONOMOUS JOBS ==============
+  
+  // Job Management
+  createJob: (data: { jobType: string; config: any; priority?: string; autoStart?: boolean; scheduledTime?: string }) =>
+    apiRequest('POST', '/api/jobs/jobs/create', data),
+  getJobs: (status?: string, jobType?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (jobType) params.append('job_type', jobType);
+    if (limit) params.append('limit', limit.toString());
+    return apiRequest('GET', `/api/jobs/jobs?${params}`);
+  },
+  getJob: (jobId: string) =>
+    apiRequest('GET', `/api/jobs/jobs/${jobId}`),
+  startJob: (jobId: string) =>
+    apiRequest('POST', `/api/jobs/jobs/${jobId}/start`, {}),
+  pauseJob: (jobId: string) =>
+    apiRequest('POST', `/api/jobs/jobs/${jobId}/pause`, {}),
+  cancelJob: (jobId: string) =>
+    apiRequest('POST', `/api/jobs/jobs/${jobId}/cancel`, {}),
+  getRunningJobsCount: () =>
+    apiRequest('GET', '/api/jobs/jobs/running/count'),
+  
+  // Autonomy Preferences
+  getAutonomyPreferences: () =>
+    apiRequest('GET', '/api/jobs/autonomy/preferences'),
+  updateAutonomyPreferences: (data: { default?: string; preferences?: Record<string, string>; notifications?: { inApp?: boolean; email?: boolean } }) =>
+    apiRequest('PUT', '/api/jobs/autonomy/preferences', data),
+  askAutonomyPreference: (data: { jobType: string; taskDescription?: string }) =>
+    apiRequest('POST', '/api/jobs/autonomy/ask-preference', data),
+  
+  // Quick Start Actions
+  quickStartResearch: (data: { targets: any[]; depth?: string }) =>
+    apiRequest('POST', '/api/jobs/quick-start/research', data),
+  quickStartOutreach: (data: { prospects: any[]; templateId?: string; goal?: string }) =>
+    apiRequest('POST', '/api/jobs/quick-start/outreach', data),
+  quickStartFollowUp: (data: { daysSinceContact?: number; maxProspects?: number }) =>
+    apiRequest('POST', '/api/jobs/quick-start/follow-up', data),
+  
+  // Job Analytics
+  getJobAnalytics: () =>
+    apiRequest('GET', '/api/jobs/analytics/summary'),
 };
