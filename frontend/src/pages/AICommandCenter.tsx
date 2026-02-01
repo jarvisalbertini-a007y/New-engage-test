@@ -1084,6 +1084,302 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
           </div>
         </div>
       )}
+
+      {/* Agent Console Panel - Replit Style */}
+      {showConsole && (
+        <div className="fixed right-0 top-0 h-full w-80 border-l bg-gray-900 text-gray-100 flex flex-col z-40" data-testid="agent-console">
+          {/* Console Header */}
+          <div className="flex items-center justify-between p-3 border-b border-gray-700 bg-gray-800">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              <span className="font-semibold text-sm">Agent Console</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => refetchJobs()}
+                className="p-1.5 hover:bg-gray-700 rounded"
+                title="Refresh"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setShowConsole(false)}
+                className="p-1.5 hover:bg-gray-700 rounded"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Console Tabs */}
+          <div className="flex border-b border-gray-700">
+            {(['jobs', 'autonomy', 'analytics'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setConsoleTab(tab)}
+                className={`flex-1 px-3 py-2 text-xs font-medium transition ${
+                  consoleTab === tab
+                    ? 'text-emerald-400 border-b-2 border-emerald-400 bg-gray-800'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {tab === 'jobs' ? 'Jobs' : tab === 'autonomy' ? 'Autonomy' : 'Analytics'}
+              </button>
+            ))}
+          </div>
+
+          {/* Console Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Jobs Tab */}
+            {consoleTab === 'jobs' && (
+              <div className="p-3 space-y-3">
+                {/* Running Jobs */}
+                {(activeJobs as any[])?.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
+                      <Activity className="w-3 h-3 animate-pulse" />
+                      RUNNING ({(activeJobs as any[]).length})
+                    </div>
+                    {(activeJobs as any[]).map((job: any) => (
+                      <div key={job.id} className="p-2.5 bg-gray-800 rounded-lg border border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-emerald-400 uppercase">
+                            {job.jobType?.replace(/_/g, ' ')}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => pauseJobMutation.mutate(job.id)}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Pause"
+                            >
+                              <Pause className="w-3 h-3 text-yellow-400" />
+                            </button>
+                            <button
+                              onClick={() => cancelJobMutation.mutate(job.id)}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Cancel"
+                            >
+                              <StopCircle className="w-3 h-3 text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-300 mb-2 truncate">
+                          {job.currentStep || job.config?.goal || 'Processing...'}
+                        </p>
+                        {job.progress !== undefined && (
+                          <div className="space-y-1">
+                            <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-emerald-500 rounded-full transition-all"
+                                style={{ width: `${job.progress || 0}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500">{job.progress || 0}%</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recent Jobs */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-gray-400">
+                    <History className="w-3 h-3" />
+                    RECENT
+                  </div>
+                  {!recentJobs || (recentJobs as any[]).length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      <Terminal className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">No jobs yet</p>
+                      <p className="text-xs mt-1">Jobs will appear here</p>
+                    </div>
+                  ) : (
+                    (recentJobs as any[]).slice(0, 10).map((job: any) => (
+                      <div key={job.id} className="p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {job.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                            {job.status === 'failed' && <XCircle className="w-3 h-3 text-red-400" />}
+                            {job.status === 'running' && <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />}
+                            {job.status === 'pending' && <Clock className="w-3 h-3 text-yellow-400" />}
+                            {job.status === 'paused' && <Pause className="w-3 h-3 text-yellow-400" />}
+                            {job.status === 'cancelled' && <StopCircle className="w-3 h-3 text-gray-400" />}
+                            <span className="text-xs font-medium">{job.jobType?.replace(/_/g, ' ')}</span>
+                          </div>
+                          {job.status === 'pending' && (
+                            <button
+                              onClick={() => startJobMutation.mutate(job.id)}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Start"
+                            >
+                              <Play className="w-3 h-3 text-emerald-400" />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(job.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Autonomy Tab */}
+            {consoleTab === 'autonomy' && (
+              <div className="p-3 space-y-4">
+                <div className="text-xs text-gray-400 mb-3">
+                  Configure how autonomous agents work for you
+                </div>
+                
+                {/* Default Autonomy Level */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Default Level</label>
+                  <select
+                    className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-xs"
+                    value={(autonomyPrefs as any)?.default || 'approval'}
+                    onChange={(e) => updateAutonomyMutation.mutate({ 
+                      default: e.target.value,
+                      preferences: (autonomyPrefs as any)?.preferences || {},
+                      notifications: (autonomyPrefs as any)?.notifications || { inApp: true, email: false }
+                    })}
+                  >
+                    <option value="full_auto">Full Auto - Execute immediately</option>
+                    <option value="approval">Approval Required - Wait for confirmation</option>
+                    <option value="notify">Notify Only - Execute & notify</option>
+                    <option value="manual">Manual - Don't auto-execute</option>
+                  </select>
+                </div>
+
+                {/* Per-Type Settings */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Per Task Type</label>
+                  {['research', 'outreach', 'follow_up', 'lead_monitor', 'data_enrich'].map((type) => (
+                    <div key={type} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                      <span className="text-xs capitalize">{type.replace(/_/g, ' ')}</span>
+                      <select
+                        className="p-1 bg-gray-700 border-0 rounded text-xs"
+                        value={(autonomyPrefs as any)?.preferences?.[type] || (autonomyPrefs as any)?.default || 'approval'}
+                        onChange={(e) => updateAutonomyMutation.mutate({
+                          default: (autonomyPrefs as any)?.default,
+                          preferences: {
+                            ...(autonomyPrefs as any)?.preferences,
+                            [type]: e.target.value
+                          },
+                          notifications: (autonomyPrefs as any)?.notifications
+                        })}
+                      >
+                        <option value="full_auto">Auto</option>
+                        <option value="approval">Approval</option>
+                        <option value="notify">Notify</option>
+                        <option value="manual">Manual</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Notifications */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300">Notifications</label>
+                  <div className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                    <span className="text-xs">In-App Notifications</span>
+                    <input
+                      type="checkbox"
+                      checked={(autonomyPrefs as any)?.notifications?.inApp !== false}
+                      onChange={(e) => updateAutonomyMutation.mutate({
+                        ...(autonomyPrefs as any),
+                        notifications: {
+                          ...(autonomyPrefs as any)?.notifications,
+                          inApp: e.target.checked
+                        }
+                      })}
+                      className="rounded bg-gray-700 border-gray-600"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                    <span className="text-xs">Email Notifications</span>
+                    <input
+                      type="checkbox"
+                      checked={(autonomyPrefs as any)?.notifications?.email === true}
+                      onChange={(e) => updateAutonomyMutation.mutate({
+                        ...(autonomyPrefs as any),
+                        notifications: {
+                          ...(autonomyPrefs as any)?.notifications,
+                          email: e.target.checked
+                        }
+                      })}
+                      className="rounded bg-gray-700 border-gray-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Analytics Tab */}
+            {consoleTab === 'analytics' && (
+              <div className="p-3 space-y-4">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 bg-gray-800 rounded-lg">
+                    <p className="text-2xl font-bold text-emerald-400">{(jobAnalytics as any)?.total || 0}</p>
+                    <p className="text-xs text-gray-400">Total Jobs</p>
+                  </div>
+                  <div className="p-3 bg-gray-800 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-400">{(jobAnalytics as any)?.byStatus?.running || 0}</p>
+                    <p className="text-xs text-gray-400">Running</p>
+                  </div>
+                  <div className="p-3 bg-gray-800 rounded-lg">
+                    <p className="text-2xl font-bold text-green-400">{(jobAnalytics as any)?.byStatus?.completed || 0}</p>
+                    <p className="text-xs text-gray-400">Completed</p>
+                  </div>
+                  <div className="p-3 bg-gray-800 rounded-lg">
+                    <p className="text-2xl font-bold text-violet-400">{(jobAnalytics as any)?.successRate || 0}%</p>
+                    <p className="text-xs text-gray-400">Success Rate</p>
+                  </div>
+                </div>
+
+                {/* By Type */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Jobs by Type</label>
+                  {Object.entries((jobAnalytics as any)?.byType || {}).map(([type, count]) => (
+                    <div key={type} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                      <span className="text-xs capitalize">{type.replace(/_/g, ' ')}</span>
+                      <span className="text-xs font-medium text-emerald-400">{count as number}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Console Footer - Quick Actions */}
+          <div className="p-3 border-t border-gray-700 bg-gray-800">
+            <p className="text-xs text-gray-500 mb-2">Quick Start</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                onClick={() => setInput('Find new prospects for my ICP')}
+              >
+                <Search className="w-3 h-3 mr-1" />
+                Research
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                onClick={() => setInput('Create follow-up emails for prospects not contacted in 3 days')}
+              >
+                <Mail className="w-3 h-3 mr-1" />
+                Follow Up
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
