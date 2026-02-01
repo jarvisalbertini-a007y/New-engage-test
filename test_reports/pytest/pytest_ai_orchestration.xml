@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="29" skipped="0" tests="36" time="6.914" timestamp="2026-02-01T12:26:23.217251+00:00" hostname="agent-env-c70ff3d8-df42-4f96-9617-2ec81c854e07"><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_agents_no_auth" time="0.073" /><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_agents_returns_correct_structure" time="0.041" /><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_orchestrator_agent_has_correct_capabilities" time="0.041" /><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_chat_requires_auth" time="0.037"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:100: in test_chat_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_chat_requires_message" time="0.304"><failure message="assert 401 == 400&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:106: in test_chat_requires_message
+    assert response.status_code == 400
+E   assert 401 == 400
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_chat_basic_message" time="0.271"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:115: in test_chat_basic_message
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_chat_returns_plan_for_complex_request" time="0.278"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:131: in test_chat_returns_plan_for_complex_request
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_chat_with_session_maintains_context" time="0.315"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:148: in test_chat_with_session_maintains_context
+    assert response1.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_pending_plans_requires_auth" time="0.035"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:163: in test_pending_plans_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_pending_plans_returns_list" time="0.274"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:169: in test_pending_plans_returns_list
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_active_plans_requires_auth" time="0.039"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:178: in test_active_plans_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_active_plans_returns_list" time="0.264"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:184: in test_active_plans_returns_list
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_quick_action_requires_auth" time="0.038"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:196: in test_quick_action_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_quick_action_requires_task" time="0.315"><failure message="assert 401 == 400&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:204: in test_quick_action_requires_task
+    assert response.status_code == 400
+E   assert 401 == 400
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_quick_action_with_research_agent" time="0.307"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:213: in test_quick_action_with_research_agent
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_quick_action_with_qualification_agent" time="0.280"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:227: in test_quick_action_with_qualification_agent
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_quick_action_with_invalid_agent_falls_back" time="0.309"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:241: in test_quick_action_with_invalid_agent_falls_back
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_suggest_requires_auth" time="0.037"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:250: in test_suggest_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_suggest_returns_suggestions" time="0.266"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:258: in test_suggest_returns_suggestions
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_suggest_with_prospect_context" time="0.275"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:276: in test_suggest_with_prospect_context
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_suggest_with_workflow_context" time="0.269"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:286: in test_suggest_with_workflow_context
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_approve_nonexistent_plan" time="0.308"><failure message="assert 401 == 404&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:298: in test_approve_nonexistent_plan
+    assert response.status_code == 404
+E   assert 401 == 404
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_reject_nonexistent_plan" time="0.265"><failure message="assert 401 == 404&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:306: in test_reject_nonexistent_plan
+    assert response.status_code == 404
+E   assert 401 == 404
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_session_requires_auth" time="0.038"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:313: in test_get_session_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_nonexistent_session" time="0.263"><failure message="assert 401 == 404&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:319: in test_get_nonexistent_session
+    assert response.status_code == 404
+E   assert 401 == 404
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_session_after_chat" time="0.287"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:330: in test_get_session_after_chat
+    assert chat_response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_sessions_requires_auth" time="0.038"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:345: in test_get_sessions_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_get_sessions_returns_list" time="0.309"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:351: in test_get_sessions_returns_list
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_recent_activity_requires_auth" time="0.075"><failure message="assert 403 == 401&#10; +  where 403 = &lt;Response [403]&gt;.status_code">backend/tests/test_ai_orchestration.py:360: in test_recent_activity_requires_auth
+    assert response.status_code == 401
+E   assert 403 == 401
+E    +  where 403 = &lt;Response [403]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_recent_activity_returns_list" time="0.270"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:366: in test_recent_activity_returns_list
+    assert response.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_pause_nonexistent_plan" time="0.267"><failure message="assert 401 == 404&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:376: in test_pause_nonexistent_plan
+    assert response.status_code == 404
+E   assert 401 == 404
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestAIOrchestration" name="test_resume_nonexistent_plan" time="0.307"><failure message="assert 401 == 404&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_ai_orchestration.py:382: in test_resume_nonexistent_plan
+    assert response.status_code == 404
+E   assert 401 == 404
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_ai_orchestration.TestUnifiedAgentFramework" name="test_all_8_agents_present" time="0.041" /><testcase classname="backend.tests.test_ai_orchestration.TestUnifiedAgentFramework" name="test_agents_have_capabilities" time="0.036" /><testcase classname="backend.tests.test_ai_orchestration.TestUnifiedAgentFramework" name="test_outreach_agent_requires_approval" time="0.039" /><testcase classname="backend.tests.test_ai_orchestration.TestUnifiedAgentFramework" name="test_workflow_agent_requires_approval" time="0.041" /></testsuite></testsuites>
