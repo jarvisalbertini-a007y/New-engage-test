@@ -67,9 +67,16 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Landing />} />
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
+      <Route path="/" element={isAuthenticated ? <Navigate to="/ai" replace /> : <Landing />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/ai" replace /> : <Login />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/ai" replace /> : <Register />} />
+      
+      {/* AI Command Center - Primary Interface (Full Screen) */}
+      <Route path="/ai" element={
+        <ProtectedRoute>
+          <AICommandCenter />
+        </ProtectedRoute>
+      } />
       
       <Route path="/onboarding" element={
         <ProtectedRoute>
