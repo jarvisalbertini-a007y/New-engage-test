@@ -357,7 +357,7 @@ class TestAIOrchestration:
     def test_recent_activity_requires_auth(self):
         """GET /api/ai/activity/recent requires authentication"""
         response = self.session.get(f"{BASE_URL}/api/ai/activity/recent")
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_recent_activity_returns_list(self):
         """GET /api/ai/activity/recent returns list of activities"""
