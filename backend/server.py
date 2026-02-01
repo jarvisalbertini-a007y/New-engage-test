@@ -32,6 +32,8 @@ from routes.self_improvement import router as self_improvement_router
 from routes.multi_agent import router as multi_agent_router
 from routes.ai_orchestration import router as ai_orchestration_router
 from routes.autonomous_jobs import router as autonomous_jobs_router
+from routes.lead_scoring import router as lead_scoring_router
+from routes.ab_testing import router as ab_testing_router
 from database import connect_db, close_db
 
 @asynccontextmanager
