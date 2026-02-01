@@ -673,14 +673,17 @@ async def list_jobs(
         {"_id": 0}
     ).sort("createdAt", -1).limit(limit).to_list(limit)
     
-    # Add real-time progress for running jobs
+    # Sanitize to remove any nested _id fields and add real-time progress for running jobs
+    sanitized_jobs = []
     for job in jobs:
-        if job["status"] == "running":
+        job = sanitize_mongo_doc(job)
+        if job.get("status") == "running":
             progress = jobs_manager.get_progress(job["id"])
             job["progress"] = progress.get("progress", 0)
             job["currentStep"] = progress.get("current_step", "")
+        sanitized_jobs.append(job)
     
-    return jobs
+    return sanitized_jobs
 
 
 @router.get("/jobs/{job_id}")
