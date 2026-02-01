@@ -38,7 +38,7 @@ class TestAIOrchestration:
             "password": "test123"
         })
         if response.status_code == 200:
-            self.token = response.json().get("token")
+            self.token = response.json().get("access_token")
             self.session.headers.update({"Authorization": f"Bearer {self.token}"})
             return self.token
         return None
