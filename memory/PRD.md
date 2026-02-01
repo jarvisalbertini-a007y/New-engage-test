@@ -104,19 +104,31 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - ✅ `POST /api/ai/suggest` - Context-aware suggestions
 - ✅ `WebSocket /api/ai/ws/{user_id}` - Real-time activity updates
 
+**Additional Features (Iteration 10)**
+- ✅ `POST /api/ai/create-workflow` - AI workflow creation from natural language
+- ✅ `GET /api/ai/pending-approvals-unified` - Unified approvals (plans, workflows, emails)
+- ✅ `POST /api/ai/approve-item/{id}` - Approve/reject any pending item
+- ✅ `POST /api/ai/knowledge/upload` - Document upload with AI extraction
+- ✅ `POST /api/ai/voice/transcribe` - Voice input (placeholder for STT integration)
+- ✅ `GET /api/ai/stats` - AI usage statistics
+
 **Frontend** (`/app/frontend/src/pages/AICommandCenter.tsx`)
 - ✅ Full-screen chat as primary interface (like Emergent)
 - ✅ AI asks clarifying questions before creating plans
 - ✅ Plan display with approve/reject buttons
 - ✅ Suggested action quick buttons
-- ✅ Split-screen sidebar toggle (Activity, History, Settings)
+- ✅ Split-screen sidebar with 4 tabs: Activity, Approvals, History, Settings
 - ✅ Real-time agent activity feed via WebSocket
-- ✅ All 8 agents listed in settings
+- ✅ Voice input button (mic icon)
+- ✅ Document upload button with file picker
+- ✅ Unified approvals tab with approve/reject per item
+- ✅ Conversation history with load/delete/new session
+- ✅ AI stats display (plans completed, docs)
 
-**Testing Results (Iteration 8):**
-- Backend: 100% (36/36 tests passed)
-- Frontend: 100% (all components working)
-- Test report: `/app/test_reports/iteration_8.json`
+**Testing Results (Iteration 10):**
+- Backend: 100% (20/20 new tests passed)
+- Frontend: 100% (all features working)
+- Test report: `/app/test_reports/iteration_10.json`
 
 ### Session: January 31, 2026
 
