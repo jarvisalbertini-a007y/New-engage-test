@@ -70,6 +70,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - ✅ Split-view UI with collapsible Agent Console (Replit-style)
 - ✅ **Jobs Tab**: Running jobs with progress, Recent jobs with status indicators
 - ✅ **Autonomy Tab**: Default level dropdown, Per task type settings
+- ✅ **Learning Tab**: NLP customization, Agent learnings, Current agent settings
 - ✅ **Analytics Tab**: Total jobs, Running, Completed, Success Rate, By Type
 - ✅ Quick Start buttons (Research, Follow Up)
 
@@ -77,6 +78,60 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 - Backend: 100% (22/22 tests passed)
 - Frontend: 100% (all UI features working)
 - Test report: `/app/test_reports/iteration_12.json`
+
+#### P1: Agent Learning & NLP Customization (COMPLETE - Iteration 13)
+
+**Backend: Learning Visibility**
+- ✅ `GET /api/jobs/learning/summary` - Learning statistics by agent and type
+- ✅ `GET /api/jobs/learning/history` - Full learning history with filters
+- ✅ `POST /api/jobs/learning/record` - Record new agent learnings
+- ✅ `GET /api/jobs/learning/agent/{type}` - Agent-specific learnings with metrics
+- ✅ `PUT /api/jobs/learning/{id}/feedback` - User feedback on learnings
+
+**Backend: NLP Agent Customization**
+- ✅ `GET /api/jobs/agents/customization` - Get agent settings
+- ✅ `PUT /api/jobs/agents/customization` - Update settings
+- ✅ `POST /api/jobs/agents/customize-nlp` - Natural language customization
+- ✅ Keyword parsing: casual, formal, concise, detailed, aggressive, subtle
+- ✅ `GET /api/jobs/agents/customization-history` - NLP request history
+
+**Frontend: Enhanced Agent Console**
+- ✅ **Learning Tab** with NLP customization textarea
+- ✅ "Apply Changes" button for NLP instructions
+- ✅ Agent Learnings summary (Total, High Impact)
+- ✅ Learnings by Agent breakdown
+- ✅ Current Agent Settings display
+
+**Testing Results (Iteration 13):**
+- Backend: 100% (16/16 tests passed)
+- Frontend: 100% (all UI features working)
+- Test report: `/app/test_reports/iteration_13.json`
+
+#### P1: Enhanced Visual Workflow Builder (COMPLETE - Iteration 13)
+
+**Drag-Drop Canvas**
+- ✅ 10 Node types: Trigger, Email, Wait, Approval, Branch, Condition, Action, Notification, Task, End
+- ✅ Drag from palette to canvas
+- ✅ Node connection handles (input/output)
+- ✅ Edge creation by dragging between handles
+- ✅ Curved SVG edge paths with arrows
+
+**Canvas Controls**
+- ✅ Zoom in/out (0.5x to 2x)
+- ✅ Reset view button
+- ✅ Undo/Redo with keyboard shortcuts (⌘Z/⌘⇧Z)
+- ✅ Delete nodes/edges (Del key)
+- ✅ Duplicate nodes (⌘D)
+- ✅ Alt+Drag to pan
+
+**Node Configuration Panel**
+- ✅ Step Name editing
+- ✅ Trigger Type selector (Manual, New Prospect, Email Opened, etc.)
+- ✅ Wait Duration with unit selector
+- ✅ Email Template and Subject Line
+- ✅ Condition selector for Branch nodes
+- ✅ Action Type selector
+- ✅ Connections info, Duplicate, Delete buttons
 
 #### Voice Input & PDF Upload (COMPLETE - Iteration 11)
 
