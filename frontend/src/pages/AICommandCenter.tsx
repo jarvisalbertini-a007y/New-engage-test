@@ -1346,6 +1346,79 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
               </div>
             )}
 
+            {/* Learning Tab */}
+            {consoleTab === 'learning' && (
+              <div className="p-3 space-y-4">
+                {/* NLP Customization Input */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Customize Agents with NLP</label>
+                  <div className="space-y-2">
+                    <textarea
+                      value={nlpCustomizeInput}
+                      onChange={(e) => setNlpCustomizeInput(e.target.value)}
+                      placeholder="Tell agents how to behave...&#10;e.g., 'Make outreach more casual' or 'Be more thorough in research'"
+                      className="w-full p-2 text-xs bg-gray-800 border border-gray-700 rounded resize-none h-16"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => nlpCustomizeMutation.mutate({ instruction: nlpCustomizeInput })}
+                      disabled={!nlpCustomizeInput.trim() || nlpCustomizeMutation.isPending}
+                      className="w-full bg-violet-600 hover:bg-violet-700 text-xs"
+                    >
+                      {nlpCustomizeMutation.isPending ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Applying...</>
+                      ) : (
+                        <><Brain className="w-3 h-3 mr-1" /> Apply Changes</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Learning Summary */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300">Agent Learnings</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-gray-800 rounded-lg text-center">
+                      <p className="text-lg font-bold text-emerald-400">{(learningSummary as any)?.total || 0}</p>
+                      <p className="text-xs text-gray-500">Total</p>
+                    </div>
+                    <div className="p-2 bg-gray-800 rounded-lg text-center">
+                      <p className="text-lg font-bold text-violet-400">{(learningSummary as any)?.highImpactRecent?.length || 0}</p>
+                      <p className="text-xs text-gray-500">High Impact</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* By Agent Type */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Learnings by Agent</label>
+                  {Object.entries((learningSummary as any)?.byAgent || {}).map(([agent, count]) => (
+                    <div key={agent} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                      <span className="text-xs capitalize">{agent}</span>
+                      <span className="text-xs font-medium text-emerald-400">{count as number}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Current Agent Settings */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300">Current Agent Settings</label>
+                  {Object.entries((agentCustomization as any)?.agents || {}).slice(0, 3).map(([agent, settings]) => (
+                    <div key={agent} className="p-2 bg-gray-800 rounded">
+                      <p className="text-xs font-medium capitalize text-gray-300">{agent} Agent</p>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {Object.entries(settings as Record<string, any>).slice(0, 2).map(([key, value]) => (
+                          <span key={key} className="mr-2">
+                            {key}: <span className="text-emerald-400">{String(value)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Analytics Tab */}
             {consoleTab === 'analytics' && (
               <div className="p-3 space-y-4">
