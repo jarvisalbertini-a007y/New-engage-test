@@ -1471,8 +1471,291 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
               </div>
             )}
 
-            {/* Learning Tab */}
-            {consoleTab === 'learning' && (
+            {/* Teams Tab */}
+            {consoleTab === 'teams' && (
+              <div className="p-3 space-y-4">
+                {/* Quick Team Creation */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Quick Create Team</label>
+                  <select
+                    value={selectedTeamTemplate}
+                    onChange={(e) => setSelectedTeamTemplate(e.target.value)}
+                    className="w-full p-2 text-xs bg-gray-800 border border-gray-700 rounded"
+                  >
+                    <option value="">Select a template...</option>
+                    {(teamTemplates as any[])?.map((template: any) => (
+                      <option key={template.id} value={template.id}>{template.name}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (selectedTeamTemplate) {
+                        createTeamMutation.mutate({ 
+                          name: `My ${(teamTemplates as any[])?.find((t: any) => t.id === selectedTeamTemplate)?.name || 'Team'}`,
+                          templateId: selectedTeamTemplate 
+                        });
+                        setSelectedTeamTemplate('');
+                      }
+                    }}
+                    disabled={!selectedTeamTemplate || createTeamMutation.isPending}
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-xs"
+                  >
+                    {createTeamMutation.isPending ? (
+                      <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Creating...</>
+                    ) : (
+                      <><Users className="w-3 h-3 mr-1" /> Create Team</>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Team Stats */}
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-700">
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-emerald-400">{(teamsAnalytics as any)?.totalTeams || 0}</p>
+                    <p className="text-xs text-gray-500">Teams</p>
+                  </div>
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-blue-400">{(teamsAnalytics as any)?.totalExecutions || 0}</p>
+                    <p className="text-xs text-gray-500">Executions</p>
+                  </div>
+                </div>
+
+                {/* User Teams */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Your Teams</label>
+                  {!(userTeams as any[])?.length ? (
+                    <p className="text-xs text-gray-500 italic">No teams yet. Create one above!</p>
+                  ) : (
+                    (userTeams as any[])?.slice(0, 5).map((team: any) => (
+                      <div key={team.id} className="p-2 bg-gray-800 rounded flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-gray-300">{team.name}</p>
+                          <p className="text-xs text-gray-500">{team.agents?.length || 0} agents</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setInput(`Run ${team.name} team on my prospects`)}
+                          className="text-xs text-emerald-400 hover:text-emerald-300"
+                        >
+                          <Play className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scoring Tab */}
+            {consoleTab === 'scoring' && (
+              <div className="p-3 space-y-4">
+                {/* Score Distribution */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-300">Lead Distribution</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    <div className="p-2 bg-gradient-to-b from-red-500/20 to-transparent rounded text-center">
+                      <Flame className="w-4 h-4 mx-auto text-red-400" />
+                      <p className="text-sm font-bold text-red-400">{(scoreDistribution as any)?.distribution?.hot?.count || 0}</p>
+                      <p className="text-xs text-gray-500">Hot</p>
+                    </div>
+                    <div className="p-2 bg-gradient-to-b from-orange-500/20 to-transparent rounded text-center">
+                      <TrendingUp className="w-4 h-4 mx-auto text-orange-400" />
+                      <p className="text-sm font-bold text-orange-400">{(scoreDistribution as any)?.distribution?.warm?.count || 0}</p>
+                      <p className="text-xs text-gray-500">Warm</p>
+                    </div>
+                    <div className="p-2 bg-gradient-to-b from-yellow-500/20 to-transparent rounded text-center">
+                      <Clock className="w-4 h-4 mx-auto text-yellow-400" />
+                      <p className="text-sm font-bold text-yellow-400">{(scoreDistribution as any)?.distribution?.nurture?.count || 0}</p>
+                      <p className="text-xs text-gray-500">Nurture</p>
+                    </div>
+                    <div className="p-2 bg-gradient-to-b from-blue-500/20 to-transparent rounded text-center">
+                      <TrendingDown className="w-4 h-4 mx-auto text-blue-400" />
+                      <p className="text-sm font-bold text-blue-400">{(scoreDistribution as any)?.distribution?.cold?.count || 0}</p>
+                      <p className="text-xs text-gray-500">Cold</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Score All */}
+                <Button
+                  size="sm"
+                  onClick={() => scoreProspectsMutation.mutate()}
+                  disabled={scoreProspectsMutation.isPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs"
+                >
+                  {scoreProspectsMutation.isPending ? (
+                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Scoring...</>
+                  ) : (
+                    <><Target className="w-3 h-3 mr-1" /> Score All Unscored</>
+                  )}
+                </Button>
+
+                {/* Top Hot Leads */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300 flex items-center gap-1">
+                    <Flame className="w-3 h-3 text-red-400" /> Hot Leads
+                  </label>
+                  {!(topLeads as any)?.topLeads?.length ? (
+                    <p className="text-xs text-gray-500 italic">No hot leads yet</p>
+                  ) : (
+                    (topLeads as any)?.topLeads?.slice(0, 4).map((lead: any) => (
+                      <div key={lead.id} className="p-2 bg-gray-800 rounded flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-gray-300">{lead.firstName} {lead.lastName}</p>
+                          <p className="text-xs text-gray-500">{lead.company}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-bold text-emerald-400">{lead.leadScore}</span>
+                          <Award className="w-3 h-3 text-yellow-400" />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Factor Weights Quick Adjust */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300 flex items-center gap-1">
+                    <Sliders className="w-3 h-3" /> Factor Weights
+                  </label>
+                  {['engagement_score', 'industry_fit', 'job_title'].map((factor) => (
+                    <div key={factor} className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400 capitalize">{factor.replace(/_/g, ' ')}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        value={(scoringConfig as any)?.factors?.[factor]?.weight || 20}
+                        onChange={(e) => updateFactorWeightMutation.mutate({ factor, weight: parseInt(e.target.value) })}
+                        className="w-20 h-1 accent-emerald-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* A/B Tests Tab */}
+            {consoleTab === 'tests' && (
+              <div className="p-3 space-y-4">
+                {/* Test Stats */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-emerald-400">{(abTestAnalytics as any)?.totalTests || 0}</p>
+                    <p className="text-xs text-gray-500">Tests</p>
+                  </div>
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-blue-400">{(abTestAnalytics as any)?.runningTests || 0}</p>
+                    <p className="text-xs text-gray-500">Running</p>
+                  </div>
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-violet-400">{(abTestAnalytics as any)?.avgImprovement || 0}%</p>
+                    <p className="text-xs text-gray-500">Avg Lift</p>
+                  </div>
+                </div>
+
+                {/* Quick Create Test */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300">Quick Start Test</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => createABTestMutation.mutate({ suggestionType: 'subject_line', autoApplyWinner: true })}
+                      disabled={createABTestMutation.isPending}
+                      className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      <Mail className="w-3 h-3 mr-1" />
+                      Subject
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => createABTestMutation.mutate({ suggestionType: 'send_time', autoApplyWinner: true })}
+                      disabled={createABTestMutation.isPending}
+                      className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      <Clock className="w-3 h-3 mr-1" />
+                      Timing
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => createABTestMutation.mutate({ suggestionType: 'cta', autoApplyWinner: true })}
+                      disabled={createABTestMutation.isPending}
+                      className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      <Target className="w-3 h-3 mr-1" />
+                      CTA
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => createABTestMutation.mutate({ suggestionType: 'channel', autoApplyWinner: true })}
+                      disabled={createABTestMutation.isPending}
+                      className="text-xs bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      <GitBranch className="w-3 h-3 mr-1" />
+                      Channel
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Active Tests */}
+                <div className="space-y-2 pt-3 border-t border-gray-700">
+                  <label className="text-xs font-medium text-gray-300">Recent Tests</label>
+                  {!(abTests as any[])?.length ? (
+                    <p className="text-xs text-gray-500 italic">No tests yet</p>
+                  ) : (
+                    (abTests as any[])?.slice(0, 4).map((test: any) => (
+                      <div key={test.id} className="p-2 bg-gray-800 rounded">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-300 truncate">{test.name}</p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            test.status === 'running' ? 'bg-blue-500/20 text-blue-400' :
+                            test.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {test.status}
+                          </span>
+                        </div>
+                        {test.winner && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Trophy className="w-3 h-3 text-yellow-400" />
+                            <span className="text-emerald-400">Winner: Variant {test.winner}</span>
+                          </div>
+                        )}
+                        {test.status === 'draft' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startABTestMutation.mutate(test.id)}
+                            className="w-full mt-1 text-xs text-emerald-400"
+                          >
+                            <Play className="w-3 h-3 mr-1" /> Start
+                          </Button>
+                        )}
+                        {test.status === 'running' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => completeABTestMutation.mutate(test.id)}
+                            className="w-full mt-1 text-xs text-violet-400"
+                          >
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Complete
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Learn Tab (Agent Learning & NLP Customization) */}
+            {consoleTab === 'learn' && (
               <div className="p-3 space-y-4">
                 {/* NLP Customization Input */}
                 <div className="space-y-2">
@@ -1500,37 +1783,23 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                 </div>
 
                 {/* Learning Summary */}
-                <div className="space-y-2 pt-3 border-t border-gray-700">
-                  <label className="text-xs font-medium text-gray-300">Agent Learnings</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2 bg-gray-800 rounded-lg text-center">
-                      <p className="text-lg font-bold text-emerald-400">{(learningSummary as any)?.total || 0}</p>
-                      <p className="text-xs text-gray-500">Total</p>
-                    </div>
-                    <div className="p-2 bg-gray-800 rounded-lg text-center">
-                      <p className="text-lg font-bold text-violet-400">{(learningSummary as any)?.highImpactRecent?.length || 0}</p>
-                      <p className="text-xs text-gray-500">High Impact</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-700">
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-emerald-400">{(learningSummary as any)?.total || 0}</p>
+                    <p className="text-xs text-gray-500">Learnings</p>
                   </div>
-                </div>
-
-                {/* By Agent Type */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-300">Learnings by Agent</label>
-                  {Object.entries((learningSummary as any)?.byAgent || {}).map(([agent, count]) => (
-                    <div key={agent} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                      <span className="text-xs capitalize">{agent}</span>
-                      <span className="text-xs font-medium text-emerald-400">{count as number}</span>
-                    </div>
-                  ))}
+                  <div className="p-2 bg-gray-800 rounded-lg text-center">
+                    <p className="text-lg font-bold text-violet-400">{(abTestAnalytics as any)?.testsWithWinner || 0}</p>
+                    <p className="text-xs text-gray-500">Test Wins</p>
+                  </div>
                 </div>
 
                 {/* Current Agent Settings */}
                 <div className="space-y-2 pt-3 border-t border-gray-700">
-                  <label className="text-xs font-medium text-gray-300">Current Agent Settings</label>
+                  <label className="text-xs font-medium text-gray-300">Agent Settings</label>
                   {Object.entries((agentCustomization as any)?.agents || {}).slice(0, 3).map(([agent, settings]) => (
                     <div key={agent} className="p-2 bg-gray-800 rounded">
-                      <p className="text-xs font-medium capitalize text-gray-300">{agent} Agent</p>
+                      <p className="text-xs font-medium capitalize text-gray-300">{agent}</p>
                       <div className="mt-1 text-xs text-gray-500">
                         {Object.entries(settings as Record<string, any>).slice(0, 2).map(([key, value]) => (
                           <span key={key} className="mr-2">
@@ -1538,42 +1807,6 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                           </span>
                         ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Analytics Tab */}
-            {consoleTab === 'analytics' && (
-              <div className="p-3 space-y-4">
-                {/* Summary Stats */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-gray-800 rounded-lg">
-                    <p className="text-2xl font-bold text-emerald-400">{(jobAnalytics as any)?.total || 0}</p>
-                    <p className="text-xs text-gray-400">Total Jobs</p>
-                  </div>
-                  <div className="p-3 bg-gray-800 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-400">{(jobAnalytics as any)?.byStatus?.running || 0}</p>
-                    <p className="text-xs text-gray-400">Running</p>
-                  </div>
-                  <div className="p-3 bg-gray-800 rounded-lg">
-                    <p className="text-2xl font-bold text-green-400">{(jobAnalytics as any)?.byStatus?.completed || 0}</p>
-                    <p className="text-xs text-gray-400">Completed</p>
-                  </div>
-                  <div className="p-3 bg-gray-800 rounded-lg">
-                    <p className="text-2xl font-bold text-violet-400">{(jobAnalytics as any)?.successRate || 0}%</p>
-                    <p className="text-xs text-gray-400">Success Rate</p>
-                  </div>
-                </div>
-
-                {/* By Type */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-300">Jobs by Type</label>
-                  {Object.entries((jobAnalytics as any)?.byType || {}).map(([type, count]) => (
-                    <div key={type} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                      <span className="text-xs capitalize">{type.replace(/_/g, ' ')}</span>
-                      <span className="text-xs font-medium text-emerald-400">{count as number}</span>
                     </div>
                   ))}
                 </div>
