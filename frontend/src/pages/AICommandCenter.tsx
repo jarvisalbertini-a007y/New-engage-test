@@ -589,7 +589,67 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
 
         {/* Input Area */}
         <div className="p-4 border-t bg-white dark:bg-gray-800">
-          <form onSubmit={handleSubmit} className="flex gap-3">
+          {/* Upload area */}
+          {showUpload && (
+            <div className="mb-4 p-4 border-2 border-dashed border-violet-300 rounded-lg bg-violet-50 dark:bg-violet-900/10">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept=".txt,.md,.json,.csv,.pdf"
+                className="hidden"
+              />
+              <div className="text-center">
+                <FileText className="w-8 h-8 mx-auto mb-2 text-violet-500" />
+                <p className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                  Drop a file or click to upload
+                </p>
+                <p className="text-xs text-violet-500 mt-1">
+                  Supports: .txt, .md, .json, .csv
+                </p>
+                <div className="flex gap-2 justify-center mt-3">
+                  <Button
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadMutation.isPending}
+                  >
+                    {uploadMutation.isPending ? 'Uploading...' : 'Choose File'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowUpload(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            {/* Voice button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={toggleRecording}
+              className={`h-12 w-12 ${isRecording ? 'bg-red-100 border-red-300 text-red-500' : ''}`}
+              title={isRecording ? "Stop recording" : "Voice input"}
+            >
+              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </Button>
+            
+            {/* Upload button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowUpload(!showUpload)}
+              className="h-12 w-12"
+              title="Upload document"
+            >
+              <Upload className="w-5 h-5" />
+            </Button>
+            
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -605,9 +665,17 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
               <Send className="w-5 h-5" />
             </Button>
           </form>
-          <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-            <Sparkles className="w-3 h-3" />
-            <span>AI will create a plan and ask for your approval before executing</span>
+          <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3 h-3" />
+              <span>AI will create a plan and ask for your approval before executing</span>
+            </div>
+            {aiStats && (
+              <div className="flex items-center gap-3">
+                <span>{(aiStats as any).completedPlans || 0} plans completed</span>
+                <span>{(aiStats as any).knowledgeDocuments || 0} docs</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -617,16 +685,17 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
         <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-800 border-l shadow-xl z-50">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b">
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto">
               {[
                 { id: 'activity', label: 'Activity', icon: Zap },
+                { id: 'approvals', label: 'Approvals', icon: Bell, count: (unifiedApprovals as any[] || []).length },
                 { id: 'history', label: 'History', icon: History },
                 { id: 'settings', label: 'Settings', icon: Settings },
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSidebarTab(tab.id as any)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition ${
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm transition whitespace-nowrap ${
                     sidebarTab === tab.id
                       ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
                       : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -634,6 +703,11 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.label}
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white">
+                      {tab.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
