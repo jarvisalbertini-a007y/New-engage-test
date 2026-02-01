@@ -848,3 +848,294 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                     
     except WebSocketDisconnect:
         manager.disconnect(user_id)
+
+
+# ============== KNOWLEDGE BASE INTEGRATION ==============
+
+@router.post("/knowledge/auto-ingest")
+async def auto_ingest_to_knowledge(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Auto-ingest data into knowledge base from agent activities"""
+    db = get_db()
+    
+    content = request.get("content", "")
+    category = request.get("category", "auto_learnings")
+    source = request.get("source", "agent_activity")
+    name = request.get("name", f"Auto-ingested {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    
+    if not content:
+        raise HTTPException(status_code=400, detail="Content required")
+    
+    # Process content with AI to extract key information
+    extract_prompt = f"""Extract key information from this content for a sales knowledge base:
+
+CONTENT:
+{content[:3000]}
+
+Extract and structure:
+- Key facts and data points
+- Actionable insights
+- Patterns or trends
+- Relevant contacts or companies
+- Useful quotes or phrases
+
+Return JSON:
+{{
+    "summary": "Brief summary",
+    "keyFacts": ["fact1", "fact2"],
+    "insights": ["insight1"],
+    "entities": {{"companies": [], "people": [], "products": []}},
+    "tags": ["tag1", "tag2"]
+}}"""
+    
+    extracted_data = {}
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"extract-{str(uuid4())[:8]}",
+            system_message="You are a knowledge extraction AI."
+        )
+        
+        extraction = await llm.send_message(UserMessage(text=extract_prompt))
+        if extraction:
+            json_match = re.search(r'\{.*\}', extraction, re.DOTALL)
+            if json_match:
+                extracted_data = json.loads(json_match.group())
+    except Exception as e:
+        print(f"Extraction error: {e}")
+    
+    # Save to knowledge base
+    doc = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "name": name,
+        "category": category,
+        "content": content,
+        "extractedData": extracted_data,
+        "source": source,
+        "fileType": "text",
+        "fileSize": len(content),
+        "status": "processed",
+        "autoIngested": True,
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.knowledge_base.insert_one(doc)
+    
+    return {
+        "success": True,
+        "documentId": doc["id"],
+        "extractedData": extracted_data
+    }
+
+
+@router.get("/knowledge/search")
+async def search_knowledge(
+    query: str,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search knowledge base for relevant context"""
+    db = get_db()
+    
+    # Simple text search (in production, use vector search)
+    # For now, use regex matching
+    regex_pattern = {"$regex": query, "$options": "i"}
+    
+    results = await db.knowledge_base.find(
+        {
+            "userId": current_user["id"],
+            "$or": [
+                {"name": regex_pattern},
+                {"content": regex_pattern},
+                {"extractedData.summary": regex_pattern},
+                {"extractedData.keyFacts": regex_pattern}
+            ]
+        },
+        {"_id": 0}
+    ).limit(limit).to_list(limit)
+    
+    return results
+
+
+@router.post("/knowledge/query-rag")
+async def query_knowledge_rag(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """RAG query - find relevant knowledge and answer question"""
+    db = get_db()
+    
+    query = request.get("query", "")
+    categories = request.get("categories", [])
+    
+    if not query:
+        raise HTTPException(status_code=400, detail="Query required")
+    
+    # Get relevant documents
+    filter_query = {"userId": current_user["id"]}
+    if categories:
+        filter_query["category"] = {"$in": categories}
+    
+    docs = await db.knowledge_base.find(
+        filter_query,
+        {"_id": 0}
+    ).limit(10).to_list(10)
+    
+    if not docs:
+        return {
+            "answer": "I don't have any relevant information in the knowledge base yet. Upload some documents or let me learn from your activities.",
+            "sources": []
+        }
+    
+    # Build context from documents
+    context_parts = []
+    for doc in docs:
+        content = doc.get("content", "")
+        extracted = doc.get("extractedData", {})
+        
+        if extracted.get("summary"):
+            context_parts.append(f"Document '{doc['name']}': {extracted['summary']}")
+        elif content:
+            context_parts.append(f"Document '{doc['name']}': {content[:500]}")
+    
+    context_str = "\n\n".join(context_parts)
+    
+    # Query AI with context
+    rag_prompt = f"""Answer this question using the provided knowledge base context.
+If the answer isn't in the context, say so.
+
+KNOWLEDGE BASE CONTEXT:
+{context_str}
+
+USER QUESTION: {query}
+
+Provide a helpful, accurate answer based on the context. Cite which documents you used."""
+
+    answer = ""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        llm = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"rag-{str(uuid4())[:8]}",
+            system_message="You are a helpful sales knowledge assistant."
+        )
+        
+        answer = await llm.send_message(UserMessage(text=rag_prompt))
+    except Exception as e:
+        answer = f"Error querying knowledge base: {e}"
+    
+    return {
+        "answer": answer,
+        "sources": [{"id": d["id"], "name": d["name"], "category": d["category"]} for d in docs],
+        "documentsSearched": len(docs)
+    }
+
+
+# ============== CONVERSATION HISTORY ==============
+
+@router.get("/sessions/list")
+async def list_conversation_sessions(
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get list of conversation sessions with preview"""
+    db = get_db()
+    
+    sessions = await db.ai_sessions.find(
+        {"userId": current_user["id"]},
+        {"_id": 0}
+    ).sort("updatedAt", -1).limit(limit).to_list(limit)
+    
+    # Format for display
+    formatted = []
+    for session in sessions:
+        messages = session.get("messages", [])
+        
+        # Get first user message as title
+        first_user_msg = next(
+            (m for m in messages if m.get("role") == "user"),
+            {"content": "New conversation"}
+        )
+        
+        # Get last message for preview
+        last_msg = messages[-1] if messages else {"content": "", "role": "assistant"}
+        
+        formatted.append({
+            "id": session.get("id"),
+            "title": first_user_msg.get("content", "")[:50] + ("..." if len(first_user_msg.get("content", "")) > 50 else ""),
+            "preview": last_msg.get("content", "")[:100],
+            "messageCount": len(messages),
+            "createdAt": session.get("createdAt"),
+            "updatedAt": session.get("updatedAt")
+        })
+    
+    return formatted
+
+
+@router.get("/session/{session_id}/messages")
+async def get_session_messages(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all messages from a session"""
+    db = get_db()
+    
+    session = await db.ai_sessions.find_one(
+        {"id": session_id, "userId": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {
+        "sessionId": session_id,
+        "messages": session.get("messages", []),
+        "createdAt": session.get("createdAt"),
+        "updatedAt": session.get("updatedAt")
+    }
+
+
+@router.delete("/session/{session_id}")
+async def delete_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a conversation session"""
+    db = get_db()
+    
+    result = await db.ai_sessions.delete_one(
+        {"id": session_id, "userId": current_user["id"]}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {"success": True, "message": "Session deleted"}
+
+
+@router.post("/session/new")
+async def create_new_session(
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new conversation session"""
+    db = get_db()
+    
+    session_id = str(uuid4())
+    session = {
+        "id": session_id,
+        "userId": current_user["id"],
+        "messages": [],
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.ai_sessions.insert_one(session)
+    
+    return {"success": True, "sessionId": session_id}
