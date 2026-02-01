@@ -1467,26 +1467,88 @@ async def transcribe_voice_input(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Transcribe voice input to text.
-    Note: This is a placeholder for actual speech-to-text integration.
-    In production, integrate with OpenAI Whisper, Google Speech-to-Text, etc.
+    Transcribe voice input to text using OpenAI Whisper.
+    Accepts base64 encoded audio data.
     """
     db = get_db()
     
     audio_data = request.get("audio", "")  # Base64 encoded audio
+    audio_format = request.get("format", "webm")  # webm, wav, mp3, etc.
     
     if not audio_data:
         raise HTTPException(status_code=400, detail="Audio data required")
     
-    # For now, return a helpful message about integration
-    # In production, this would call a speech-to-text API
-    
-    return {
-        "success": True,
-        "transcription": "",
-        "message": "Voice transcription requires integration with a speech-to-text service (OpenAI Whisper, Google Speech-to-Text, etc.)",
-        "placeholder": True
-    }
+    try:
+        import base64
+        import tempfile
+        from emergentintegrations.llm.openai import OpenAISpeechToText
+        
+        # Decode base64 audio
+        if "base64," in audio_data:
+            audio_data = audio_data.split("base64,")[1]
+        
+        audio_bytes = base64.b64decode(audio_data)
+        
+        # Check file size (25MB limit)
+        if len(audio_bytes) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Audio file too large (max 25MB)")
+        
+        # Create temporary file for the audio
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as temp_file:
+            temp_file.write(audio_bytes)
+            temp_path = temp_file.name
+        
+        try:
+            # Initialize Whisper STT
+            stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+            
+            # Transcribe
+            with open(temp_path, "rb") as audio_file:
+                response = await stt.transcribe(
+                    file=audio_file,
+                    model="whisper-1",
+                    response_format="json",
+                    language="en"
+                )
+            
+            transcription = response.text if hasattr(response, 'text') else str(response)
+            
+            # Log transcription
+            await db.voice_transcriptions.insert_one({
+                "id": str(uuid4()),
+                "userId": current_user["id"],
+                "transcription": transcription,
+                "audioFormat": audio_format,
+                "audioSize": len(audio_bytes),
+                "createdAt": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return {
+                "success": True,
+                "transcription": transcription,
+                "format": audio_format
+            }
+            
+        finally:
+            # Clean up temp file
+            import os as os_module
+            if os_module.path.exists(temp_path):
+                os_module.unlink(temp_path)
+                
+    except ImportError:
+        return {
+            "success": False,
+            "transcription": "",
+            "message": "Speech-to-text integration not available. Install emergentintegrations.",
+            "placeholder": True
+        }
+    except Exception as e:
+        print(f"Transcription error: {e}")
+        return {
+            "success": False,
+            "transcription": "",
+            "error": str(e)
+        }
 
 
 @router.get("/stats")
