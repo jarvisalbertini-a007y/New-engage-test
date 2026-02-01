@@ -31,7 +31,13 @@ import {
   Menu,
   Plus,
   Trash2,
-  MessageSquare
+  MessageSquare,
+  Mic,
+  MicOff,
+  Upload,
+  FileText,
+  Bell,
+  BarChart3
 } from 'lucide-react';
 
 interface Message {
