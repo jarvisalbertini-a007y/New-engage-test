@@ -329,15 +329,33 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 
 ## Backlog
 
-### P0 - Immediate
+### P0 - Immediate (Autonomous Agent System)
+- [ ] **Background Agent Job Queue**: Implement job queue and status tracking for autonomous agent work
+- [ ] **Split-View Agent Console**: Add Replit-style agent console panel to AI Command Center
+- [ ] **Autonomy Level Configuration**: Agent asks and stores user's preferred autonomy level per task type
 - [ ] SendGrid API integration for actual email sending
-- [ ] Real data source integrations (Apollo.io, Clearbit, Crunchbase)
 
-### P1 - Upcoming
+### P1 - Upcoming (Enhanced Autonomy)
+- [ ] **Real-time Agent Status Updates**: WebSocket notifications for background agent activity
+- [ ] **Agent Learning Visibility**: Show users what agents have learned and how they've improved
+- [ ] **NLP Agent Customization**: Allow users to modify agent behavior via natural language
+- [ ] Real data source integrations (Apollo.io, Clearbit, Crunchbase)
 - [ ] Campaign-level A/B testing across multiple prospects
 - [ ] Time-based send optimization (best time to send)
 
-### P2 - Enhancements (COMPLETED)
+### P2 - Future Enhancements
+- [ ] **Email Notifications**: Configurable email alerts for agent completions
+- [ ] **Agent Teams Management**: Custom team creation and workflow execution
+- [ ] Predictive lead scoring with ML
+- [ ] Campaign ROI tracking
+- [ ] Deprecate old standalone pages (/multi-agent, /self-improvement)
+
+### Completed
+- [x] ~~Advanced Self-Improvement Loop~~ ✅
+- [x] ~~Multi-Agent Architecture~~ ✅
+- [x] ~~Voice Input with Whisper~~ ✅
+- [x] ~~PDF Document Parsing~~ ✅
+- [x] ~~Visual Workflow Builder~~ ✅
 - [x] ~~Advanced Self-Improvement Loop~~ ✅
 - [x] ~~Multi-Agent Architecture~~ ✅
 
