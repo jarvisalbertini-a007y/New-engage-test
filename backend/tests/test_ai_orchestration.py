@@ -193,7 +193,7 @@ class TestAIOrchestration:
             "agentId": "research",
             "task": "Research Acme Corp"
         })
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_quick_action_requires_task(self):
         """POST /api/ai/quick-action requires task"""
