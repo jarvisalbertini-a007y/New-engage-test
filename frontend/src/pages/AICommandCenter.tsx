@@ -46,7 +46,7 @@ interface Message {
   content: string;
   parsed?: {
     type: 'plan' | 'clarification' | 'execution' | 'suggestion' | 'response';
-    message: string;
+    message: string | { text?: string };
     plan?: {
       summary: string;
       steps: Array<{
@@ -59,8 +59,8 @@ interface Message {
       requiresApproval: boolean;
     };
     planId?: string;
-    clarifyingQuestions?: string[];
-    suggestedActions?: string[];
+    clarifyingQuestions?: Array<string | { text?: string }>;
+    suggestedActions?: Array<string | { label?: string; text?: string }>;
     agentActivity?: any[];
   };
   timestamp: string;
