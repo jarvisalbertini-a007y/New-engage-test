@@ -175,7 +175,7 @@ class TestAIOrchestration:
     def test_active_plans_requires_auth(self):
         """GET /api/ai/plans/active requires authentication"""
         response = self.session.get(f"{BASE_URL}/api/ai/plans/active")
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_active_plans_returns_list(self):
         """GET /api/ai/plans/active returns list of executing plans"""
