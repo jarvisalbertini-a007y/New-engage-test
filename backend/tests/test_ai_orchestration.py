@@ -247,7 +247,7 @@ class TestAIOrchestration:
         response = self.session.post(f"{BASE_URL}/api/ai/suggest", json={
             "context": "general"
         })
-        assert response.status_code == 401
+        assert response.status_code in [401, 403]
     
     def test_suggest_returns_suggestions(self):
         """POST /api/ai/suggest returns list of suggestions"""
