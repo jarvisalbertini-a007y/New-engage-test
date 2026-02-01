@@ -183,6 +183,24 @@ export default function AICommandCenter() {
     queryFn: () => api.getJobAnalytics?.() || Promise.resolve({})
   });
 
+  // Fetch learning summary
+  const { data: learningSummary } = useQuery({
+    queryKey: ['learning-summary'],
+    queryFn: () => api.getLearningSummary?.() || Promise.resolve({})
+  });
+
+  // Fetch learning history
+  const { data: learningHistory } = useQuery({
+    queryKey: ['learning-history'],
+    queryFn: () => api.getLearningHistory?.() || Promise.resolve([])
+  });
+
+  // Fetch agent customization
+  const { data: agentCustomization, refetch: refetchCustomization } = useQuery({
+    queryKey: ['agent-customization'],
+    queryFn: () => api.getAgentCustomization?.() || Promise.resolve({})
+  });
+
   // Job mutations
   const startJobMutation = useMutation({
     mutationFn: (jobId: string) => api.startJob?.(jobId) || Promise.resolve({}),
@@ -212,6 +230,16 @@ export default function AICommandCenter() {
     mutationFn: (data: any) => api.updateAutonomyPreferences?.(data) || Promise.resolve({}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['autonomy-preferences'] });
+    }
+  });
+
+  // NLP Customization mutation
+  const nlpCustomizeMutation = useMutation({
+    mutationFn: (data: { instruction: string; agentType?: string }) => 
+      api.customizeAgentNLP?.(data) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-customization'] });
+      setNlpCustomizeInput('');
     }
   });
 
