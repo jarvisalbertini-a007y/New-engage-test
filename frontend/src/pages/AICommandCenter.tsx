@@ -252,6 +252,20 @@ export default function AICommandCenter() {
               queryClient.invalidateQueries({ queryKey: ['pending-plans'] });
             }
           }
+          
+          // Handle job updates
+          if (data.type === 'job_update') {
+            queryClient.invalidateQueries({ queryKey: ['active-jobs'] });
+            queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+            
+            // Add to activity feed
+            setActivities(prev => [{
+              type: data.data?.type || 'job_update',
+              message: data.data?.message || 'Job updated',
+              timestamp: data.timestamp || new Date().toISOString(),
+              ...data.data
+            }, ...prev].slice(0, 50));
+          }
         } catch (e) {
           console.error('WS message parse error:', e);
         }
