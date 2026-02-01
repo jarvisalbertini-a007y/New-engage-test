@@ -215,6 +215,59 @@ export default function AICommandCenter() {
     queryFn: () => api.getAgentCustomization?.() || Promise.resolve({})
   });
 
+  // ============== TEAMS QUERIES ==============
+  const { data: teamTemplates } = useQuery({
+    queryKey: ['team-templates'],
+    queryFn: () => api.getTeamTemplates?.() || Promise.resolve([])
+  });
+
+  const { data: userTeams, refetch: refetchTeams } = useQuery({
+    queryKey: ['user-teams'],
+    queryFn: () => api.getTeams?.() || Promise.resolve([])
+  });
+
+  const { data: teamsAnalytics } = useQuery({
+    queryKey: ['teams-analytics'],
+    queryFn: () => api.getTeamsAnalytics?.() || Promise.resolve({})
+  });
+
+  // ============== LEAD SCORING QUERIES ==============
+  const { data: scoreDistribution, refetch: refetchScoreDistribution } = useQuery({
+    queryKey: ['score-distribution'],
+    queryFn: () => api.getScoreDistribution?.() || Promise.resolve({})
+  });
+
+  const { data: topLeads } = useQuery({
+    queryKey: ['top-leads'],
+    queryFn: () => api.getTopLeads?.(5, 60) || Promise.resolve({})
+  });
+
+  const { data: scoringConfig, refetch: refetchScoringConfig } = useQuery({
+    queryKey: ['scoring-config'],
+    queryFn: () => api.getScoringConfig?.() || Promise.resolve({})
+  });
+
+  const { data: scoringRecommendations } = useQuery({
+    queryKey: ['scoring-recommendations'],
+    queryFn: () => api.getScoringRecommendations?.() || Promise.resolve({})
+  });
+
+  // ============== A/B TESTING QUERIES ==============
+  const { data: abTests, refetch: refetchABTests } = useQuery({
+    queryKey: ['ab-tests'],
+    queryFn: () => api.getABTests?.(undefined, undefined, 10) || Promise.resolve([])
+  });
+
+  const { data: abTestAnalytics } = useQuery({
+    queryKey: ['ab-test-analytics'],
+    queryFn: () => api.getABTestingAnalytics?.() || Promise.resolve({})
+  });
+
+  const { data: abTestSuggestions } = useQuery({
+    queryKey: ['ab-test-suggestions'],
+    queryFn: () => api.suggestABTest?.({ goal: 'all' }) || Promise.resolve({})
+  });
+
   // Job mutations
   const startJobMutation = useMutation({
     mutationFn: (jobId: string) => api.startJob?.(jobId) || Promise.resolve({}),
@@ -244,6 +297,64 @@ export default function AICommandCenter() {
     mutationFn: (data: any) => api.updateAutonomyPreferences?.(data) || Promise.resolve({}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['autonomy-preferences'] });
+    }
+  });
+
+  // Team mutations
+  const createTeamMutation = useMutation({
+    mutationFn: (data: any) => api.createTeam?.(data) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-teams'] });
+      queryClient.invalidateQueries({ queryKey: ['teams-analytics'] });
+    }
+  });
+
+  const executeTeamMutation = useMutation({
+    mutationFn: ({ teamId, task }: { teamId: string; task: string }) => 
+      api.executeTeamParallel?.(teamId, { task }) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-teams'] });
+    }
+  });
+
+  // Scoring mutations
+  const updateFactorWeightMutation = useMutation({
+    mutationFn: ({ factor, weight }: { factor: string; weight: number }) => 
+      api.updateFactorWeight?.(factor, weight) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scoring-config'] });
+    }
+  });
+
+  const scoreProspectsMutation = useMutation({
+    mutationFn: () => api.scoreProspectsBatch?.({}) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-distribution'] });
+      queryClient.invalidateQueries({ queryKey: ['top-leads'] });
+    }
+  });
+
+  // A/B Test mutations
+  const createABTestMutation = useMutation({
+    mutationFn: (data: any) => api.quickCreateABTest?.(data) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
+      queryClient.invalidateQueries({ queryKey: ['ab-test-analytics'] });
+    }
+  });
+
+  const startABTestMutation = useMutation({
+    mutationFn: (testId: string) => api.startABTest?.(testId) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
+    }
+  });
+
+  const completeABTestMutation = useMutation({
+    mutationFn: (testId: string) => api.completeABTest?.(testId) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
+      queryClient.invalidateQueries({ queryKey: ['ab-test-analytics'] });
     }
   });
 
