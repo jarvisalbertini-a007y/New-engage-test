@@ -157,6 +157,63 @@ export default function AICommandCenter() {
     queryFn: () => api.getAIStats?.() || Promise.resolve({})
   });
 
+  // Fetch autonomous jobs
+  const { data: activeJobs, refetch: refetchJobs } = useQuery({
+    queryKey: ['active-jobs'],
+    queryFn: () => api.getJobs?.('running', undefined, 10) || Promise.resolve([]),
+    refetchInterval: 3000 // Poll every 3 seconds for running jobs
+  });
+
+  // Fetch all recent jobs
+  const { data: recentJobs } = useQuery({
+    queryKey: ['recent-jobs'],
+    queryFn: () => api.getJobs?.(undefined, undefined, 20) || Promise.resolve([])
+  });
+
+  // Fetch autonomy preferences
+  const { data: autonomyPrefs, refetch: refetchAutonomy } = useQuery({
+    queryKey: ['autonomy-preferences'],
+    queryFn: () => api.getAutonomyPreferences?.() || Promise.resolve({})
+  });
+
+  // Fetch job analytics
+  const { data: jobAnalytics } = useQuery({
+    queryKey: ['job-analytics'],
+    queryFn: () => api.getJobAnalytics?.() || Promise.resolve({})
+  });
+
+  // Job mutations
+  const startJobMutation = useMutation({
+    mutationFn: (jobId: string) => api.startJob?.(jobId) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+    }
+  });
+
+  const pauseJobMutation = useMutation({
+    mutationFn: (jobId: string) => api.pauseJob?.(jobId) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+    }
+  });
+
+  const cancelJobMutation = useMutation({
+    mutationFn: (jobId: string) => api.cancelJob?.(jobId) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+    }
+  });
+
+  const updateAutonomyMutation = useMutation({
+    mutationFn: (data: any) => api.updateAutonomyPreferences?.(data) || Promise.resolve({}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['autonomy-preferences'] });
+    }
+  });
+
   // Scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
