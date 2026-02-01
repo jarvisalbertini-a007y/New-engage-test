@@ -536,4 +536,104 @@ export const api = {
     apiRequest('POST', '/api/jobs/agents/customize-nlp', data),
   getCustomizationHistory: () =>
     apiRequest('GET', '/api/jobs/agents/customization-history'),
+
+  // ============== AGENT TEAMS ==============
+  
+  getTeamTemplates: () =>
+    apiRequest('GET', '/api/agent-teams/templates'),
+  getTeams: (status?: string) => {
+    const params = status ? `?status=${status}` : '';
+    return apiRequest('GET', `/api/agent-teams${params}`);
+  },
+  getTeam: (teamId: string) =>
+    apiRequest('GET', `/api/agent-teams/${teamId}`),
+  createTeam: (data: { name: string; description?: string; agents?: any[]; templateId?: string }) =>
+    apiRequest('POST', '/api/agent-teams', data),
+  updateTeam: (teamId: string, data: any) =>
+    apiRequest('PUT', `/api/agent-teams/${teamId}`, data),
+  deleteTeam: (teamId: string) =>
+    apiRequest('DELETE', `/api/agent-teams/${teamId}`),
+  activateTeam: (teamId: string) =>
+    apiRequest('POST', `/api/agent-teams/${teamId}/activate`, {}),
+  pauseTeam: (teamId: string) =>
+    apiRequest('POST', `/api/agent-teams/${teamId}/pause`, {}),
+  executeTeam: (teamId: string, data: { task: string; prospectIds?: string[]; context?: any }) =>
+    apiRequest('POST', `/api/agent-teams/${teamId}/execute`, data),
+  executeTeamParallel: (teamId: string, data: { task: string; prospectIds?: string[]; context?: any }) =>
+    apiRequest('POST', `/api/agent-teams/${teamId}/execute-parallel`, data),
+  getTeamExecutions: (teamId: string) =>
+    apiRequest('GET', `/api/agent-teams/${teamId}/executions`),
+  getAllExecutions: (status?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (limit) params.append('limit', limit.toString());
+    return apiRequest('GET', `/api/agent-teams/executions/all?${params}`);
+  },
+  getTeamsAnalytics: () =>
+    apiRequest('GET', '/api/agent-teams/analytics/summary'),
+
+  // ============== LEAD SCORING ==============
+  
+  scoreProspect: (data: { prospectId?: string; prospect?: any }) =>
+    apiRequest('POST', '/api/lead-scoring/score', data),
+  scoreProspectsBatch: (data: { prospectIds?: string[] }) =>
+    apiRequest('POST', '/api/lead-scoring/score-batch', data),
+  getScoringConfig: () =>
+    apiRequest('GET', '/api/lead-scoring/config'),
+  updateScoringConfig: (data: any) =>
+    apiRequest('PUT', '/api/lead-scoring/config', data),
+  updateFactorWeight: (factor: string, weight: number) =>
+    apiRequest('PUT', `/api/lead-scoring/config/factor/${factor}`, { weight }),
+  getTopLeads: (limit?: number, minScore?: number) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (minScore) params.append('min_score', minScore.toString());
+    return apiRequest('GET', `/api/lead-scoring/top-leads?${params}`);
+  },
+  getScoreDistribution: () =>
+    apiRequest('GET', '/api/lead-scoring/distribution'),
+  recordOutcome: (data: { prospectId: string; outcome: string; dealValue?: number; notes?: string }) =>
+    apiRequest('POST', '/api/lead-scoring/learn', data),
+  getModelAccuracy: () =>
+    apiRequest('GET', '/api/lead-scoring/model-accuracy'),
+  getScoringRecommendations: () =>
+    apiRequest('GET', '/api/lead-scoring/recommendations'),
+
+  // ============== A/B TESTING ==============
+  
+  createABTest: (data: any) =>
+    apiRequest('POST', '/api/ab-testing/tests', data),
+  getABTests: (status?: string, testType?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (testType) params.append('test_type', testType);
+    if (limit) params.append('limit', limit.toString());
+    return apiRequest('GET', `/api/ab-testing/tests?${params}`);
+  },
+  getABTest: (testId: string) =>
+    apiRequest('GET', `/api/ab-testing/tests/${testId}`),
+  startABTest: (testId: string) =>
+    apiRequest('POST', `/api/ab-testing/tests/${testId}/start`, {}),
+  pauseABTest: (testId: string) =>
+    apiRequest('POST', `/api/ab-testing/tests/${testId}/pause`, {}),
+  resumeABTest: (testId: string) =>
+    apiRequest('POST', `/api/ab-testing/tests/${testId}/resume`, {}),
+  completeABTest: (testId: string) =>
+    apiRequest('POST', `/api/ab-testing/tests/${testId}/complete`, {}),
+  recordABTestEvent: (testId: string, data: { variant: string; eventType: string; prospectId?: string }) =>
+    apiRequest('POST', `/api/ab-testing/tests/${testId}/record-event`, data),
+  deleteABTest: (testId: string) =>
+    apiRequest('DELETE', `/api/ab-testing/tests/${testId}`),
+  getABTestingAnalytics: () =>
+    apiRequest('GET', '/api/ab-testing/analytics/summary'),
+  getABLearnings: (testType?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (testType) params.append('test_type', testType);
+    if (limit) params.append('limit', limit.toString());
+    return apiRequest('GET', `/api/ab-testing/learnings?${params}`);
+  },
+  suggestABTest: (data: { goal?: string }) =>
+    apiRequest('POST', '/api/ab-testing/suggest-test', data),
+  quickCreateABTest: (data: { suggestionType: string; prospectIds?: string[]; autoApplyWinner?: boolean }) =>
+    apiRequest('POST', '/api/ab-testing/quick-create', data),
 };
