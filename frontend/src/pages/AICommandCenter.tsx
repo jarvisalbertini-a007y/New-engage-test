@@ -338,13 +338,54 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
       setIsRecording(false);
       // In production, stop recording and transcribe
     } else {
-      setIsRecording(true);
-      // In production, start recording
-      // For now, show a message
-      setTimeout(() => {
-        setIsRecording(false);
-        setInput(input + " [Voice input requires speech-to-text integration]");
-      }, 2000);
+      // Start real audio recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        
+        mediaRecorder.onstop = async () => {
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Create audio blob
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          
+          // Convert to base64
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64Audio = reader.result as string;
+            
+            setIsTranscribing(true);
+            try {
+              const result = await api.transcribeVoice?.({ audio: base64Audio });
+              if (result?.success && result.transcription) {
+                setInput(prev => (prev + ' ' + result.transcription).trim());
+              } else if (result?.error) {
+                console.error('Transcription error:', result.error);
+              }
+            } catch (err) {
+              console.error('Voice transcription failed:', err);
+            } finally {
+              setIsTranscribing(false);
+            }
+          };
+          reader.readAsDataURL(audioBlob);
+        };
+        
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error('Microphone access denied:', err);
+        alert('Please allow microphone access to use voice input');
+      }
     }
   };
 
