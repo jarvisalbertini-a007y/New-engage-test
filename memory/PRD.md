@@ -26,6 +26,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 │   │   └── agent_framework.py       # Unified Agent Framework (8 agents)
 │   ├── routes/
 │   │   ├── ai_orchestration.py      # Primary AI + Knowledge + History
+│   │   ├── autonomous_jobs.py       # NEW: Background Job Queue System
 │   │   ├── autonomous_prospecting.py
 │   │   ├── email_optimization.py
 │   │   ├── email_webhooks_templates.py
@@ -34,7 +35,7 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 │   │   └── ...
 │   └── server.py
 └── frontend/src/pages/
-    ├── AICommandCenter.tsx          # Primary full-screen chat + History
+    ├── AICommandCenter.tsx          # Primary full-screen chat + Agent Console
     └── ...
 ```
 
@@ -43,6 +44,39 @@ Build a **fully autonomous sales engine** with an AI-first, NLP-driven platform 
 ## What's Been Implemented
 
 ### Session: February 1, 2026 (Current)
+
+#### P0: Background Agent Job Queue System (COMPLETE - Iteration 12)
+
+**Backend: /app/backend/routes/autonomous_jobs.py**
+- ✅ `POST /api/jobs/jobs/create` - Create and auto-start background jobs
+- ✅ `GET /api/jobs/jobs` - List user's jobs with status/type filters
+- ✅ `GET /api/jobs/jobs/{id}` - Get job details with real-time progress
+- ✅ `POST /api/jobs/jobs/{id}/start|pause|cancel` - Job control
+- ✅ `GET /api/jobs/autonomy/preferences` - Get user autonomy settings
+- ✅ `PUT /api/jobs/autonomy/preferences` - Update autonomy per task type
+- ✅ `GET /api/jobs/analytics/summary` - Job statistics
+- ✅ Quick-start endpoints: `/quick-start/research|outreach|follow-up`
+
+**Job Types Supported:**
+- Research (prospect/company research)
+- Outreach (email generation)
+- Follow Up (automated follow-ups)
+- Lead Monitor (hot lead detection)
+- Data Enrich (prospect enrichment)
+- Workflow (execute saved workflows)
+- Custom (any user goal)
+
+**Frontend: Agent Console Panel**
+- ✅ Split-view UI with collapsible Agent Console (Replit-style)
+- ✅ **Jobs Tab**: Running jobs with progress, Recent jobs with status indicators
+- ✅ **Autonomy Tab**: Default level dropdown, Per task type settings
+- ✅ **Analytics Tab**: Total jobs, Running, Completed, Success Rate, By Type
+- ✅ Quick Start buttons (Research, Follow Up)
+
+**Testing Results (Iteration 12):**
+- Backend: 100% (22/22 tests passed)
+- Frontend: 100% (all UI features working)
+- Test report: `/app/test_reports/iteration_12.json`
 
 #### Voice Input & PDF Upload (COMPLETE - Iteration 11)
 
