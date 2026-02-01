@@ -332,11 +332,14 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
     reader.readAsText(file);
   };
 
-  // Voice recording toggle (placeholder)
-  const toggleRecording = () => {
+  // Voice recording toggle
+  const toggleRecording = async () => {
     if (isRecording) {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
-      // In production, stop recording and transcribe
     } else {
       // Start real audio recording
       try {
