@@ -504,7 +504,9 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                     <p className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">
                       {typeof message.parsed.message === 'string' 
                         ? message.parsed.message 
-                        : (message.parsed.message?.text || message.content || JSON.stringify(message.parsed.message))}
+                        : (typeof message.parsed.message === 'object' 
+                            ? ((message.parsed.message as any)?.text || JSON.stringify(message.parsed.message))
+                            : message.content)}
                     </p>
 
                     {/* Plan Display */}
