@@ -308,23 +308,22 @@ class TestVoiceTranscribe(TestAuthentication):
         data = response.json()
         assert "audio" in data.get("detail", "").lower() or "required" in data.get("detail", "").lower()
     
-    def test_transcribe_placeholder_response(self, auth_headers):
-        """Should return placeholder response indicating integration needed"""
+    def test_transcribe_invalid_audio_returns_error(self, auth_headers):
+        """Should return error for invalid base64 audio data"""
         response = requests.post(
             f"{BASE_URL}/api/ai/voice/transcribe",
             headers=auth_headers,
-            json={"audio": "base64encodedaudiodata"}
+            json={"audio": "base64encodedaudiodata"}  # Invalid base64
         )
         assert response.status_code == 200
         data = response.json()
         
-        # Verify placeholder response
-        assert data.get("success") == True
-        assert data.get("placeholder") == True
-        assert "message" in data
-        assert "speech-to-text" in data.get("message", "").lower() or "transcription" in data.get("message", "").lower()
+        # Verify error response for invalid audio
+        assert data.get("success") == False
+        # Should have error message about decoding or invalid data
+        assert "error" in data or "message" in data
         
-        print(f"Voice transcribe placeholder message: {data.get('message')}")
+        print(f"Voice transcribe error response: {data}")
 
 
 class TestAIStats(TestAuthentication):
