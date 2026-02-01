@@ -37,7 +37,15 @@ import {
   Upload,
   FileText,
   Bell,
-  BarChart3
+  BarChart3,
+  Terminal,
+  Activity,
+  StopCircle,
+  RotateCcw,
+  Loader2,
+  CircleDot,
+  PanelRightOpen,
+  PanelRightClose
 } from 'lucide-react';
 
 interface Message {
