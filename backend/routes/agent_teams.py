@@ -268,3 +268,226 @@ async def execute_agent_team(
         "message": "Team execution started",
         "team": team["name"]
     }
+
+
+@router.get("/{team_id}/executions")
+async def get_team_executions(
+    team_id: str,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get executions for a specific team"""
+    db = get_db()
+    
+    executions = await db.team_executions.find(
+        {"teamId": team_id, "userId": current_user["id"]},
+        {"_id": 0}
+    ).sort("startedAt", -1).limit(limit).to_list(limit)
+    
+    return executions
+
+
+@router.get("/executions/all")
+async def get_all_executions(
+    status: Optional[str] = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all team executions"""
+    db = get_db()
+    
+    query = {"userId": current_user["id"]}
+    if status:
+        query["status"] = status
+    
+    executions = await db.team_executions.find(
+        query,
+        {"_id": 0}
+    ).sort("startedAt", -1).limit(limit).to_list(limit)
+    
+    return executions
+
+
+@router.post("/{team_id}/execute-parallel")
+async def execute_team_parallel(
+    team_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Execute all team agents in parallel"""
+    db = get_db()
+    import asyncio
+    from core.agent_framework import AgentRegistry, AgentContext
+    
+    team = await db.agent_teams.find_one(
+        {"id": team_id, "userId": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    task = request.get("task", "")
+    prospect_ids = request.get("prospectIds", [])
+    context = request.get("context", {})
+    
+    if not task:
+        raise HTTPException(status_code=400, detail="Task is required")
+    
+    execution_id = str(uuid4())
+    
+    # Create execution record
+    execution = {
+        "id": execution_id,
+        "teamId": team_id,
+        "teamName": team["name"],
+        "userId": current_user["id"],
+        "task": task,
+        "prospectIds": prospect_ids,
+        "context": context,
+        "executionMode": "parallel",
+        "status": "running",
+        "agentStatuses": {},
+        "results": {},
+        "startedAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Get agent types from team
+    agent_types = []
+    for agent in team.get("agents", []):
+        agent_type = agent.get("agentType", agent.get("type"))
+        if agent_type:
+            agent_types.append(agent_type)
+            execution["agentStatuses"][agent_type] = "pending"
+    
+    await db.team_executions.insert_one(execution)
+    
+    # Execute agents in parallel
+    registry = AgentRegistry()
+    registry.set_db_for_all(db)
+    
+    agent_context = AgentContext(
+        user_id=current_user["id"],
+        session_id=f"team-{execution_id}",
+        original_goal=task
+    )
+    
+    async def run_agent(agent_type: str):
+        try:
+            await db.team_executions.update_one(
+                {"id": execution_id},
+                {"$set": {f"agentStatuses.{agent_type}": "running"}}
+            )
+            
+            agent = registry.get_agent(agent_type)
+            result = await agent.execute(task, agent_context)
+            
+            await db.team_executions.update_one(
+                {"id": execution_id},
+                {
+                    "$set": {
+                        f"agentStatuses.{agent_type}": "completed",
+                        f"results.{agent_type}": result.get("result", {})
+                    }
+                }
+            )
+            
+            return {"agent": agent_type, "result": result.get("result", {})}
+        except Exception as e:
+            await db.team_executions.update_one(
+                {"id": execution_id},
+                {
+                    "$set": {
+                        f"agentStatuses.{agent_type}": "failed",
+                        f"results.{agent_type}": {"error": str(e)}
+                    }
+                }
+            )
+            return {"agent": agent_type, "error": str(e)}
+    
+    # Run all agents in parallel
+    tasks = [run_agent(agent_type) for agent_type in agent_types]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Compile results
+    final_results = {}
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        if isinstance(result, dict):
+            agent = result.get("agent")
+            if agent:
+                final_results[agent] = result.get("result") or result.get("error")
+    
+    # Update execution as completed
+    await db.team_executions.update_one(
+        {"id": execution_id},
+        {
+            "$set": {
+                "status": "completed",
+                "results": final_results,
+                "completedAt": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Update team metrics
+    await db.agent_teams.update_one(
+        {"id": team_id},
+        {"$inc": {"metrics.totalExecutions": 1}}
+    )
+    
+    return {
+        "success": True,
+        "executionId": execution_id,
+        "teamId": team_id,
+        "executionMode": "parallel",
+        "agentsExecuted": agent_types,
+        "results": final_results
+    }
+
+
+@router.get("/analytics/summary")
+async def get_teams_analytics(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get team analytics summary"""
+    db = get_db()
+    
+    total_teams = await db.agent_teams.count_documents({"userId": current_user["id"]})
+    active_teams = await db.agent_teams.count_documents({
+        "userId": current_user["id"],
+        "status": "active"
+    })
+    total_executions = await db.team_executions.count_documents({"userId": current_user["id"]})
+    completed_executions = await db.team_executions.count_documents({
+        "userId": current_user["id"],
+        "status": "completed"
+    })
+    
+    # Top performing teams
+    pipeline = [
+        {"$match": {"userId": current_user["id"], "status": "completed"}},
+        {"$group": {
+            "_id": "$teamId",
+            "teamName": {"$first": "$teamName"},
+            "executions": {"$sum": 1}
+        }},
+        {"$sort": {"executions": -1}},
+        {"$limit": 5}
+    ]
+    
+    top_teams = await db.team_executions.aggregate(pipeline).to_list(5)
+    
+    return {
+        "totalTeams": total_teams,
+        "activeTeams": active_teams,
+        "totalExecutions": total_executions,
+        "completedExecutions": completed_executions,
+        "successRate": round((completed_executions / max(total_executions, 1)) * 100, 1),
+        "topTeams": [
+            {"teamId": t["_id"], "teamName": t.get("teamName", "Unknown"), "executions": t["executions"]}
+            for t in top_teams
+        ]
+    }
+
