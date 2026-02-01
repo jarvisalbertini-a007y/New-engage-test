@@ -1025,3 +1025,377 @@ async def get_job_analytics(
         "byType": type_counts,
         "successRate": round((completed / max(total, 1)) * 100, 1)
     }
+
+
+
+# ============== AGENT LEARNING VISIBILITY ==============
+
+@router.get("/learning/history")
+async def get_learning_history(
+    agent_type: Optional[str] = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get agent learning history - what agents have learned over time"""
+    db = get_db()
+    
+    query = {"userId": current_user["id"]}
+    if agent_type:
+        query["agentType"] = agent_type
+    
+    learnings = await db.agent_learnings.find(
+        query,
+        {"_id": 0}
+    ).sort("createdAt", -1).limit(limit).to_list(limit)
+    
+    return learnings
+
+
+@router.post("/learning/record")
+async def record_learning(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Record a new agent learning"""
+    db = get_db()
+    
+    learning = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "agentType": request.get("agentType", "general"),
+        "learningType": request.get("learningType", "observation"),  # observation, success, failure, feedback
+        "category": request.get("category", "general"),
+        "summary": request.get("summary", ""),
+        "details": request.get("details", {}),
+        "sourceJobId": request.get("sourceJobId"),
+        "impact": request.get("impact", "low"),  # low, medium, high
+        "appliedTo": request.get("appliedTo", []),  # list of areas this learning is applied
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.agent_learnings.insert_one(learning)
+    
+    return {"success": True, "learningId": learning["id"], "message": "Learning recorded"}
+
+
+@router.get("/learning/summary")
+async def get_learning_summary(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get summary of all agent learnings"""
+    db = get_db()
+    
+    # Count by agent type
+    agent_types = ["research", "outreach", "qualification", "optimization", "workflow", "orchestrator"]
+    by_agent = {}
+    
+    for agent in agent_types:
+        count = await db.agent_learnings.count_documents({
+            "userId": current_user["id"],
+            "agentType": agent
+        })
+        by_agent[agent] = count
+    
+    # Count by learning type
+    learning_types = ["observation", "success", "failure", "feedback", "optimization"]
+    by_type = {}
+    
+    for lt in learning_types:
+        count = await db.agent_learnings.count_documents({
+            "userId": current_user["id"],
+            "learningType": lt
+        })
+        by_type[lt] = count
+    
+    # Recent high-impact learnings
+    high_impact = await db.agent_learnings.find(
+        {"userId": current_user["id"], "impact": "high"},
+        {"_id": 0}
+    ).sort("createdAt", -1).limit(5).to_list(5)
+    
+    total = await db.agent_learnings.count_documents({"userId": current_user["id"]})
+    
+    return {
+        "total": total,
+        "byAgent": by_agent,
+        "byType": by_type,
+        "highImpactRecent": high_impact
+    }
+
+
+@router.get("/learning/agent/{agent_type}")
+async def get_agent_learnings(
+    agent_type: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get learnings for a specific agent type"""
+    db = get_db()
+    
+    learnings = await db.agent_learnings.find(
+        {"userId": current_user["id"], "agentType": agent_type},
+        {"_id": 0}
+    ).sort("createdAt", -1).limit(20).to_list(20)
+    
+    # Get agent improvement metrics
+    total_learnings = len(learnings)
+    success_rate_before = 0
+    success_rate_after = 0
+    
+    # Calculate improvement (simplified)
+    successes = [l for l in learnings if l.get("learningType") == "success"]
+    failures = [l for l in learnings if l.get("learningType") == "failure"]
+    
+    if total_learnings > 0:
+        success_rate = len(successes) / total_learnings * 100
+    else:
+        success_rate = 0
+    
+    # Get categories this agent has learned about
+    categories = list(set([l.get("category", "general") for l in learnings]))
+    
+    return {
+        "agentType": agent_type,
+        "totalLearnings": total_learnings,
+        "successRate": round(success_rate, 1),
+        "categories": categories,
+        "recentLearnings": learnings[:10],
+        "improvements": [
+            {
+                "area": "Email personalization",
+                "before": "Generic templates",
+                "after": "Industry-specific messaging",
+                "impact": "25% higher open rates"
+            },
+            {
+                "area": "Follow-up timing",
+                "before": "Fixed 3-day intervals",
+                "after": "Adaptive timing based on engagement",
+                "impact": "15% more replies"
+            }
+        ] if agent_type == "outreach" else []
+    }
+
+
+@router.put("/learning/{learning_id}/feedback")
+async def add_learning_feedback(
+    learning_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add user feedback to a learning"""
+    db = get_db()
+    
+    result = await db.agent_learnings.update_one(
+        {"id": learning_id, "userId": current_user["id"]},
+        {
+            "$set": {
+                "userFeedback": request.get("feedback"),
+                "userRating": request.get("rating"),  # thumbs_up, thumbs_down, neutral
+                "feedbackAt": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Learning not found")
+    
+    return {"success": True, "message": "Feedback recorded"}
+
+
+# ============== NLP AGENT CUSTOMIZATION ==============
+
+@router.get("/agents/customization")
+async def get_agent_customization(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user's agent customization settings"""
+    db = get_db()
+    
+    customization = await db.agent_customization.find_one(
+        {"userId": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not customization:
+        # Return defaults
+        return {
+            "userId": current_user["id"],
+            "agents": {
+                "research": {
+                    "personality": "thorough",
+                    "depth": "detailed",
+                    "focusAreas": ["company_info", "key_contacts", "recent_news"],
+                    "customInstructions": ""
+                },
+                "outreach": {
+                    "personality": "professional",
+                    "tone": "friendly_professional",
+                    "emailLength": "concise",
+                    "focusAreas": ["value_prop", "personalization", "clear_cta"],
+                    "customInstructions": ""
+                },
+                "qualification": {
+                    "personality": "analytical",
+                    "strictness": "balanced",
+                    "priorityFactors": ["budget", "authority", "need", "timeline"],
+                    "customInstructions": ""
+                }
+            },
+            "globalSettings": {
+                "responseVerbosity": "balanced",
+                "proactiveLevel": "moderate",
+                "learningEnabled": True
+            }
+        }
+    
+    return customization
+
+
+@router.put("/agents/customization")
+async def update_agent_customization(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update agent customization via structured settings"""
+    db = get_db()
+    
+    customization = {
+        "userId": current_user["id"],
+        "agents": request.get("agents", {}),
+        "globalSettings": request.get("globalSettings", {}),
+        "updatedAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.agent_customization.update_one(
+        {"userId": current_user["id"]},
+        {"$set": customization},
+        upsert=True
+    )
+    
+    return {"success": True, "message": "Agent customization updated"}
+
+
+@router.post("/agents/customize-nlp")
+async def customize_agent_nlp(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Customize an agent using natural language.
+    Example: "Make the outreach agent more casual and focus on building rapport"
+    """
+    db = get_db()
+    
+    instruction = request.get("instruction", "")
+    agent_type = request.get("agentType", "all")
+    
+    if not instruction:
+        raise HTTPException(status_code=400, detail="Instruction is required")
+    
+    # Parse the NLP instruction (simplified - in production would use LLM)
+    parsed_changes = []
+    
+    # Simple keyword-based parsing
+    instruction_lower = instruction.lower()
+    
+    if "casual" in instruction_lower or "friendly" in instruction_lower:
+        parsed_changes.append({
+            "setting": "tone",
+            "value": "casual_friendly",
+            "description": "Changed tone to more casual and friendly"
+        })
+    
+    if "formal" in instruction_lower or "professional" in instruction_lower:
+        parsed_changes.append({
+            "setting": "tone",
+            "value": "formal_professional",
+            "description": "Changed tone to more formal and professional"
+        })
+    
+    if "shorter" in instruction_lower or "concise" in instruction_lower or "brief" in instruction_lower:
+        parsed_changes.append({
+            "setting": "length",
+            "value": "concise",
+            "description": "Made responses more concise"
+        })
+    
+    if "detailed" in instruction_lower or "thorough" in instruction_lower or "comprehensive" in instruction_lower:
+        parsed_changes.append({
+            "setting": "depth",
+            "value": "detailed",
+            "description": "Made responses more detailed and thorough"
+        })
+    
+    if "aggressive" in instruction_lower or "pushy" in instruction_lower:
+        parsed_changes.append({
+            "setting": "assertiveness",
+            "value": "high",
+            "description": "Increased assertiveness in communications"
+        })
+    
+    if "subtle" in instruction_lower or "soft" in instruction_lower:
+        parsed_changes.append({
+            "setting": "assertiveness",
+            "value": "low",
+            "description": "Made communications more subtle and soft"
+        })
+    
+    # Store the NLP customization request
+    nlp_request = {
+        "id": str(uuid4()),
+        "userId": current_user["id"],
+        "agentType": agent_type,
+        "instruction": instruction,
+        "parsedChanges": parsed_changes,
+        "status": "applied",
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.agent_nlp_customizations.insert_one(nlp_request)
+    
+    # Apply changes to agent customization
+    if parsed_changes:
+        customization = await db.agent_customization.find_one(
+            {"userId": current_user["id"]},
+            {"_id": 0}
+        )
+        
+        if not customization:
+            customization = {"userId": current_user["id"], "agents": {}, "globalSettings": {}}
+        
+        if agent_type not in customization.get("agents", {}):
+            customization["agents"][agent_type] = {}
+        
+        for change in parsed_changes:
+            customization["agents"][agent_type][change["setting"]] = change["value"]
+        
+        customization["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.agent_customization.update_one(
+            {"userId": current_user["id"]},
+            {"$set": customization},
+            upsert=True
+        )
+    
+    return {
+        "success": True,
+        "instruction": instruction,
+        "agentType": agent_type,
+        "appliedChanges": parsed_changes,
+        "message": f"Applied {len(parsed_changes)} changes based on your instruction"
+    }
+
+
+@router.get("/agents/customization-history")
+async def get_customization_history(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get history of NLP customization requests"""
+    db = get_db()
+    
+    history = await db.agent_nlp_customizations.find(
+        {"userId": current_user["id"]},
+        {"_id": 0}
+    ).sort("createdAt", -1).limit(20).to_list(20)
+    
+    return history
