@@ -702,6 +702,9 @@ async def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Sanitize to remove any nested _id fields
+    job = sanitize_mongo_doc(job)
+    
     # Add real-time progress if running
     if job["status"] == "running":
         progress = jobs_manager.get_progress(job_id)
