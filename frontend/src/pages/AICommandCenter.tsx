@@ -1266,18 +1266,18 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
           </div>
 
           {/* Console Tabs */}
-          <div className="flex border-b border-gray-700">
-            {(['jobs', 'autonomy', 'learning', 'analytics'] as const).map((tab) => (
+          <div className="flex border-b border-gray-700 overflow-x-auto">
+            {(['jobs', 'teams', 'scoring', 'tests', 'learn'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setConsoleTab(tab)}
-                className={`flex-1 px-2 py-2 text-xs font-medium transition ${
+                className={`flex-1 px-2 py-2 text-xs font-medium transition whitespace-nowrap ${
                   consoleTab === tab
                     ? 'text-emerald-400 border-b-2 border-emerald-400 bg-gray-800'
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
-                {tab === 'jobs' ? 'Jobs' : tab === 'autonomy' ? 'Auto' : tab === 'learning' ? 'Learn' : 'Stats'}
+                {tab === 'jobs' ? 'Jobs' : tab === 'teams' ? 'Teams' : tab === 'scoring' ? 'Score' : tab === 'tests' ? 'A/B' : 'Learn'}
               </button>
             ))}
           </div>
