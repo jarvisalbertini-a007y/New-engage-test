@@ -106,9 +106,12 @@ export default function AICommandCenter() {
   const [input, setInput] = useState('');
   const [sessionId, setSessionId] = useState(() => `session-${Date.now()}`);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'activity' | 'history' | 'settings'>('activity');
+  const [sidebarTab, setSidebarTab] = useState<'activity' | 'history' | 'approvals' | 'settings'>('activity');
   const [activities, setActivities] = useState<AgentActivity[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Fetch available agents
@@ -123,10 +126,22 @@ export default function AICommandCenter() {
     queryFn: () => api.getPendingPlans?.() || Promise.resolve([])
   });
 
+  // Fetch unified approvals (plans, workflows, emails)
+  const { data: unifiedApprovals, refetch: refetchApprovals } = useQuery({
+    queryKey: ['unified-approvals'],
+    queryFn: () => api.getUnifiedApprovals?.() || Promise.resolve([])
+  });
+
   // Fetch conversation history
   const { data: conversationHistory, refetch: refetchHistory } = useQuery({
     queryKey: ['conversation-history'],
     queryFn: () => api.listConversationSessions?.(20) || Promise.resolve([])
+  });
+
+  // Fetch AI stats
+  const { data: aiStats } = useQuery({
+    queryKey: ['ai-stats'],
+    queryFn: () => api.getAIStats?.() || Promise.resolve({})
   });
 
   // Scroll to bottom on new messages
