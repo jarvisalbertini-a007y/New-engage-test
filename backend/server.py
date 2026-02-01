@@ -30,6 +30,7 @@ from routes.email_optimization import router as email_optimization_router
 from routes.email_webhooks_templates import router as email_templates_router
 from routes.self_improvement import router as self_improvement_router
 from routes.multi_agent import router as multi_agent_router
+from routes.ai_orchestration import router as ai_orchestration_router
 from database import connect_db, close_db
 
 @asynccontextmanager
