@@ -29,6 +29,7 @@ import EmailTemplates from './pages/EmailTemplates';
 import SelfImprovement from './pages/SelfImprovement';
 import MultiAgent from './pages/MultiAgent';
 import AICommandCenter from './pages/AICommandCenter';
+import VisualWorkflowBuilder from './pages/VisualWorkflowBuilder';
 
 const queryClient = new QueryClient();
 
