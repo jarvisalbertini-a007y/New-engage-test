@@ -612,8 +612,66 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
 
             {sidebarTab === 'history' && (
               <div className="p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase">Conversation History</h3>
-                <p className="text-sm text-gray-400">Previous sessions will appear here</p>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase">Conversation History</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={startNewSession}
+                    className="h-8"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    New
+                  </Button>
+                </div>
+                
+                {!conversationHistory || (conversationHistory as any[]).length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No conversations yet</p>
+                    <p className="text-xs mt-1">Start chatting to create history</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(conversationHistory as any[]).map((session: any) => (
+                      <div 
+                        key={session.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition ${
+                          sessionId === session.id 
+                            ? 'bg-violet-50 border-violet-200 dark:bg-violet-900/20 dark:border-violet-800' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                        onClick={() => loadSessionMutation.mutate(session.id)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{session.title || 'Untitled'}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">{session.preview || 'No preview'}</p>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Delete this conversation?')) {
+                                deleteSessionMutation.mutate(session.id);
+                              }
+                            }}
+                            className="p-1 ml-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <MessageSquare className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-400">{session.messageCount || 0} messages</span>
+                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-400">
+                            {session.updatedAt ? new Date(session.updatedAt).toLocaleDateString() : 'Unknown'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
