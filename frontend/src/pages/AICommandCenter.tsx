@@ -116,11 +116,12 @@ export default function AICommandCenter() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showConsole, setShowConsole] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<'activity' | 'history' | 'approvals' | 'settings'>('activity');
-  const [consoleTab, setConsoleTab] = useState<'jobs' | 'autonomy' | 'analytics'>('jobs');
+  const [consoleTab, setConsoleTab] = useState<'jobs' | 'autonomy' | 'learning' | 'analytics'>('jobs');
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [nlpCustomizeInput, setNlpCustomizeInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
