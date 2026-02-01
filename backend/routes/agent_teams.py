@@ -112,12 +112,18 @@ async def create_agent_team(
                 for agent in template["agents"]
             ]
     
+    # Ensure all agents have IDs
+    agents = request.get("agents", [])
+    for agent in agents:
+        if "id" not in agent:
+            agent["id"] = str(uuid4())
+    
     team = {
         "id": str(uuid4()),
         "userId": current_user["id"],
         "name": request.get("name", "New Team"),
         "description": request.get("description", ""),
-        "agents": request.get("agents", []),
+        "agents": agents,
         "handoffRules": request.get("handoffRules", []),
         "status": "draft",
         "metrics": {
