@@ -129,7 +129,7 @@ export default function AICommandCenter() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showConsole, setShowConsole] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<'activity' | 'history' | 'approvals' | 'settings'>('activity');
-  const [consoleTab, setConsoleTab] = useState<'jobs' | 'teams' | 'scoring' | 'tests' | 'learn'>('jobs');
+  const [consoleTab, setConsoleTab] = useState<'jobs' | 'autonomy' | 'teams' | 'scoring' | 'tests' | 'learn'>('jobs');
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -1267,7 +1267,7 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
 
           {/* Console Tabs */}
           <div className="flex border-b border-gray-700 overflow-x-auto">
-            {(['jobs', 'teams', 'scoring', 'tests', 'learn'] as const).map((tab) => (
+            {(['jobs', 'autonomy', 'teams', 'scoring', 'tests', 'learn'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setConsoleTab(tab)}
@@ -1277,7 +1277,7 @@ I'll create a plan, show you what I'm going to do, and wait for your approval be
                     : 'text-gray-400 hover:text-gray-200'
                 }`}
               >
-                {tab === 'jobs' ? 'Jobs' : tab === 'teams' ? 'Teams' : tab === 'scoring' ? 'Score' : tab === 'tests' ? 'A/B' : 'Learn'}
+                {tab === 'jobs' ? 'Jobs' : tab === 'autonomy' ? 'Auto' : tab === 'teams' ? 'Teams' : tab === 'scoring' ? 'Score' : tab === 'tests' ? 'A/B' : 'Learn'}
               </button>
             ))}
           </div>

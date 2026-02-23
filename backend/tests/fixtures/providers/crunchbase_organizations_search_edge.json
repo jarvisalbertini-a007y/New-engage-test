@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "name": "Sparse Co",
+      "website_url": "http://www.sparse.co"
+    },
+    {
+      "entity": {
+        "properties": {
+          "name": "Nested Sparse",
+          "country_code": "US"
+        }
+      }
+    }
+  ]
+}

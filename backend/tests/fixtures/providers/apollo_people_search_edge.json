@@ -1,0 +1,15 @@
+{
+  "contacts": [
+    {
+      "id": "apollo-edge-001",
+      "firstName": "Casey",
+      "lastName": "Morgan",
+      "title": "Head of Revenue",
+      "organization_name": "Edge Labs"
+    },
+    {
+      "name": "Unknown Prospect",
+      "organization_website_url": "https://www.edgelabs.dev/about"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "entities": [
+    {
+      "properties": {
+        "name": "PipelineIQ",
+        "website_url": "https://pipelineiq.com",
+        "short_description": "Sales pipeline intelligence platform.",
+        "category_groups": "Sales Automation",
+        "funding_stage": "Series B",
+        "city_name": "Denver",
+        "region_name": "Colorado",
+        "country_code": "US",
+        "linkedin_url": "https://www.linkedin.com/company/pipelineiq"
+      }
+    },
+    {
+      "properties": {
+        "name": "SignalForge",
+        "website_url": "https://signalforge.io",
+        "short_description": "Intent signal analytics for outbound teams.",
+        "category_groups": "Data Analytics",
+        "funding_stage": "Series A",
+        "city_name": "New York",
+        "region_name": "New York",
+        "country_code": "US",
+        "linkedin_url": "https://www.linkedin.com/company/signalforge"
+      }
+    }
+  ]
+}

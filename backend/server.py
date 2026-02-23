@@ -34,15 +34,25 @@ from routes.ai_orchestration import router as ai_orchestration_router
 from routes.autonomous_jobs import router as autonomous_jobs_router
 from routes.lead_scoring import router as lead_scoring_router
 from routes.ab_testing import router as ab_testing_router
+from routes.sales_intelligence import router as sales_intelligence_router
 from database import connect_db, close_db
+
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await connect_db()
+    skip_db_connect = _is_truthy(os.getenv("ENGAGEAI_SKIP_DB_CONNECT"))
+    if not skip_db_connect:
+        await connect_db()
     yield
     # Shutdown
-    await close_db()
+    if not skip_db_connect:
+        await close_db()
 
 app = FastAPI(
     title="EngageAI Sales Engine",
@@ -87,6 +97,7 @@ app.include_router(ai_orchestration_router, prefix="/api/ai", tags=["AI Orchestr
 app.include_router(autonomous_jobs_router, prefix="/api/jobs", tags=["Autonomous Jobs"])
 app.include_router(lead_scoring_router, prefix="/api/lead-scoring", tags=["Lead Scoring"])
 app.include_router(ab_testing_router, prefix="/api/ab-testing", tags=["A/B Testing"])
+app.include_router(sales_intelligence_router, prefix="/api/sales-intelligence", tags=["Sales Intelligence"])
 
 @app.get("/api/health")
 async def health_check():

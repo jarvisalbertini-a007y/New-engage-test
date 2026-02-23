@@ -4,10 +4,18 @@ function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
+function buildRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `req-${crypto.randomUUID()}`;
+  }
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function apiRequest(method: string, endpoint: string, data?: any) {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Request-Id': buildRequestId(),
   };
   
   if (token) {
@@ -112,6 +120,63 @@ export const api = {
   // Health
   healthCheck: () => apiRequest('GET', '/api/health'),
 
+  // Sales Intelligence
+  getPhraseAnalytics: (params?: { windowDays?: number; minExposure?: number; limit?: number; query?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.minExposure) query.append('min_exposure', String(params.minExposure));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.query) query.append('query', params.query);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/analytics/phrases${suffix}`);
+  },
+  getPhraseChannelSummary: (params?: {
+    windowDays?: number;
+    minExposure?: number;
+    limit?: number;
+    channels?: string[];
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.minExposure) query.append('min_exposure', String(params.minExposure));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.channels?.length) query.append('channels', params.channels.join(','));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/analytics/phrases/channel-summary${suffix}`);
+  },
+  predictResponse: (data: {
+    message: string;
+    channel?: string;
+    sendTime?: string;
+    prospect?: any;
+  }) => apiRequest('POST', '/api/sales-intelligence/prediction/response', data),
+  recordPredictionFeedback: (data: {
+    predictionId?: string;
+    predictedProbability: number;
+    outcome: string;
+    channel?: string;
+    responseLatencyHours?: number;
+  }) => apiRequest('POST', '/api/sales-intelligence/prediction/feedback', data),
+  getPredictionPerformance: (params?: { windowDays?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/performance${suffix}`);
+  },
+  getPredictionPerformanceReport: (params?: { windowDays?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/performance/report${suffix}`);
+  },
+  getPredictionFeedbackHistory: (params?: { windowDays?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/feedback/history${suffix}`);
+  },
+
   // Universal Chat
   sendChatMessage: (data: { message: string; sessionId: string; context?: any }) =>
     apiRequest('POST', '/api/chat/message', data),
@@ -205,9 +270,84 @@ export const api = {
 
   // Real Integrations
   getIntegrations: () => apiRequest('GET', '/api/integrations/integrations'),
+  getIntegrationsHealth: () => apiRequest('GET', '/api/integrations/integrations/health'),
+  getIntegrationsTelemetrySummary: (days?: number, limit?: number) =>
+    apiRequest('GET', `/api/integrations/integrations/telemetry/summary?days=${days || 7}&limit=${limit || 1000}`),
+  getIntegrationsTelemetrySnapshotGovernance: (retentionDays?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/snapshot-governance?retention_days=${retentionDays || 30}`
+    ),
+  getIntegrationsBaselineGovernance: () =>
+    apiRequest(
+      'GET',
+      '/api/integrations/integrations/telemetry/baseline-governance'
+    ),
+  getIntegrationsSloGates: (params?: {
+    days?: number;
+    limit?: number;
+    maxErrorRatePct?: number;
+    minSchemaV2Pct?: number;
+    minSchemaV2SampleCount?: number;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('days', String(params?.days || 7));
+    query.append('limit', String(params?.limit || 2000));
+    if (params?.maxErrorRatePct !== undefined) {
+      query.append('max_error_rate_pct', String(params.maxErrorRatePct));
+    }
+    if (params?.minSchemaV2Pct !== undefined) {
+      query.append('min_schema_v2_pct', String(params.minSchemaV2Pct));
+    }
+    if (params?.minSchemaV2SampleCount !== undefined) {
+      query.append('min_schema_v2_sample_count', String(params.minSchemaV2SampleCount));
+    }
+    return apiRequest('GET', `/api/integrations/integrations/telemetry/slo-gates?${query.toString()}`);
+  },
   saveSendgridIntegration: (data: { api_key: string; from_email: string }) =>
     apiRequest('POST', '/api/integrations/integrations/sendgrid', data),
+  saveApolloIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/apollo', data),
+  saveClearbitIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/clearbit', data),
+  saveCrunchbaseIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/crunchbase', data),
   removeSendgridIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/sendgrid'),
+  removeApolloIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/apollo'),
+  removeClearbitIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/clearbit'),
+  removeCrunchbaseIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/crunchbase'),
+  apolloSearchProspects: (data: {
+    query?: string;
+    title?: string;
+    domain?: string;
+    limit?: number;
+    page?: number;
+    saveResults?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/apollo/search', data),
+  apolloEnrichCompany: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/apollo/company', data),
+  clearbitEnrichCompany: (data: {
+    domain: string;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/clearbit/company', data),
+  crunchbaseEnrichCompany: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/crunchbase/company', data),
+  orchestrateCompanyEnrichment: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+    stopOnFirstMatch?: boolean;
+    providerOrder?: string[];
+  }) => apiRequest('POST', '/api/integrations/providers/company-enrichment', data),
   
   // Real Lead Search
   searchRealLeads: (criteria: string, count?: number) =>
@@ -601,7 +741,7 @@ export const api = {
 
   // ============== A/B TESTING ==============
   
-  createABTest: (data: any) =>
+  createSalesABTest: (data: any) =>
     apiRequest('POST', '/api/ab-testing/tests', data),
   getABTests: (status?: string, testType?: string, limit?: number) => {
     const params = new URLSearchParams();
@@ -610,7 +750,7 @@ export const api = {
     if (limit) params.append('limit', limit.toString());
     return apiRequest('GET', `/api/ab-testing/tests?${params}`);
   },
-  getABTest: (testId: string) =>
+  getSalesABTest: (testId: string) =>
     apiRequest('GET', `/api/ab-testing/tests/${testId}`),
   startABTest: (testId: string) =>
     apiRequest('POST', `/api/ab-testing/tests/${testId}/start`, {}),
@@ -636,4 +776,34 @@ export const api = {
     apiRequest('POST', '/api/ab-testing/suggest-test', data),
   quickCreateABTest: (data: { suggestionType: string; prospectIds?: string[]; autoApplyWinner?: boolean }) =>
     apiRequest('POST', '/api/ab-testing/quick-create', data),
+
+  // ============== SALES INTELLIGENCE ==============
+  getPipelineForecast: (windowDays?: number) =>
+    apiRequest('GET', `/api/sales-intelligence/forecast/pipeline${windowDays ? `?window_days=${windowDays}` : ''}`),
+  getConversationIntelligence: (limit?: number) =>
+    apiRequest('GET', `/api/sales-intelligence/conversation/intelligence${limit ? `?limit=${limit}` : ''}`),
+  getMultiChannelEngagement: () =>
+    apiRequest('GET', '/api/sales-intelligence/engagement/multi-channel'),
+  getRelationshipMap: (limit?: number) =>
+    apiRequest('GET', `/api/sales-intelligence/relationships/map${limit ? `?limit=${limit}` : ''}`),
+  getSalesCampaigns: (status?: string) =>
+    apiRequest('GET', `/api/sales-intelligence/campaigns${status ? `?status=${status}` : ''}`),
+  getSalesCampaign: (campaignId: string) =>
+    apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}`),
+  getSalesCampaignPerformance: (campaignId: string) =>
+    apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}/performance`),
+  getSalesCampaignPortfolio: (options?: { windowDays?: number; status?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.status) params.append('status', options.status);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/campaigns/performance/portfolio${suffix}`);
+  },
+  createSalesCampaign: (data: { name: string; objective?: string; targetSegment?: string; channels: string[] }) =>
+    apiRequest('POST', '/api/sales-intelligence/campaigns', data),
+  activateSalesCampaign: (campaignId: string) =>
+    apiRequest('POST', `/api/sales-intelligence/campaigns/${campaignId}/activate`, {}),
+  recordSalesCampaignMetrics: (campaignId: string, data: { channel: string; sent?: number; opened?: number; replied?: number }) =>
+    apiRequest('POST', `/api/sales-intelligence/campaigns/${campaignId}/metrics`, data),
 };

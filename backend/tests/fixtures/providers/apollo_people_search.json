@@ -1,0 +1,36 @@
+{
+  "people": [
+    {
+      "id": "apollo-person-001",
+      "first_name": "Jordan",
+      "last_name": "Lee",
+      "name": "Jordan Lee",
+      "title": "Director of Sales",
+      "email": "jordan.lee@example.com",
+      "linkedin_url": "https://linkedin.com/in/jordan-lee",
+      "city": "Austin",
+      "organization": {
+        "name": "Example Software",
+        "website_url": "https://www.examplesoftware.com",
+        "industry": "Software",
+        "estimated_num_employees": 150
+      }
+    },
+    {
+      "id": "apollo-person-002",
+      "first_name": "Riley",
+      "last_name": "Nguyen",
+      "name": "Riley Nguyen",
+      "title": "VP Revenue Operations",
+      "email": "riley.nguyen@samplecorp.io",
+      "linkedin_url": "https://linkedin.com/in/riley-nguyen",
+      "city": "Chicago",
+      "organization": {
+        "name": "SampleCorp",
+        "website_url": "https://samplecorp.io",
+        "industry": "FinTech",
+        "estimated_num_employees": 80
+      }
+    }
+  ]
+}
