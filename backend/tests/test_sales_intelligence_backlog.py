@@ -34,8 +34,27 @@ def test_pipeline_forecast_returns_confidence_and_projection():
     assert forecast["projectedWonValue"] > 0
     assert forecast["historicalWinRate"] > 0
     assert forecast["confidenceInterval"]["high"] > forecast["confidenceInterval"]["low"]
+    assert forecast["confidenceIntervalWidth"] > 0
+    assert forecast["confidenceIntervalWidthPct"] > 0
+    assert forecast["forecastReliabilityTier"] in {"low", "medium", "high"}
+    assert isinstance(forecast["forecastRecommendation"], str)
     assert forecast["sampleSize"]["openProspects"] == 3
     assert forecast["sampleSize"]["closedOutcomes"] == 3
+
+
+def test_pipeline_forecast_low_reliability_when_history_is_sparse():
+    prospects = [
+        {"id": "p1", "leadScore": 80, "companySize": 300, "title": "VP Sales"},
+    ]
+    outcomes = [
+        {"outcome": "won", "scoreAtOutcome": 81},
+    ]
+
+    forecast = build_pipeline_forecast(prospects, outcomes, window_days=90)
+
+    assert forecast["sampleSize"]["closedOutcomes"] == 1
+    assert forecast["forecastReliabilityTier"] == "low"
+    assert "Collect additional closed-outcome evidence" in forecast["forecastRecommendation"]
 
 
 def test_conversation_intelligence_detects_sentiment_and_objections():
@@ -73,6 +92,8 @@ def test_multi_channel_health_scores_coverage():
     assert "email" in health["activeChannels"]
     assert "linkedin" in health["activeChannels"]
     assert health["coverageScore"] >= 75
+    assert health["coverageReliabilityTier"] == "high"
+    assert isinstance(health["coverageRecommendation"], str)
     assert isinstance(health["recommendations"], list)
 
 
@@ -96,6 +117,30 @@ def test_campaign_performance_computes_rates_and_quality():
     assert summary["overall"]["replyRate"] == round(16 / 140, 4)
     assert summary["overall"]["qualityTier"] in {"watch", "strong"}
     assert len(summary["byChannel"]) == 2
+    assert summary["channelCount"] == 2
+    assert summary["displayedChannelCount"] == 2
+    assert summary["channelsTruncated"] is False
+
+
+def test_campaign_performance_applies_channel_limit_and_marks_truncation():
+    campaign = {
+        "id": "c1",
+        "name": "Q2 Outbound",
+        "status": "active",
+        "channels": ["email", "linkedin", "phone"],
+        "metrics": {
+            "email": {"sent": 100, "opened": 38, "replied": 12},
+            "linkedin": {"sent": 40, "opened": 18, "replied": 4},
+            "phone": {"sent": 10, "opened": 4, "replied": 1},
+        },
+        "updatedAt": "2026-02-22T10:00:00+00:00",
+    }
+    summary = build_campaign_performance(campaign, channel_limit=2)
+    assert summary["channelCount"] == 3
+    assert summary["displayedChannelCount"] == 2
+    assert summary["appliedChannelLimit"] == 2
+    assert summary["channelsTruncated"] is True
+    assert [entry["channel"] for entry in summary["byChannel"]] == ["email", "linkedin"]
 
 
 def test_campaign_portfolio_ranks_by_reply_rate():

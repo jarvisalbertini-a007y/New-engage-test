@@ -162,6 +162,40 @@ def _iso_days_ago(days: int) -> str:
     return cutoff.isoformat()
 
 
+def _coerce_iso_datetime(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        token = str(value).strip()
+        if not token:
+            return None
+        if token.endswith("Z"):
+            token = f"{token[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(token)
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _record_within_window(
+    record: Dict[str, Any],
+    *,
+    cutoff_dt: datetime,
+    timestamp_keys: List[str],
+) -> bool:
+    for key in timestamp_keys:
+        parsed = _coerce_iso_datetime(record.get(key))
+        if parsed:
+            return parsed >= cutoff_dt
+    # Preserve legacy records that do not yet carry timestamp metadata.
+    return True
+
+
 def _extract_request_id(http_request: Optional[Request]) -> Optional[str]:
     if not http_request:
         return None
@@ -682,6 +716,27 @@ def build_pipeline_forecast(
     margin = 0.35 if closed < 10 else 0.25 if closed < 30 else 0.18
     confidence_low = projected_won_value * (1.0 - margin)
     confidence_high = projected_won_value * (1.0 + margin)
+    confidence_width = max(0.0, confidence_high - confidence_low)
+    confidence_width_pct = (
+        (confidence_width / projected_won_value) * 100.0
+        if projected_won_value > 0
+        else margin * 200.0
+    )
+    if closed < 10 or confidence_width_pct >= 70:
+        reliability_tier = "low"
+        reliability_recommendation = (
+            "Collect additional closed-outcome evidence before widening predictive rollout."
+        )
+    elif closed < 30 or confidence_width_pct >= 45:
+        reliability_tier = "medium"
+        reliability_recommendation = (
+            "Hold current rollout scope and monitor interval width before expansion."
+        )
+    else:
+        reliability_tier = "high"
+        reliability_recommendation = (
+            "Forecast interval is stable enough for controlled rollout expansion."
+        )
 
     return {
         "openPipelineValue": round(open_pipeline_value, 2),
@@ -693,6 +748,10 @@ def build_pipeline_forecast(
             "high": round(confidence_high, 2),
             "confidenceLevel": 95,
         },
+        "confidenceIntervalWidth": round(confidence_width, 2),
+        "confidenceIntervalWidthPct": round(confidence_width_pct, 2),
+        "forecastReliabilityTier": reliability_tier,
+        "forecastRecommendation": reliability_recommendation,
         "sampleSize": {"openProspects": len(prospects), "closedOutcomes": closed},
     }
 
@@ -786,6 +845,13 @@ def build_multi_channel_health(
             active_channels.add(normalized)
 
     coverage_score = round((len(active_channels) / len(SUPPORTED_CHANNELS)) * 100, 1)
+    coverage_tier = (
+        "high"
+        if coverage_score >= 75
+        else "medium"
+        if coverage_score >= 50
+        else "low"
+    )
     recommendations: List[str] = []
     if "email" not in active_channels:
         recommendations.append("Enable email campaigns for baseline sales coverage.")
@@ -795,10 +861,19 @@ def build_multi_channel_health(
         recommendations.append("Add phone follow-up stage for high-intent prospects.")
     if "sms" not in active_channels:
         recommendations.append("Use SMS only for late-stage follow-ups with consent.")
+    coverage_recommendation = (
+        "Coverage is broad enough for staged rollout expansion."
+        if coverage_tier == "high"
+        else "Coverage is moderate. Add one additional high-intent channel before expansion."
+        if coverage_tier == "medium"
+        else "Coverage is narrow. Prioritize adding core channels before scaling."
+    )
 
     return {
         "activeChannels": sorted(active_channels),
         "coverageScore": coverage_score,
+        "coverageReliabilityTier": coverage_tier,
+        "coverageRecommendation": coverage_recommendation,
         "channelUsage": channel_usage,
         "recommendations": recommendations[:3],
     }
@@ -879,7 +954,7 @@ def build_relationship_map(
     }
 
 
-def build_campaign_performance(campaign: Dict[str, Any]) -> Dict[str, Any]:
+def build_campaign_performance(campaign: Dict[str, Any], channel_limit: Optional[int] = None) -> Dict[str, Any]:
     metrics = campaign.get("metrics") or {}
     declared_channels = [normalize_channel(str(channel)) for channel in (campaign.get("channels") or [])]
     metric_channels = [normalize_channel(str(channel)) for channel in metrics.keys()]
@@ -910,6 +985,27 @@ def build_campaign_performance(campaign: Dict[str, Any]) -> Dict[str, Any]:
                 "replyToOpenRate": round((replied / opened) if opened > 0 else 0.0, 4),
             }
         )
+
+    by_channel.sort(
+        key=lambda entry: (
+            entry.get("sent", 0),
+            entry.get("replied", 0),
+            entry.get("opened", 0),
+            entry.get("channel", ""),
+        ),
+        reverse=True,
+    )
+
+    safe_channel_limit = None
+    if channel_limit is not None:
+        try:
+            safe_channel_limit = max(1, int(channel_limit))
+        except (TypeError, ValueError):
+            safe_channel_limit = None
+    displayed_by_channel = by_channel[:safe_channel_limit] if safe_channel_limit is not None else by_channel
+    channel_count = len(by_channel)
+    displayed_channel_count = len(displayed_by_channel)
+    channels_truncated = displayed_channel_count < channel_count
 
     overall_open_rate = round((total_opened / total_sent) if total_sent > 0 else 0.0, 4)
     overall_reply_rate = round((total_replied / total_sent) if total_sent > 0 else 0.0, 4)
@@ -946,7 +1042,11 @@ def build_campaign_performance(campaign: Dict[str, Any]) -> Dict[str, Any]:
             "replyToOpenRate": overall_reply_to_open_rate,
             "qualityTier": quality_tier,
         },
-        "byChannel": by_channel,
+        "byChannel": displayed_by_channel,
+        "channelCount": channel_count,
+        "displayedChannelCount": displayed_channel_count,
+        "appliedChannelLimit": safe_channel_limit if safe_channel_limit is not None else channel_count,
+        "channelsTruncated": channels_truncated,
         "recommendations": recommendations[:3],
         "updatedAt": campaign.get("updatedAt"),
     }
@@ -1017,6 +1117,9 @@ async def get_pipeline_forecast(
             "open_pipeline_value": forecast.get("openPipelineValue"),
             "weighted_pipeline_value": forecast.get("weightedPipelineValue"),
             "projected_won_value": forecast.get("projectedWonValue"),
+            "confidence_interval_width": forecast.get("confidenceIntervalWidth"),
+            "confidence_interval_width_pct": forecast.get("confidenceIntervalWidthPct"),
+            "forecast_reliability_tier": forecast.get("forecastReliabilityTier"),
             "open_prospect_count": forecast.get("sampleSize", {}).get("openProspects", 0),
             "closed_outcome_count": forecast.get("sampleSize", {}).get("closedOutcomes", 0),
         },
@@ -1027,6 +1130,7 @@ async def get_pipeline_forecast(
 
 @router.get("/conversation/intelligence")
 async def get_conversation_intelligence(
+    window_days: int = Query(default=90, ge=14, le=365),
     limit: int = Query(default=200, ge=20, le=1000),
     http_request: Request = None,
     current_user: dict = Depends(get_current_user),
@@ -1035,13 +1139,14 @@ async def get_conversation_intelligence(
         raise HTTPException(status_code=503, detail="Conversation intelligence is disabled by feature flag.")
 
     db = get_db()
+    cutoff_iso = _iso_days_ago(window_days)
     chat_sessions = await db.chat_sessions.find(
-        {"userId": current_user["id"]},
+        {"userId": current_user["id"], "timestamp": {"$gte": cutoff_iso}},
         {"_id": 0, "message": 1, "response": 1, "timestamp": 1},
     ).limit(limit).to_list(limit)
 
     email_events = await db.email_events.find(
-        {"userId": current_user["id"]},
+        {"userId": current_user["id"], "timestamp": {"$gte": cutoff_iso}},
         {"_id": 0, "eventType": 1, "channel": 1, "metadata": 1, "timestamp": 1},
     ).limit(limit).to_list(limit)
 
@@ -1057,6 +1162,7 @@ async def get_conversation_intelligence(
             records.append({"text": text, "channel": event.get("channel") or "email"})
 
     intelligence = build_conversation_intelligence(records)
+    intelligence["windowDays"] = window_days
     intelligence["generatedAt"] = datetime.now(timezone.utc).isoformat()
     intelligence["sources"] = {"chatSessions": len(chat_sessions), "emailEvents": len(email_events)}
 
@@ -1065,11 +1171,13 @@ async def get_conversation_intelligence(
         current_user["id"],
         "sales_conversation_intelligence_generated",
         {
+            "window_days": window_days,
             "limit": limit,
             "chat_session_count": len(chat_sessions),
             "email_event_count": len(email_events),
             "record_count": intelligence.get("totals", {}).get("records", 0),
             "top_objection_count": len(intelligence.get("topObjections", [])),
+            "window_start": cutoff_iso,
         },
         http_request=http_request,
     )
@@ -1078,6 +1186,10 @@ async def get_conversation_intelligence(
 
 @router.get("/engagement/multi-channel")
 async def get_multi_channel_engagement(
+    window_days: int = Query(default=90, ge=14, le=365),
+    campaign_limit: int = Query(1000, ge=10, le=5000),
+    ab_test_limit: int = Query(2000, ge=10, le=10000),
+    prospect_limit: int = Query(5000, ge=50, le=20000),
     http_request: Request = None,
     current_user: dict = Depends(get_current_user),
 ):
@@ -1085,32 +1197,80 @@ async def get_multi_channel_engagement(
         raise HTTPException(status_code=503, detail="Multi-channel engagement is disabled by feature flag.")
 
     db = get_db()
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=window_days)
+    cutoff_iso = cutoff_dt.isoformat()
+
     campaigns = await db.sales_campaigns.find(
         {"userId": current_user["id"]},
-        {"_id": 0, "channels": 1, "status": 1},
-    ).to_list(1000)
+        {"_id": 0, "channels": 1, "status": 1, "createdAt": 1, "updatedAt": 1, "timestamp": 1},
+    ).to_list(campaign_limit)
+    campaigns = [
+        record
+        for record in campaigns
+        if _record_within_window(
+            record,
+            cutoff_dt=cutoff_dt,
+            timestamp_keys=["updatedAt", "createdAt", "timestamp"],
+        )
+    ]
     ab_tests = await db.ab_tests.find(
         {"userId": current_user["id"]},
-        {"_id": 0, "testType": 1, "channelA": 1, "channelB": 1},
-    ).to_list(2000)
+        {"_id": 0, "testType": 1, "channelA": 1, "channelB": 1, "createdAt": 1, "updatedAt": 1, "timestamp": 1, "startedAt": 1},
+    ).to_list(ab_test_limit)
+    ab_tests = [
+        record
+        for record in ab_tests
+        if _record_within_window(
+            record,
+            cutoff_dt=cutoff_dt,
+            timestamp_keys=["updatedAt", "createdAt", "timestamp", "startedAt"],
+        )
+    ]
     prospects = await db.prospects.find(
         {"userId": current_user["id"]},
-        {"_id": 0, "preferredChannel": 1, "primaryChannel": 1},
-    ).to_list(5000)
+        {"_id": 0, "preferredChannel": 1, "primaryChannel": 1, "createdAt": 1, "updatedAt": 1, "lastActivityAt": 1, "timestamp": 1},
+    ).to_list(prospect_limit)
+    prospects = [
+        record
+        for record in prospects
+        if _record_within_window(
+            record,
+            cutoff_dt=cutoff_dt,
+            timestamp_keys=["updatedAt", "lastActivityAt", "createdAt", "timestamp"],
+        )
+    ]
 
     health = build_multi_channel_health(campaigns, ab_tests, prospects)
+    health["windowDays"] = window_days
     health["generatedAt"] = datetime.now(timezone.utc).isoformat()
+    health["sourceCounts"] = {
+        "campaigns": len(campaigns),
+        "abTests": len(ab_tests),
+        "prospects": len(prospects),
+    }
+    health["appliedLimits"] = {
+        "windowDays": window_days,
+        "campaigns": campaign_limit,
+        "abTests": ab_test_limit,
+        "prospects": prospect_limit,
+    }
 
     await _emit_sales_intelligence_telemetry(
         db,
         current_user["id"],
         "sales_multi_channel_engagement_generated",
         {
+            "window_days": window_days,
+            "campaign_limit": campaign_limit,
+            "ab_test_limit": ab_test_limit,
+            "prospect_limit": prospect_limit,
             "active_channel_count": len(health.get("activeChannels", [])),
             "coverage_score": health.get("coverageScore", 0),
+            "coverage_reliability_tier": health.get("coverageReliabilityTier"),
             "campaign_count": len(campaigns),
             "ab_test_count": len(ab_tests),
             "prospect_count": len(prospects),
+            "window_start": cutoff_iso,
         },
         http_request=http_request,
     )
@@ -1264,6 +1424,7 @@ async def get_campaign(
 @router.get("/campaigns/{campaign_id}/performance")
 async def get_campaign_performance(
     campaign_id: str,
+    channel_limit: int = Query(default=10, ge=1, le=20),
     http_request: Request = None,
     current_user: dict = Depends(get_current_user),
 ):
@@ -1278,7 +1439,7 @@ async def get_campaign_performance(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    performance = build_campaign_performance(campaign)
+    performance = build_campaign_performance(campaign, channel_limit=channel_limit)
     performance["generatedAt"] = datetime.now(timezone.utc).isoformat()
 
     await _emit_sales_intelligence_telemetry(
@@ -1292,6 +1453,9 @@ async def get_campaign_performance(
             "replied": performance.get("totals", {}).get("replied", 0),
             "reply_rate": performance.get("overall", {}).get("replyRate", 0.0),
             "quality_tier": performance.get("overall", {}).get("qualityTier", "insufficient_data"),
+            "channel_limit": channel_limit,
+            "channel_count": performance.get("channelCount", 0),
+            "displayed_channel_count": performance.get("displayedChannelCount", 0),
         },
         http_request=http_request,
     )
@@ -1386,6 +1550,7 @@ async def record_campaign_metrics(
 
 @router.get("/relationships/map")
 async def get_relationship_map(
+    window_days: int = Query(default=90, ge=14, le=365),
     limit: int = Query(default=250, ge=50, le=1000),
     http_request: Request = None,
     current_user: dict = Depends(get_current_user),
@@ -1394,27 +1559,54 @@ async def get_relationship_map(
         raise HTTPException(status_code=503, detail="Relationship mapping is disabled by feature flag.")
 
     db = get_db()
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=window_days)
+    cutoff_iso = cutoff_dt.isoformat()
     prospects = await db.prospects.find(
         {"userId": current_user["id"]},
-        {"_id": 0},
+        {"_id": 0, "createdAt": 1, "updatedAt": 1, "lastActivityAt": 1, "timestamp": 1},
     ).limit(limit).to_list(limit)
+    prospects = [
+        record
+        for record in prospects
+        if _record_within_window(
+            record,
+            cutoff_dt=cutoff_dt,
+            timestamp_keys=["updatedAt", "lastActivityAt", "createdAt", "timestamp"],
+        )
+    ]
     companies = await db.companies.find(
         {"userId": current_user["id"]},
-        {"_id": 0},
+        {"_id": 0, "createdAt": 1, "updatedAt": 1, "timestamp": 1},
     ).limit(limit).to_list(limit)
+    companies = [
+        record
+        for record in companies
+        if _record_within_window(
+            record,
+            cutoff_dt=cutoff_dt,
+            timestamp_keys=["updatedAt", "createdAt", "timestamp"],
+        )
+    ]
 
     graph = build_relationship_map(prospects, companies, max_nodes=limit)
+    graph["windowDays"] = window_days
     graph["generatedAt"] = datetime.now(timezone.utc).isoformat()
+    graph["sourceCounts"] = {
+        "prospects": len(prospects),
+        "companies": len(companies),
+    }
     await _emit_sales_intelligence_telemetry(
         db,
         current_user["id"],
         "sales_relationship_map_generated",
         {
+            "window_days": window_days,
             "limit": limit,
             "node_count": len(graph.get("nodes", [])),
             "edge_count": len(graph.get("edges", [])),
             "prospect_count": graph.get("stats", {}).get("prospects", 0),
             "company_count": graph.get("stats", {}).get("companies", 0),
+            "window_start": cutoff_iso,
         },
         http_request=http_request,
     )

@@ -13,15 +13,28 @@ def _build_evidence(
     sample_gate_passed: bool = True,
     sample_count: int = 30,
     min_sample_count: int = 25,
+    orchestration_error_gate_passed: bool = True,
+    orchestration_skipped_gate_passed: bool = True,
+    observed_attempt_error_count: int = 0,
+    max_attempt_error_count_threshold: int = 5,
+    observed_attempt_skipped_count: int = 0,
+    max_attempt_skipped_count_threshold: int = 25,
 ) -> dict:
     return {
         "sloSummary": {
             "decision": "PROCEED",
             "alerts": [],
             "gates": {
-                "overallPassed": True,
+                "overallPassed": (
+                    schema_gate_passed
+                    and sample_gate_passed
+                    and orchestration_error_gate_passed
+                    and orchestration_skipped_gate_passed
+                ),
                 "schemaCoveragePassed": schema_gate_passed,
                 "schemaSampleSizePassed": sample_gate_passed,
+                "orchestrationAttemptErrorPassed": orchestration_error_gate_passed,
+                "orchestrationAttemptSkippedPassed": orchestration_skipped_gate_passed,
             },
             "schemaCoverage": {
                 "thresholdPct": 95.0,
@@ -29,6 +42,12 @@ def _build_evidence(
                 "sampleCount": sample_count,
                 "minSampleCount": min_sample_count,
                 "schemaV2Count": int((observed_pct / 100.0) * sample_count),
+            },
+            "orchestrationAudit": {
+                "maxAttemptErrorCountThreshold": max_attempt_error_count_threshold,
+                "observedAttemptErrorCount": observed_attempt_error_count,
+                "maxAttemptSkippedCountThreshold": max_attempt_skipped_count_threshold,
+                "observedAttemptSkippedCount": observed_attempt_skipped_count,
             },
             "rolloutActions": [
                 {
@@ -164,6 +183,69 @@ def test_release_gate_smoke_blocks_when_alerts_are_active():
             payload = json.load(f)
         assert payload["approved"] is False
         assert "noActiveAlerts" in payload["failedChecks"]
+
+
+def test_release_gate_smoke_blocks_then_approves_after_orchestration_recovery():
+    with tempfile.TemporaryDirectory() as tmp:
+        evidence_path = os.path.join(tmp, "connector_canary_evidence.json")
+        signoff_path = os.path.join(tmp, "connector_signoff.md")
+        validation_path = os.path.join(tmp, "connector_signoff_validation.json")
+        release_path = os.path.join(tmp, "connector_release_gate_result.json")
+
+        with open(evidence_path, "w", encoding="utf-8") as f:
+            json.dump(
+                _build_evidence(
+                    schema_gate_passed=True,
+                    observed_pct=100.0,
+                    orchestration_error_gate_passed=False,
+                    orchestration_skipped_gate_passed=False,
+                    observed_attempt_error_count=3,
+                    max_attempt_error_count_threshold=1,
+                    observed_attempt_skipped_count=4,
+                    max_attempt_skipped_count_threshold=2,
+                ),
+                f,
+            )
+
+        assert _run_generate(evidence_path, signoff_path) == 0
+        with open(signoff_path, "a", encoding="utf-8") as f:
+            f.write("\n- [x] Release Manager\n- [x] Sales Ops Lead\n")
+        for artifact in ["connector_canary_evidence.json", "telemetry_slo_gates_snapshot.json"]:
+            artifact_path = os.path.join(tmp, artifact)
+            if artifact_path == evidence_path:
+                continue
+            with open(artifact_path, "w", encoding="utf-8") as f:
+                f.write("{}")
+
+        assert _run_validate(evidence_path, signoff_path, tmp, validation_path) == 0
+        assert _run_enforce(evidence_path, validation_path, release_path) == 1
+        with open(release_path, "r", encoding="utf-8") as f:
+            blocked_payload = json.load(f)
+        assert blocked_payload["approved"] is False
+        assert "orchestrationAttemptErrorPassed" in blocked_payload["failedChecks"]
+        assert "orchestrationAttemptSkippedPassed" in blocked_payload["failedChecks"]
+
+        with open(evidence_path, "w", encoding="utf-8") as f:
+            json.dump(
+                _build_evidence(
+                    schema_gate_passed=True,
+                    observed_pct=100.0,
+                    orchestration_error_gate_passed=True,
+                    orchestration_skipped_gate_passed=True,
+                    observed_attempt_error_count=1,
+                    max_attempt_error_count_threshold=1,
+                    observed_attempt_skipped_count=2,
+                    max_attempt_skipped_count_threshold=2,
+                ),
+                f,
+            )
+
+        assert _run_validate(evidence_path, signoff_path, tmp, validation_path) == 0
+        assert _run_enforce(evidence_path, validation_path, release_path) == 0
+        with open(release_path, "r", encoding="utf-8") as f:
+            approved_payload = json.load(f)
+        assert approved_payload["approved"] is True
+        assert approved_payload["failedChecks"] == []
 
 
 def test_release_gate_smoke_blocks_when_required_approval_is_missing():

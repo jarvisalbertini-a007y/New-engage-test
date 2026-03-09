@@ -77,6 +77,8 @@ class ConnectorCanaryDryRunSmokeTests(unittest.TestCase):
                 max_error_rate_pct = 5
                 min_schema_v2_pct = 95
                 min_schema_v2_sample_count = 25
+                max_orchestration_attempt_error_count = 5
+                max_orchestration_attempt_skipped_count = 25
                 output = output_path
 
             original_parse = collect_connector_canary_evidence.parse_args
@@ -103,6 +105,8 @@ class ConnectorCanaryDryRunSmokeTests(unittest.TestCase):
         slo_urls = [url for url in captured_urls if "telemetry/slo-gates" in url]
         self.assertEqual(len(slo_urls), 1)
         self.assertIn("min_schema_v2_sample_count=25", slo_urls[0])
+        self.assertIn("max_orchestration_attempt_error_count=5", slo_urls[0])
+        self.assertIn("max_orchestration_attempt_skipped_count=25", slo_urls[0])
 
 
 if __name__ == "__main__":

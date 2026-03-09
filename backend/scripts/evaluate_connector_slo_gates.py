@@ -34,6 +34,9 @@ from core.integration_slo_policy import (
     TELEMETRY_DAYS_MIN,
 )
 
+ORCHESTRATION_ATTEMPT_THRESHOLD_MIN = 0
+ORCHESTRATION_ATTEMPT_THRESHOLD_MAX = 5000
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate connector SLO gates")
@@ -58,6 +61,18 @@ def parse_args():
         type=int,
         default=None,
         help="Optional override for minimum sales schema v2 sample count",
+    )
+    parser.add_argument(
+        "--max-orchestration-attempt-error-count",
+        type=int,
+        default=None,
+        help="Optional override for maximum orchestration attempt error count",
+    )
+    parser.add_argument(
+        "--max-orchestration-attempt-skipped-count",
+        type=int,
+        default=None,
+        help="Optional override for maximum orchestration attempt skipped count",
     )
     return parser.parse_args()
 
@@ -91,6 +106,28 @@ def _validate_args(args):
             f"min_schema_v2_sample_count must be between "
             f"{SAMPLE_THRESHOLD_MIN} and {SAMPLE_THRESHOLD_MAX}"
         )
+    orchestration_attempt_error_count = getattr(
+        args, "max_orchestration_attempt_error_count", None
+    )
+    if orchestration_attempt_error_count is not None and (
+        orchestration_attempt_error_count < ORCHESTRATION_ATTEMPT_THRESHOLD_MIN
+        or orchestration_attempt_error_count > ORCHESTRATION_ATTEMPT_THRESHOLD_MAX
+    ):
+        return (
+            f"max_orchestration_attempt_error_count must be between "
+            f"{ORCHESTRATION_ATTEMPT_THRESHOLD_MIN} and {ORCHESTRATION_ATTEMPT_THRESHOLD_MAX}"
+        )
+    orchestration_attempt_skipped_count = getattr(
+        args, "max_orchestration_attempt_skipped_count", None
+    )
+    if orchestration_attempt_skipped_count is not None and (
+        orchestration_attempt_skipped_count < ORCHESTRATION_ATTEMPT_THRESHOLD_MIN
+        or orchestration_attempt_skipped_count > ORCHESTRATION_ATTEMPT_THRESHOLD_MAX
+    ):
+        return (
+            f"max_orchestration_attempt_skipped_count must be between "
+            f"{ORCHESTRATION_ATTEMPT_THRESHOLD_MIN} and {ORCHESTRATION_ATTEMPT_THRESHOLD_MAX}"
+        )
     return None
 
 
@@ -116,6 +153,14 @@ def main():
         query["min_schema_v2_pct"] = args.min_schema_v2_pct
     if args.min_schema_v2_sample_count is not None:
         query["min_schema_v2_sample_count"] = args.min_schema_v2_sample_count
+    if getattr(args, "max_orchestration_attempt_error_count", None) is not None:
+        query["max_orchestration_attempt_error_count"] = (
+            args.max_orchestration_attempt_error_count
+        )
+    if getattr(args, "max_orchestration_attempt_skipped_count", None) is not None:
+        query["max_orchestration_attempt_skipped_count"] = (
+            args.max_orchestration_attempt_skipped_count
+        )
     query_str = urllib.parse.urlencode(query)
     url = f"{args.base_url.rstrip('/')}/api/integrations/integrations/telemetry/slo-gates?{query_str}"
 

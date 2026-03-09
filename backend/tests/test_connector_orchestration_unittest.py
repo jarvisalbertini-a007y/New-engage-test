@@ -4,7 +4,9 @@ import sys
 from unittest.mock import AsyncMock, patch
 
 
-if "fastapi" not in sys.modules:
+try:
+    import fastapi as _fastapi  # noqa: F401
+except Exception:
     fastapi_stub = types.ModuleType("fastapi")
 
     class _HTTPException(Exception):
@@ -28,10 +30,18 @@ if "fastapi" not in sys.modules:
     class _BackgroundTasks:
         pass
 
+    class _Request:
+        headers = {}
+
+    class _Response:
+        headers = {}
+
     fastapi_stub.APIRouter = _APIRouter
     fastapi_stub.HTTPException = _HTTPException
     fastapi_stub.Depends = _depends
     fastapi_stub.BackgroundTasks = _BackgroundTasks
+    fastapi_stub.Request = _Request
+    fastapi_stub.Response = _Response
     sys.modules["fastapi"] = fastapi_stub
 
 if "database" not in sys.modules:
@@ -97,6 +107,7 @@ class _FakeDb:
 class ConnectorOrchestrationTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.current_user = {"id": "u-test", "email": "user@example.com"}
+        real_integrations._reset_connector_rate_limit_state()
 
     def test_normalize_apollo_company_results(self):
         payload = {
@@ -123,6 +134,23 @@ class ConnectorOrchestrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(companies[0]["domain"], "growthops.ai")
         self.assertEqual(companies[0]["source"], "apollo")
         self.assertEqual(companies[1]["fundingStage"], "Series B")
+
+    def test_normalize_provider_order_with_diagnostics(self):
+        order, diagnostics = real_integrations._normalize_provider_order_with_diagnostics(
+            ["clearbit", "clearbit", "apollo", "unknown", "crunchbase", "unknown"]
+        )
+        self.assertEqual(order, ["clearbit", "apollo", "crunchbase"])
+        self.assertEqual(diagnostics["duplicatesRemoved"], ["clearbit"])
+        self.assertEqual(diagnostics["ignoredProviders"], ["unknown"])
+        self.assertFalse(diagnostics["defaultApplied"])
+
+    def test_normalize_provider_order_with_diagnostics_defaults(self):
+        order, diagnostics = real_integrations._normalize_provider_order_with_diagnostics(
+            ["invalid-provider"]
+        )
+        self.assertEqual(order, ["clearbit", "apollo", "crunchbase"])
+        self.assertTrue(diagnostics["defaultApplied"])
+        self.assertEqual(diagnostics["ignoredProviders"], ["invalid-provider"])
 
     async def test_orchestration_requires_feature_flag(self):
         with patch.dict("os.environ", {"ENABLE_CONNECTOR_ORCHESTRATION": "false"}, clear=False):
@@ -163,13 +191,39 @@ class ConnectorOrchestrationTests(unittest.IsolatedAsyncioTestCase):
                                 AsyncMock(return_value={"companies": []}),
                             ) as crunchbase_mock:
                                 response = await real_integrations.enrich_company_with_fallback(
-                                    {"domain": "growthops.ai"},
+                                    {
+                                        "domain": "growthops.ai",
+                                        "providerOrder": [
+                                            "clearbit",
+                                            "clearbit",
+                                            "apollo",
+                                            "bad-provider",
+                                        ],
+                                    },
                                     current_user=self.current_user,
                                 )
 
         self.assertTrue(response["found"])
         self.assertEqual(response["selectedProvider"], "clearbit")
         self.assertEqual(response["resultCount"], 1)
+        self.assertEqual(response["attemptSummary"]["total"], 1)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["success"], 1)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["skipped"], 0)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["error"], 0)
+        self.assertEqual(response["attemptSummary"]["reasonCodeCounts"]["success"], 1)
+        self.assertEqual(response["attemptSummary"]["providersAttempted"], ["clearbit"])
+        self.assertEqual(response["attemptSummary"]["providersWithResults"], ["clearbit"])
+        self.assertEqual(response["attemptSummary"]["providersWithoutResults"], [])
+        self.assertEqual(
+            response["criteria"]["providerOrderDiagnostics"]["duplicatesRemoved"],
+            ["clearbit"],
+        )
+        self.assertEqual(
+            response["criteria"]["providerOrderDiagnostics"]["ignoredProviders"],
+            ["bad-provider"],
+        )
+        self.assertEqual(response["attempts"][0]["reasonCode"], "success")
+        self.assertGreaterEqual(response["attempts"][0]["latencyMs"], 0)
         clearbit_mock.assert_awaited_once()
         apollo_mock.assert_not_awaited()
         crunchbase_mock.assert_not_awaited()
@@ -201,9 +255,23 @@ class ConnectorOrchestrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response["found"])
         self.assertEqual(response["selectedProvider"], "apollo")
         self.assertEqual(response["resultCount"], 1)
+        self.assertEqual(response["attemptSummary"]["total"], 2)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["success"], 1)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["skipped"], 1)
+        self.assertEqual(response["attemptSummary"]["statusCounts"]["error"], 0)
+        self.assertEqual(response["attemptSummary"]["reasonCodeCounts"]["domain_required"], 1)
+        self.assertEqual(response["attemptSummary"]["reasonCodeCounts"]["success"], 1)
+        self.assertEqual(
+            response["attemptSummary"]["providersAttempted"],
+            ["clearbit", "apollo"],
+        )
+        self.assertEqual(response["attemptSummary"]["providersWithResults"], ["apollo"])
+        self.assertEqual(response["attemptSummary"]["providersWithoutResults"], [])
         self.assertEqual(response["attempts"][0]["provider"], "clearbit")
         self.assertEqual(response["attempts"][0]["status"], "skipped")
         self.assertEqual(response["attempts"][0]["reason"], "domain_required")
+        self.assertEqual(response["attempts"][0]["reasonCode"], "domain_required")
+        self.assertGreaterEqual(response["attempts"][0]["latencyMs"], 0)
         apollo_mock.assert_awaited_once()
 
     async def test_apollo_company_enrichment_persists_results(self):

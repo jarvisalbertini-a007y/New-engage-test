@@ -44,6 +44,8 @@ def build_fixture_payload(profile: str = "pass"):
                     "overallPassed": True,
                     "schemaCoveragePassed": True,
                     "schemaSampleSizePassed": True,
+                    "orchestrationAttemptErrorPassed": True,
+                    "orchestrationAttemptSkippedPassed": True,
                 },
                 "schemaCoverage": {
                     "thresholdPct": 95.0,
@@ -51,6 +53,12 @@ def build_fixture_payload(profile: str = "pass"):
                     "sampleCount": 30,
                     "minSampleCount": 25,
                     "schemaV2Count": 30,
+                },
+                "orchestrationAudit": {
+                    "maxAttemptErrorCountThreshold": 5,
+                    "observedAttemptErrorCount": 0,
+                    "maxAttemptSkippedCountThreshold": 25,
+                    "observedAttemptSkippedCount": 0,
                 },
                 "signoff": {"status": "READY_FOR_APPROVAL"},
             }
@@ -72,6 +80,8 @@ def build_fixture_payload(profile: str = "pass"):
                     "overallPassed": False,
                     "schemaCoveragePassed": False,
                     "schemaSampleSizePassed": False,
+                    "orchestrationAttemptErrorPassed": False,
+                    "orchestrationAttemptSkippedPassed": False,
                 },
                 "schemaCoverage": {
                     "thresholdPct": 95.0,
@@ -79,6 +89,12 @@ def build_fixture_payload(profile: str = "pass"):
                     "sampleCount": 8,
                     "minSampleCount": 25,
                     "schemaV2Count": 6,
+                },
+                "orchestrationAudit": {
+                    "maxAttemptErrorCountThreshold": 1,
+                    "observedAttemptErrorCount": 3,
+                    "maxAttemptSkippedCountThreshold": 2,
+                    "observedAttemptSkippedCount": 4,
                 },
                 "signoff": {"status": "HOLD_REMEDIATION_REQUIRED"},
             }
@@ -92,6 +108,8 @@ def build_fixture_payload(profile: str = "pass"):
                     "overallPassed": True,
                     "schemaCoveragePassed": True,
                     "schemaSampleSizePassed": True,
+                    "orchestrationAttemptErrorPassed": True,
+                    "orchestrationAttemptSkippedPassed": True,
                 },
                 "schemaCoverage": {
                     "thresholdPct": 95.0,
@@ -99,6 +117,12 @@ def build_fixture_payload(profile: str = "pass"):
                     "sampleCount": 30,
                     "minSampleCount": 25,
                     "schemaV2Count": 30,
+                },
+                "orchestrationAudit": {
+                    "maxAttemptErrorCountThreshold": 5,
+                    "observedAttemptErrorCount": 0,
+                    "maxAttemptSkippedCountThreshold": 25,
+                    "observedAttemptSkippedCount": 0,
                 },
                 "signoff": {"status": "READY_FOR_APPROVAL"},
             }

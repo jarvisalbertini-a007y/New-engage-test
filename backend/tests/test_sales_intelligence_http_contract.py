@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
@@ -190,11 +192,22 @@ def test_pipeline_forecast_success_and_telemetry(monkeypatch):
     payload = response.json()
     assert payload["windowDays"] == 120
     assert payload["sampleSize"]["openProspects"] == 2
+    assert payload["confidenceIntervalWidth"] > 0
+    assert payload["confidenceIntervalWidthPct"] > 0
+    assert payload["forecastReliabilityTier"] in {"low", "medium", "high"}
+    assert isinstance(payload["forecastRecommendation"], str)
     assert len(fake_db.integration_telemetry.inserted) == 1
     assert fake_db.integration_telemetry.inserted[0]["eventType"] == "sales_pipeline_forecast_generated"
+    telemetry_payload = fake_db.integration_telemetry.inserted[0]["payload"]
+    assert "confidence_interval_width" in telemetry_payload
+    assert "confidence_interval_width_pct" in telemetry_payload
+    assert telemetry_payload["forecast_reliability_tier"] in {"low", "medium", "high"}
 
 
 def test_sales_intelligence_telemetry_includes_request_id_and_schema(monkeypatch):
+    telemetry_timestamp = (
+        datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=5)
+    ).isoformat()
     fake_db = _FakeDb(
         prospects=[
             {"id": "p1", "userId": "u1", "leadScore": 80, "status": "open"},
@@ -208,7 +221,7 @@ def test_sales_intelligence_telemetry_includes_request_id_and_schema(monkeypatch
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Pricing", "message": "Can you send options?"},
-                "timestamp": "2026-02-22T12:00:00+00:00",
+                "timestamp": telemetry_timestamp,
             }
         ],
     )
@@ -241,6 +254,9 @@ def test_sales_intelligence_telemetry_includes_request_id_and_schema(monkeypatch
 
 
 def test_sales_intelligence_telemetry_uses_correlation_id_fallback(monkeypatch):
+    fallback_timestamp = (
+        datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=4)
+    ).isoformat()
     fake_db = _FakeDb(
         email_events=[
             {
@@ -248,7 +264,7 @@ def test_sales_intelligence_telemetry_uses_correlation_id_fallback(monkeypatch):
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Pricing", "message": "Share options"},
-                "timestamp": "2026-02-22T12:00:00+00:00",
+                "timestamp": fallback_timestamp,
             }
         ],
     )
@@ -266,6 +282,9 @@ def test_sales_intelligence_telemetry_uses_correlation_id_fallback(monkeypatch):
 
 
 def test_sales_intelligence_request_id_propagates_across_endpoint_families(monkeypatch):
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    request_chat_timestamp = (recent_base - timedelta(minutes=6)).isoformat()
+    request_email_timestamp = (recent_base - timedelta(minutes=4)).isoformat()
     fake_db = _FakeDb(
         prospects=[
             {
@@ -285,7 +304,7 @@ def test_sales_intelligence_request_id_propagates_across_endpoint_families(monke
                 "userId": "u1",
                 "message": "This looks useful.",
                 "response": "Let's meet next week.",
-                "timestamp": "2026-02-22T10:00:00+00:00",
+                "timestamp": request_chat_timestamp,
             }
         ],
         companies=[{"id": "c1", "userId": "u1", "name": "Acme Inc"}],
@@ -295,7 +314,7 @@ def test_sales_intelligence_request_id_propagates_across_endpoint_families(monke
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Book demo", "message": "Book a demo this week"},
-                "timestamp": "2026-02-22T12:00:00+00:00",
+                "timestamp": request_email_timestamp,
             }
         ],
     )
@@ -304,8 +323,17 @@ def test_sales_intelligence_request_id_propagates_across_endpoint_families(monke
 
     assert client.get("/api/sales-intelligence/forecast/pipeline?window_days=90", headers=headers).status_code == 200
     assert client.get("/api/sales-intelligence/conversation/intelligence?limit=50", headers=headers).status_code == 200
-    assert client.get("/api/sales-intelligence/engagement/multi-channel", headers=headers).status_code == 200
-    assert client.get("/api/sales-intelligence/relationships/map?limit=100", headers=headers).status_code == 200
+    assert (
+        client.get(
+            "/api/sales-intelligence/engagement/multi-channel?window_days=90&campaign_limit=100&ab_test_limit=120&prospect_limit=150",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.get("/api/sales-intelligence/relationships/map?window_days=90&limit=100", headers=headers).status_code
+        == 200
+    )
     assert client.get(
         "/api/sales-intelligence/analytics/phrases?window_days=60&min_exposure=1&limit=10",
         headers=headers,
@@ -329,7 +357,13 @@ def test_sales_intelligence_request_id_propagates_across_endpoint_families(monke
     campaign_id = create.json()["id"]
     assert client.get("/api/sales-intelligence/campaigns", headers=headers).status_code == 200
     assert client.get(f"/api/sales-intelligence/campaigns/{campaign_id}", headers=headers).status_code == 200
-    assert client.get(f"/api/sales-intelligence/campaigns/{campaign_id}/performance", headers=headers).status_code == 200
+    assert (
+        client.get(
+            f"/api/sales-intelligence/campaigns/{campaign_id}/performance?channel_limit=12",
+            headers=headers,
+        ).status_code
+        == 200
+    )
     assert (
         client.get(
             "/api/sales-intelligence/campaigns/performance/portfolio?window_days=30&limit=10",
@@ -407,13 +441,16 @@ def test_conversation_intelligence_flag_disabled(monkeypatch):
 
 def test_conversation_intelligence_success_and_telemetry(monkeypatch):
     monkeypatch.setenv("ENABLE_CONVERSATION_INTELLIGENCE", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    conversation_chat_timestamp = (recent_base - timedelta(minutes=6)).isoformat()
+    conversation_email_timestamp = (recent_base - timedelta(minutes=4)).isoformat()
     fake_db = _FakeDb(
         chat_sessions=[
             {
                 "userId": "u1",
                 "message": "Great timing, we should talk this week.",
                 "response": "Awesome. Let's book tomorrow.",
-                "timestamp": "2026-02-22T10:00:00+00:00",
+                "timestamp": conversation_chat_timestamp,
             }
         ],
         email_events=[
@@ -422,15 +459,16 @@ def test_conversation_intelligence_success_and_telemetry(monkeypatch):
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Budget check", "message": "Price is too expensive."},
-                "timestamp": "2026-02-22T12:00:00+00:00",
+                "timestamp": conversation_email_timestamp,
             }
         ],
     )
     client = _build_client(monkeypatch, fake_db, authenticated=True)
-    response = client.get("/api/sales-intelligence/conversation/intelligence?limit=50")
+    response = client.get("/api/sales-intelligence/conversation/intelligence?window_days=90&limit=50")
     assert response.status_code == 200
     payload = response.json()
     assert payload["totals"]["records"] >= 2
+    assert payload["windowDays"] == 90
     assert payload["sources"]["chatSessions"] == 1
     assert payload["sources"]["emailEvents"] == 1
     assert len(fake_db.integration_telemetry.inserted) == 1
@@ -438,6 +476,64 @@ def test_conversation_intelligence_success_and_telemetry(monkeypatch):
         fake_db.integration_telemetry.inserted[0]["eventType"]
         == "sales_conversation_intelligence_generated"
     )
+    telemetry_payload = fake_db.integration_telemetry.inserted[0]["payload"]
+    assert telemetry_payload["window_days"] == 90
+    assert telemetry_payload["limit"] == 50
+
+
+def test_conversation_intelligence_applies_window_filter(monkeypatch):
+    monkeypatch.setenv("ENABLE_CONVERSATION_INTELLIGENCE", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    recent_chat_timestamp = (recent_base - timedelta(days=2)).isoformat()
+    recent_email_timestamp = (recent_base - timedelta(days=2) + timedelta(minutes=5)).isoformat()
+    old_timestamp = (recent_base - timedelta(days=500)).isoformat()
+    fake_db = _FakeDb(
+        chat_sessions=[
+            {
+                "userId": "u1",
+                "message": "Recent conversation",
+                "response": "Recent response",
+                "timestamp": recent_chat_timestamp,
+            },
+            {
+                "userId": "u1",
+                "message": "Old conversation",
+                "response": "Old response",
+                "timestamp": old_timestamp,
+            },
+        ],
+        email_events=[
+            {
+                "userId": "u1",
+                "eventType": "reply",
+                "channel": "email",
+                "metadata": {"subject": "Recent", "message": "Recent body"},
+                "timestamp": recent_email_timestamp,
+            },
+            {
+                "userId": "u1",
+                "eventType": "reply",
+                "channel": "email",
+                "metadata": {"subject": "Old", "message": "Old body"},
+                "timestamp": old_timestamp,
+            },
+        ],
+    )
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/conversation/intelligence?window_days=14&limit=50")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sources"]["chatSessions"] == 1
+    assert payload["sources"]["emailEvents"] == 1
+    assert payload["totals"]["records"] == 2
+
+
+def test_conversation_intelligence_rejects_invalid_window_days(monkeypatch):
+    monkeypatch.setenv("ENABLE_CONVERSATION_INTELLIGENCE", "true")
+    fake_db = _FakeDb()
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/conversation/intelligence?window_days=1")
+    assert response.status_code == 422
 
 
 def test_multi_channel_engagement_flag_disabled(monkeypatch):
@@ -464,12 +560,99 @@ def test_multi_channel_engagement_success_and_telemetry(monkeypatch):
         ],
     )
     client = _build_client(monkeypatch, fake_db, authenticated=True)
-    response = client.get("/api/sales-intelligence/engagement/multi-channel")
+    response = client.get(
+        "/api/sales-intelligence/engagement/multi-channel?window_days=30&campaign_limit=10&ab_test_limit=10&prospect_limit=50"
+    )
     assert response.status_code == 200
     payload = response.json()
     assert payload["coverageScore"] >= 50
+    assert payload["coverageReliabilityTier"] in {"low", "medium", "high"}
+    assert isinstance(payload["coverageRecommendation"], str)
+    assert payload["windowDays"] == 30
+    assert payload["sourceCounts"]["campaigns"] == 2
+    assert payload["sourceCounts"]["abTests"] == 1
+    assert payload["sourceCounts"]["prospects"] == 2
+    assert payload["appliedLimits"] == {"windowDays": 30, "campaigns": 10, "abTests": 10, "prospects": 50}
     assert len(fake_db.integration_telemetry.inserted) == 1
     assert fake_db.integration_telemetry.inserted[0]["eventType"] == "sales_multi_channel_engagement_generated"
+    telemetry_payload = fake_db.integration_telemetry.inserted[0]["payload"]
+    assert telemetry_payload["window_days"] == 30
+    assert telemetry_payload["campaign_limit"] == 10
+    assert telemetry_payload["ab_test_limit"] == 10
+    assert telemetry_payload["prospect_limit"] == 50
+    assert telemetry_payload["coverage_reliability_tier"] in {"low", "medium", "high"}
+    assert telemetry_payload["window_start"]
+
+
+def test_multi_channel_engagement_rejects_invalid_limit(monkeypatch):
+    monkeypatch.setenv("ENABLE_MULTI_CHANNEL_ENGAGEMENT", "true")
+    fake_db = _FakeDb()
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/engagement/multi-channel?campaign_limit=1")
+    assert response.status_code == 422
+
+
+def test_multi_channel_engagement_rejects_invalid_window_days(monkeypatch):
+    monkeypatch.setenv("ENABLE_MULTI_CHANNEL_ENGAGEMENT", "true")
+    fake_db = _FakeDb()
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/engagement/multi-channel?window_days=1")
+    assert response.status_code == 422
+
+
+def test_multi_channel_engagement_respects_window_filter(monkeypatch):
+    monkeypatch.setenv("ENABLE_MULTI_CHANNEL_ENGAGEMENT", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    recent_updated_at = (recent_base - timedelta(days=3)).isoformat()
+    old_updated_at = (recent_base - timedelta(days=500)).isoformat()
+    fake_db = _FakeDb(
+        campaigns=[
+            {"userId": "u1", "channels": ["email"], "updatedAt": recent_updated_at},
+            {"userId": "u1", "channels": ["linkedin"], "updatedAt": old_updated_at},
+        ],
+        ab_tests=[
+            {"userId": "u1", "testType": "channel", "channelA": "email", "channelB": "phone", "updatedAt": recent_updated_at},
+            {"userId": "u1", "testType": "channel", "channelA": "sms", "channelB": "phone", "updatedAt": old_updated_at},
+        ],
+        prospects=[
+            {"userId": "u1", "preferredChannel": "linkedin", "updatedAt": recent_updated_at},
+            {"userId": "u1", "preferredChannel": "sms", "updatedAt": old_updated_at},
+        ],
+    )
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/engagement/multi-channel?window_days=30")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceCounts"]["campaigns"] == 1
+    assert payload["sourceCounts"]["abTests"] == 1
+    assert payload["sourceCounts"]["prospects"] == 1
+
+
+def test_multi_channel_engagement_accepts_limit_boundaries(monkeypatch):
+    monkeypatch.setenv("ENABLE_MULTI_CHANNEL_ENGAGEMENT", "true")
+    fake_db = _FakeDb(
+        campaigns=[{"userId": "u1", "channels": ["email"]}],
+        ab_tests=[{"userId": "u1", "testType": "channel", "channelA": "email", "channelB": "phone"}],
+        prospects=[{"userId": "u1", "preferredChannel": "linkedin"}],
+    )
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+
+    response = client.get(
+        "/api/sales-intelligence/engagement/multi-channel?window_days=14&campaign_limit=10&ab_test_limit=10&prospect_limit=50"
+    )
+    assert response.status_code == 200
+    assert response.json()["appliedLimits"] == {"windowDays": 14, "campaigns": 10, "abTests": 10, "prospects": 50}
+
+    response = client.get(
+        "/api/sales-intelligence/engagement/multi-channel?window_days=365&campaign_limit=5000&ab_test_limit=10000&prospect_limit=20000"
+    )
+    assert response.status_code == 200
+    assert response.json()["appliedLimits"] == {
+        "windowDays": 365,
+        "campaigns": 5000,
+        "abTests": 10000,
+        "prospects": 20000,
+    }
 
 
 def test_campaign_lifecycle_flag_disabled(monkeypatch):
@@ -553,14 +736,44 @@ def test_campaign_performance_endpoint_success(monkeypatch):
         ]
     )
     client = _build_client(monkeypatch, fake_db, authenticated=True)
-    response = client.get("/api/sales-intelligence/campaigns/c1/performance")
+    response = client.get("/api/sales-intelligence/campaigns/c1/performance?channel_limit=1")
     assert response.status_code == 200
     payload = response.json()
     assert payload["campaignId"] == "c1"
     assert payload["totals"]["sent"] == 140
     assert payload["overall"]["replyRate"] > 0
+    assert payload["channelCount"] == 2
+    assert payload["displayedChannelCount"] == 1
+    assert payload["appliedChannelLimit"] == 1
+    assert payload["channelsTruncated"] is True
+    assert len(payload["byChannel"]) == 1
     events = [item["eventType"] for item in fake_db.integration_telemetry.inserted]
     assert "sales_campaign_performance_viewed" in events
+    telemetry_payload = fake_db.integration_telemetry.inserted[-1]["payload"]
+    assert telemetry_payload["channel_limit"] == 1
+    assert telemetry_payload["channel_count"] == 2
+    assert telemetry_payload["displayed_channel_count"] == 1
+
+
+def test_campaign_performance_endpoint_rejects_invalid_channel_limit(monkeypatch):
+    monkeypatch.setenv("ENABLE_SALES_CAMPAIGNS", "true")
+    fake_db = _FakeDb(
+        campaigns=[
+            {
+                "id": "c1",
+                "userId": "u1",
+                "name": "Q2 Campaign",
+                "status": "active",
+                "channels": ["email"],
+                "metrics": {"email": {"sent": 100, "opened": 30, "replied": 9}},
+                "createdAt": "2026-02-22T00:00:00+00:00",
+                "updatedAt": "2026-02-22T08:00:00+00:00",
+            }
+        ]
+    )
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/campaigns/c1/performance?channel_limit=0")
+    assert response.status_code == 422
 
 
 def test_campaign_portfolio_performance_success_and_filters(monkeypatch):
@@ -672,13 +885,66 @@ def test_relationship_map_success_and_telemetry(monkeypatch):
         ],
     )
     client = _build_client(monkeypatch, fake_db, authenticated=True)
-    response = client.get("/api/sales-intelligence/relationships/map?limit=100")
+    response = client.get("/api/sales-intelligence/relationships/map?window_days=30&limit=100")
     assert response.status_code == 200
     payload = response.json()
     assert payload["stats"]["prospects"] == 2
     assert payload["stats"]["companies"] == 1
+    assert payload["windowDays"] == 30
+    assert payload["sourceCounts"] == {"prospects": 2, "companies": 1}
     assert len(fake_db.integration_telemetry.inserted) == 1
     assert fake_db.integration_telemetry.inserted[0]["eventType"] == "sales_relationship_map_generated"
+    telemetry_payload = fake_db.integration_telemetry.inserted[0]["payload"]
+    assert telemetry_payload["window_days"] == 30
+    assert telemetry_payload["window_start"]
+
+
+def test_relationship_map_rejects_invalid_window_days(monkeypatch):
+    monkeypatch.setenv("ENABLE_RELATIONSHIP_MAP", "true")
+    fake_db = _FakeDb()
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/relationships/map?window_days=1")
+    assert response.status_code == 422
+
+
+def test_relationship_map_respects_window_filter(monkeypatch):
+    monkeypatch.setenv("ENABLE_RELATIONSHIP_MAP", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    relationship_recent_updated_at = (recent_base - timedelta(days=3)).isoformat()
+    relationship_old_updated_at = (recent_base - timedelta(days=500)).isoformat()
+    fake_db = _FakeDb(
+        prospects=[
+            {
+                "id": "p1",
+                "userId": "u1",
+                "firstName": "Alex",
+                "lastName": "N",
+                "companyId": "c1",
+                "leadScore": 75,
+                "engagement": {"opens": 3, "clicks": 1, "replies": 1},
+                "updatedAt": relationship_recent_updated_at,
+            },
+            {
+                "id": "p2",
+                "userId": "u1",
+                "firstName": "Jamie",
+                "lastName": "L",
+                "companyId": "c1",
+                "leadScore": 61,
+                "engagement": {"opens": 2, "clicks": 0, "replies": 0},
+                "updatedAt": relationship_old_updated_at,
+            },
+        ],
+        companies=[
+            {"id": "c1", "userId": "u1", "name": "Acme Inc", "updatedAt": relationship_recent_updated_at},
+            {"id": "c2", "userId": "u1", "name": "Legacy Co", "updatedAt": relationship_old_updated_at},
+        ],
+    )
+    client = _build_client(monkeypatch, fake_db, authenticated=True)
+    response = client.get("/api/sales-intelligence/relationships/map?window_days=30&limit=100")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sourceCounts"] == {"prospects": 1, "companies": 1}
 
 
 def test_phrase_analytics_flag_disabled(monkeypatch):
@@ -724,6 +990,9 @@ def test_phrase_analytics_success_and_telemetry(monkeypatch):
 
 def test_phrase_analytics_respects_window_filter(monkeypatch):
     monkeypatch.setenv("ENABLE_PHRASE_ANALYTICS", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    phrase_recent_timestamp = (recent_base - timedelta(days=2)).isoformat()
+    phrase_old_timestamp = (recent_base - timedelta(days=500)).isoformat()
     fake_db = _FakeDb(
         email_events=[
             {
@@ -731,14 +1000,14 @@ def test_phrase_analytics_respects_window_filter(monkeypatch):
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Recent demo", "message": "Book a demo this week"},
-                "timestamp": "2026-02-21T11:00:00+00:00",
+                "timestamp": phrase_recent_timestamp,
             },
             {
                 "userId": "u1",
                 "eventType": "reply",
                 "channel": "email",
                 "metadata": {"subject": "Old demo", "message": "Book a demo last season"},
-                "timestamp": "2020-01-01T00:00:00+00:00",
+                "timestamp": phrase_old_timestamp,
             },
         ]
     )
@@ -940,6 +1209,9 @@ def test_prediction_performance_success(monkeypatch):
 
 def test_prediction_performance_respects_window_filter(monkeypatch):
     monkeypatch.setenv("ENABLE_RESPONSE_PREDICTION_FEEDBACK", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    prediction_recent_created_at = (recent_base - timedelta(days=2)).isoformat()
+    prediction_old_created_at = (recent_base - timedelta(days=500)).isoformat()
     fake_db = _FakeDb()
     fake_db.prediction_feedback.docs = [
         {
@@ -947,14 +1219,14 @@ def test_prediction_performance_respects_window_filter(monkeypatch):
             "predictedProbability": 0.7,
             "actualLabel": 1,
             "channel": "email",
-            "createdAt": "2026-02-20T10:00:00+00:00",
+            "createdAt": prediction_recent_created_at,
         },
         {
             "userId": "u1",
             "predictedProbability": 0.2,
             "actualLabel": 0,
             "channel": "email",
-            "createdAt": "2020-01-01T10:00:00+00:00",
+            "createdAt": prediction_old_created_at,
         },
     ]
     client = _build_client(monkeypatch, fake_db, authenticated=True)
@@ -996,6 +1268,9 @@ def test_prediction_performance_report_success(monkeypatch):
 
 def test_prediction_feedback_history(monkeypatch):
     monkeypatch.setenv("ENABLE_RESPONSE_PREDICTION_FEEDBACK", "true")
+    recent_base = datetime.now(timezone.utc).replace(microsecond=0)
+    feedback_created_at_1 = (recent_base - timedelta(days=1)).isoformat()
+    feedback_created_at_2 = (recent_base - timedelta(days=2)).isoformat()
     fake_db = _FakeDb()
     fake_db.prediction_feedback.docs = [
         {
@@ -1004,7 +1279,7 @@ def test_prediction_feedback_history(monkeypatch):
             "predictedProbability": 0.7,
             "actualLabel": 1,
             "channel": "email",
-            "createdAt": "2026-02-22T10:00:00+00:00",
+            "createdAt": feedback_created_at_1,
         },
         {
             "id": "f2",
@@ -1012,7 +1287,7 @@ def test_prediction_feedback_history(monkeypatch):
             "predictedProbability": 0.3,
             "actualLabel": 0,
             "channel": "linkedin",
-            "createdAt": "2026-02-21T10:00:00+00:00",
+            "createdAt": feedback_created_at_2,
         },
     ]
     client = _build_client(monkeypatch, fake_db, authenticated=True)

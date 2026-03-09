@@ -50,6 +50,25 @@ def evaluate_release_gate(evidence: dict, validation: dict) -> dict:
     schema_observed = schema_coverage.get("observedPct")
     schema_sample_count = schema_coverage.get("sampleCount")
     schema_min_sample_count = schema_coverage.get("minSampleCount")
+    orchestration_audit = slo.get("orchestrationAudit") or {}
+    orchestration_error_gate_passed = bool(
+        gates.get("orchestrationAttemptErrorPassed", False)
+    )
+    orchestration_skipped_gate_passed = bool(
+        gates.get("orchestrationAttemptSkippedPassed", False)
+    )
+    orchestration_error_threshold = orchestration_audit.get(
+        "maxAttemptErrorCountThreshold"
+    )
+    orchestration_error_observed = orchestration_audit.get(
+        "observedAttemptErrorCount"
+    )
+    orchestration_skipped_threshold = orchestration_audit.get(
+        "maxAttemptSkippedCountThreshold"
+    )
+    orchestration_skipped_observed = orchestration_audit.get(
+        "observedAttemptSkippedCount"
+    )
 
     checks = {
         "validationPassed": bool(validation.get("valid")),
@@ -58,6 +77,8 @@ def evaluate_release_gate(evidence: dict, validation: dict) -> dict:
         "noActiveAlerts": len(alerts) == 0,
         "schemaCoveragePassed": schema_gate_passed,
         "schemaSampleSizePassed": schema_sample_gate_passed,
+        "orchestrationAttemptErrorPassed": orchestration_error_gate_passed,
+        "orchestrationAttemptSkippedPassed": orchestration_skipped_gate_passed,
     }
     failed_checks = [name for name, passed in checks.items() if not passed]
     approved = len(failed_checks) == 0
@@ -85,6 +106,30 @@ def evaluate_release_gate(evidence: dict, validation: dict) -> dict:
             )
         else:
             reasons.append("Schema sample size gate is not passed.")
+    if not checks["orchestrationAttemptErrorPassed"]:
+        if (
+            orchestration_error_observed is not None
+            and orchestration_error_threshold is not None
+        ):
+            reasons.append(
+                "Orchestration attempt error count is "
+                f"{orchestration_error_observed}, above threshold "
+                f"{orchestration_error_threshold}."
+            )
+        else:
+            reasons.append("Orchestration attempt error gate is not passed.")
+    if not checks["orchestrationAttemptSkippedPassed"]:
+        if (
+            orchestration_skipped_observed is not None
+            and orchestration_skipped_threshold is not None
+        ):
+            reasons.append(
+                "Orchestration attempt skipped count is "
+                f"{orchestration_skipped_observed}, above threshold "
+                f"{orchestration_skipped_threshold}."
+            )
+        else:
+            reasons.append("Orchestration attempt skipped gate is not passed.")
 
     return {
         "evaluatedAt": datetime.now(timezone.utc).isoformat(),
@@ -98,6 +143,14 @@ def evaluate_release_gate(evidence: dict, validation: dict) -> dict:
             "sampleSizePassed": schema_sample_gate_passed,
             "sampleCount": schema_sample_count,
             "minSampleCount": schema_min_sample_count,
+        },
+        "orchestrationAudit": {
+            "attemptErrorPassed": orchestration_error_gate_passed,
+            "observedAttemptErrorCount": orchestration_error_observed,
+            "maxAttemptErrorCountThreshold": orchestration_error_threshold,
+            "attemptSkippedPassed": orchestration_skipped_gate_passed,
+            "observedAttemptSkippedCount": orchestration_skipped_observed,
+            "maxAttemptSkippedCountThreshold": orchestration_skipped_threshold,
         },
         "checks": checks,
         "failedChecks": failed_checks,

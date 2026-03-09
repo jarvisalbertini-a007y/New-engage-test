@@ -28,8 +28,12 @@ def test_build_fixture_payload_produces_release_gate_contract_shape_for_pass_pro
     assert payload["decision"] == "PROCEED"
     assert payload["checks"]["schemaCoveragePassed"] is True
     assert payload["checks"]["schemaSampleSizePassed"] is True
+    assert payload["checks"]["orchestrationAttemptErrorPassed"] is True
+    assert payload["checks"]["orchestrationAttemptSkippedPassed"] is True
     assert payload["schemaCoverage"]["sampleCount"] == 30
     assert payload["schemaCoverage"]["minSampleCount"] == 25
+    assert payload["orchestrationAudit"]["attemptErrorPassed"] is True
+    assert payload["orchestrationAudit"]["attemptSkippedPassed"] is True
 
 
 def test_build_fixture_payload_produces_blocked_release_gate_for_hold_profile():
@@ -39,10 +43,16 @@ def test_build_fixture_payload_produces_blocked_release_gate_for_hold_profile():
     assert payload["decision"] == "HOLD"
     assert payload["checks"]["schemaCoveragePassed"] is False
     assert payload["checks"]["schemaSampleSizePassed"] is False
+    assert payload["checks"]["orchestrationAttemptErrorPassed"] is False
+    assert payload["checks"]["orchestrationAttemptSkippedPassed"] is False
     assert "decisionIsProceed" in payload["failedChecks"]
     assert "schemaSampleSizePassed" in payload["failedChecks"]
+    assert "orchestrationAttemptErrorPassed" in payload["failedChecks"]
+    assert "orchestrationAttemptSkippedPassed" in payload["failedChecks"]
     assert payload["schemaCoverage"]["sampleCount"] == 8
     assert payload["schemaCoverage"]["minSampleCount"] == 25
+    assert payload["orchestrationAudit"]["observedAttemptErrorCount"] == 3
+    assert payload["orchestrationAudit"]["observedAttemptSkippedCount"] == 4
 
 
 def test_build_fixture_payload_produces_validation_failed_profile():
@@ -53,6 +63,8 @@ def test_build_fixture_payload_produces_validation_failed_profile():
     assert payload["checks"]["validationPassed"] is False
     assert payload["checks"]["schemaCoveragePassed"] is True
     assert payload["checks"]["schemaSampleSizePassed"] is True
+    assert payload["checks"]["orchestrationAttemptErrorPassed"] is True
+    assert payload["checks"]["orchestrationAttemptSkippedPassed"] is True
     assert "validationPassed" in payload["failedChecks"]
 
 

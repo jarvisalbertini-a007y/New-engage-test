@@ -27,6 +27,20 @@ def _valid_payload(step_labels):
         "workspace": "/tmp/repo",
         "overallStatus": "pass",
         "schemaAdoption": {"available": False},
+        "runtimePrereqs": {
+            "available": True,
+            "passed": True,
+            "source": "/tmp/sales_runtime_prereqs.json",
+            "artifactPath": "/tmp/sales_runtime_prereqs.json",
+            "generatedAt": "2026-02-22T00:00:00+00:00",
+            "validatedAt": "2026-02-22T00:00:00+00:00",
+            "command": "verify_sales_runtime_prereqs",
+            "valid": True,
+            "contractValid": True,
+            "missingChecks": {"commands": [], "workspace": []},
+            "missingCheckCount": 0,
+        },
+        "orchestrationGate": {"available": False},
         "releaseGateFixtures": {
             "sourceDir": "/tmp",
             "requiredProfiles": ["pass", "hold", "validation-fail"],
@@ -82,6 +96,84 @@ def test_validate_artifact_rejects_step_label_order_drift():
     payload = _valid_payload(list(reversed(labels)))
     errors = module.validate_artifact(payload)
     assert any("step labels/order mismatch" in error for error in errors)
+
+
+def test_validate_artifact_rejects_missing_orchestration_gate_available_marker():
+    module = _load_script_module()
+    labels = [step["label"] for step in module.DEFAULT_STEPS]
+    payload = _valid_payload(labels)
+    payload["orchestrationGate"] = {}
+    errors = module.validate_artifact(payload)
+    assert any("orchestrationGate missing key: available" in error for error in errors)
+
+
+def test_validate_artifact_rejects_runtime_prereqs_fail_state():
+    module = _load_script_module()
+    labels = [step["label"] for step in module.DEFAULT_STEPS]
+    payload = _valid_payload(labels)
+    payload["runtimePrereqs"]["passed"] = False
+    payload["runtimePrereqs"]["valid"] = False
+    payload["runtimePrereqs"]["missingChecks"]["commands"] = ["git"]
+    payload["runtimePrereqs"]["missingCheckCount"] = 1
+    errors = module.validate_artifact(payload)
+    assert any("runtimePrereqs.passed must be true" in error for error in errors)
+    assert any("runtimePrereqs.valid must be true" in error for error in errors)
+    assert any(
+        "runtimePrereqs.missingChecks.commands must be empty" in error for error in errors
+    )
+    assert any("runtimePrereqs.missingCheckCount must be 0" in error for error in errors)
+
+
+def test_validate_artifact_rejects_incomplete_orchestration_gate_when_available():
+    module = _load_script_module()
+    labels = [step["label"] for step in module.DEFAULT_STEPS]
+    payload = _valid_payload(labels)
+    payload["orchestrationGate"] = {"available": True, "decision": "PROCEED"}
+    errors = module.validate_artifact(payload)
+    assert any(
+        "orchestrationGate missing key: attemptErrorGatePassed" in error
+        for error in errors
+    )
+    assert any(
+        "orchestrationGate missing key: observedAttemptSkippedCount" in error
+        for error in errors
+    )
+
+
+def test_validate_artifact_rejects_invalid_orchestration_gate_value_types():
+    module = _load_script_module()
+    labels = [step["label"] for step in module.DEFAULT_STEPS]
+    payload = _valid_payload(labels)
+    payload["orchestrationGate"] = {
+        "available": True,
+        "decision": 123,
+        "attemptErrorGatePassed": "true",
+        "attemptSkippedGatePassed": False,
+        "maxAttemptErrorCountThreshold": -1,
+        "observedAttemptErrorCount": 2,
+        "maxAttemptSkippedCountThreshold": "3",
+        "observedAttemptSkippedCount": 1,
+    }
+    errors = module.validate_artifact(payload)
+    assert any(
+        "orchestrationGate.decision must be a string when available=true" in error
+        for error in errors
+    )
+    assert any(
+        "orchestrationGate.attemptErrorGatePassed must be a boolean when available=true"
+        in error
+        for error in errors
+    )
+    assert any(
+        "orchestrationGate.maxAttemptErrorCountThreshold must be a non-negative integer when available=true"
+        in error
+        for error in errors
+    )
+    assert any(
+        "orchestrationGate.maxAttemptSkippedCountThreshold must be a non-negative integer when available=true"
+        in error
+        for error in errors
+    )
 
 
 def test_main_returns_nonzero_for_invalid_artifact_file():

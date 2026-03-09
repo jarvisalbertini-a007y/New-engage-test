@@ -16,12 +16,20 @@ class EnforceConnectorReleaseGateTests(unittest.TestCase):
                     "overallPassed": True,
                     "schemaCoveragePassed": True,
                     "schemaSampleSizePassed": True,
+                    "orchestrationAttemptErrorPassed": True,
+                    "orchestrationAttemptSkippedPassed": True,
                 },
                 "schemaCoverage": {
                     "thresholdPct": 95.0,
                     "observedPct": 100.0,
                     "sampleCount": 30,
                     "minSampleCount": 25,
+                },
+                "orchestrationAudit": {
+                    "maxAttemptErrorCountThreshold": 5,
+                    "observedAttemptErrorCount": 0,
+                    "maxAttemptSkippedCountThreshold": 25,
+                    "observedAttemptSkippedCount": 0,
                 },
                 "signoff": {
                     "status": "READY_FOR_APPROVAL",
@@ -79,6 +87,21 @@ class EnforceConnectorReleaseGateTests(unittest.TestCase):
         self.assertIn("schemaSampleSizePassed", result["failedChecks"])
         self.assertFalse(result["schemaCoverage"]["sampleSizePassed"])
         self.assertIn("below minimum", " ".join(result["reasons"]))
+
+    def test_release_gate_fails_when_orchestration_attempt_gate_is_not_passed(self):
+        evidence = self._base_evidence()
+        evidence["sloSummary"]["gates"]["orchestrationAttemptErrorPassed"] = False
+        evidence["sloSummary"]["orchestrationAudit"]["maxAttemptErrorCountThreshold"] = 1
+        evidence["sloSummary"]["orchestrationAudit"]["observedAttemptErrorCount"] = 3
+
+        result = enforce_connector_release_gate.evaluate_release_gate(
+            evidence,
+            self._base_validation(),
+        )
+        self.assertFalse(result["approved"])
+        self.assertIn("orchestrationAttemptErrorPassed", result["failedChecks"])
+        self.assertFalse(result["orchestrationAudit"]["attemptErrorPassed"])
+        self.assertIn("above threshold", " ".join(result["reasons"]))
 
     def test_main_writes_output_and_returns_nonzero_when_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:

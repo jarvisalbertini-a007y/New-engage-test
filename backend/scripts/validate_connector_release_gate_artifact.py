@@ -17,6 +17,7 @@ REQUIRED_TOP_LEVEL_KEYS = [
     "decision",
     "signoffStatus",
     "schemaCoverage",
+    "orchestrationAudit",
     "checks",
     "failedChecks",
     "reasons",
@@ -31,6 +32,15 @@ REQUIRED_SCHEMA_COVERAGE_KEYS = [
     "minSampleCount",
 ]
 
+REQUIRED_ORCHESTRATION_AUDIT_KEYS = [
+    "attemptErrorPassed",
+    "observedAttemptErrorCount",
+    "maxAttemptErrorCountThreshold",
+    "attemptSkippedPassed",
+    "observedAttemptSkippedCount",
+    "maxAttemptSkippedCountThreshold",
+]
+
 REQUIRED_CHECK_KEYS = [
     "validationPassed",
     "decisionIsProceed",
@@ -38,6 +48,8 @@ REQUIRED_CHECK_KEYS = [
     "noActiveAlerts",
     "schemaCoveragePassed",
     "schemaSampleSizePassed",
+    "orchestrationAttemptErrorPassed",
+    "orchestrationAttemptSkippedPassed",
 ]
 
 
@@ -74,6 +86,14 @@ def validate_artifact(payload: Dict[str, object]) -> List[str]:
         for key in REQUIRED_SCHEMA_COVERAGE_KEYS:
             if key not in schema_coverage:
                 errors.append(f"schemaCoverage missing key: {key}")
+
+    orchestration_audit = payload.get("orchestrationAudit")
+    if not isinstance(orchestration_audit, dict):
+        errors.append("orchestrationAudit must be an object")
+    else:
+        for key in REQUIRED_ORCHESTRATION_AUDIT_KEYS:
+            if key not in orchestration_audit:
+                errors.append(f"orchestrationAudit missing key: {key}")
 
     checks = payload.get("checks")
     if not isinstance(checks, dict):

@@ -35,6 +35,14 @@ def _valid_payload():
             "sampleCount": 30,
             "minSampleCount": 25,
         },
+        "orchestrationAudit": {
+            "attemptErrorPassed": True,
+            "observedAttemptErrorCount": 0,
+            "maxAttemptErrorCountThreshold": 5,
+            "attemptSkippedPassed": True,
+            "observedAttemptSkippedCount": 1,
+            "maxAttemptSkippedCountThreshold": 25,
+        },
         "checks": {
             "validationPassed": True,
             "decisionIsProceed": True,
@@ -42,6 +50,8 @@ def _valid_payload():
             "noActiveAlerts": True,
             "schemaCoveragePassed": True,
             "schemaSampleSizePassed": True,
+            "orchestrationAttemptErrorPassed": True,
+            "orchestrationAttemptSkippedPassed": True,
         },
         "failedChecks": [],
         "reasons": [],
@@ -60,6 +70,17 @@ def test_validate_artifact_rejects_missing_schema_keys():
     payload["schemaCoverage"].pop("sampleSizePassed")
     errors = module.validate_artifact(payload)
     assert any("schemaCoverage missing key: sampleSizePassed" in error for error in errors)
+
+
+def test_validate_artifact_rejects_missing_orchestration_keys():
+    module = _load_script_module()
+    payload = _valid_payload()
+    payload["orchestrationAudit"].pop("maxAttemptSkippedCountThreshold")
+    errors = module.validate_artifact(payload)
+    assert any(
+        "orchestrationAudit missing key: maxAttemptSkippedCountThreshold" in error
+        for error in errors
+    )
 
 
 def test_validate_artifact_rejects_non_boolean_check_values():

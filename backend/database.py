@@ -64,17 +64,39 @@ async def create_indexes():
     await db.email_sends.create_index("provider")
     await db.email_events.create_index("sendId")
     await db.email_events.create_index("eventType")
+    await db.email_events.create_index("timestamp")
+    await db.email_events.create_index([("sendId", 1), ("eventType", 1), ("timestamp", -1)])
     await db.integration_telemetry.create_index("userId")
     await db.integration_telemetry.create_index("provider")
     await db.integration_telemetry.create_index("eventType")
     await db.integration_telemetry.create_index("createdAt")
+    await db.integration_telemetry.create_index([("userId", 1), ("createdAt", -1)])
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("eventType", 1), ("createdAt", -1)]
+    )
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("provider", 1), ("createdAt", -1)]
+    )
     await db.integration_telemetry.create_index(
         [("userId", 1), ("provider", 1), ("eventType", 1), ("createdAt", -1)]
+    )
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("governanceStatus", 1), ("createdAt", -1)]
+    )
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("governancePacketValidationStatus", 1), ("createdAt", -1)]
+    )
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("requestId", 1), ("createdAt", -1)]
+    )
+    await db.integration_telemetry.create_index(
+        [("userId", 1), ("schemaVersion", 1), ("createdAt", -1)]
     )
 
     # Webhook idempotency dedup cache (7 days)
     await db.integration_event_dedup.create_index("id", unique=True)
     await db.integration_event_dedup.create_index("createdAt", expireAfterSeconds=604800)
+    await db.integration_event_dedup.create_index([("provider", 1), ("createdAt", -1)])
 
     # Company research indexes
     await db.company_research.create_index("userId")

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -63,6 +65,11 @@ def _build_client(monkeypatch, fake_db):
 
 
 def test_schema_gate_smoke_hold_then_proceed(monkeypatch):
+    recent_base = datetime.now(timezone.utc).replace(
+        hour=12, minute=0, second=0, microsecond=0
+    )
+    created_at_1 = (recent_base - timedelta(minutes=5)).isoformat()
+    created_at_2 = recent_base.isoformat()
     telemetry_docs = [
         {
             "id": "s1",
@@ -71,7 +78,7 @@ def test_schema_gate_smoke_hold_then_proceed(monkeypatch):
             "eventType": "sales_pipeline_forecast_generated",
             "schemaVersion": 2,
             "payload": {"schema_version": 2},
-            "createdAt": "2026-02-18T11:00:00+00:00",
+            "createdAt": created_at_1,
         },
         {
             "id": "s2",
@@ -80,7 +87,7 @@ def test_schema_gate_smoke_hold_then_proceed(monkeypatch):
             "eventType": "sales_campaign_created",
             "schemaVersion": 1,
             "payload": {"schema_version": 1},
-            "createdAt": "2026-02-18T11:05:00+00:00",
+            "createdAt": created_at_2,
         },
     ]
     fake_db = _FakeDb(telemetry_docs)

@@ -170,3 +170,72 @@ def test_route_threshold_resolution_rejects_non_numeric_sample_threshold_env():
 
     assert exc.value.status_code == 400
     assert "INTEGRATION_SLO_MIN_SCHEMA_V2_SAMPLE_COUNT must be an integer" in str(exc.value.detail)
+
+
+def test_orchestration_slo_threshold_resolution_uses_defaults():
+    with patch.dict(os.environ, {}, clear=True):
+        error_threshold, skipped_threshold = (
+            real_integrations._resolve_orchestration_audit_slo_thresholds(
+                max_orchestration_attempt_error_count=None,
+                max_orchestration_attempt_skipped_count=None,
+            )
+        )
+    assert error_threshold == real_integrations.DEFAULT_MAX_ORCHESTRATION_ATTEMPT_ERROR_COUNT
+    assert skipped_threshold == real_integrations.DEFAULT_MAX_ORCHESTRATION_ATTEMPT_SKIPPED_COUNT
+
+
+def test_orchestration_slo_threshold_resolution_honors_environment_overrides():
+    with patch.dict(
+        os.environ,
+        {
+            "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_ERROR_COUNT": "2",
+            "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_SKIPPED_COUNT": "9",
+        },
+        clear=True,
+    ):
+        error_threshold, skipped_threshold = (
+            real_integrations._resolve_orchestration_audit_slo_thresholds(
+                max_orchestration_attempt_error_count=None,
+                max_orchestration_attempt_skipped_count=None,
+            )
+        )
+    assert error_threshold == 2
+    assert skipped_threshold == 9
+
+
+def test_orchestration_slo_threshold_resolution_rejects_non_numeric_env():
+    with patch.dict(
+        os.environ,
+        {
+            "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_ERROR_COUNT": "bad-value",
+        },
+        clear=True,
+    ):
+        with pytest.raises(HTTPException) as exc:
+            real_integrations._resolve_orchestration_audit_slo_thresholds(
+                max_orchestration_attempt_error_count=None,
+                max_orchestration_attempt_skipped_count=None,
+            )
+    assert exc.value.status_code == 400
+    assert (
+        "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_ERROR_COUNT must be an integer"
+        in str(exc.value.detail)
+    )
+
+    with patch.dict(
+        os.environ,
+        {
+            "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_SKIPPED_COUNT": "bad-value",
+        },
+        clear=True,
+    ):
+        with pytest.raises(HTTPException) as exc:
+            real_integrations._resolve_orchestration_audit_slo_thresholds(
+                max_orchestration_attempt_error_count=None,
+                max_orchestration_attempt_skipped_count=None,
+            )
+    assert exc.value.status_code == 400
+    assert (
+        "INTEGRATION_SLO_MAX_ORCHESTRATION_ATTEMPT_SKIPPED_COUNT must be an integer"
+        in str(exc.value.detail)
+    )

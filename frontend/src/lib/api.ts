@@ -29,8 +29,145 @@ async function apiRequest(method: string, endpoint: string, data?: any) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || error.message || 'Request failed');
+    const errorPayload = await response.json().catch(() => ({ detail: 'Request failed' }));
+    const detail = errorPayload?.detail;
+    const detailObject = detail && typeof detail === 'object' ? detail : null;
+
+    const message =
+      (typeof detail === 'string' && detail) ||
+      (typeof detailObject?.message === 'string' && detailObject.message) ||
+      (typeof detailObject?.error === 'string' && detailObject.error) ||
+      (typeof errorPayload?.message === 'string' && errorPayload.message) ||
+      'Request failed';
+
+    const apiError: any = new Error(message);
+    apiError.status = response.status;
+    apiError.payload = errorPayload;
+    if (typeof detailObject?.errorCode === 'string') {
+      apiError.errorCode = detailObject.errorCode;
+    }
+    const parseFiniteNumber = (value: unknown): number | undefined => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return undefined;
+      }
+      return parsed;
+    };
+    const validationField =
+      typeof detailObject?.field === 'string' && detailObject.field.trim()
+        ? detailObject.field.trim()
+        : undefined;
+    const validationReason =
+      typeof detailObject?.reason === 'string' && detailObject.reason.trim()
+        ? detailObject.reason.trim()
+        : undefined;
+    const validationMinimum = parseFiniteNumber(
+      detailObject?.minimum ?? detailObject?.min
+    );
+    const validationMaximum = parseFiniteNumber(
+      detailObject?.maximum ?? detailObject?.max
+    );
+    const hasValidationReceived =
+      !!detailObject && typeof detailObject === 'object' && 'received' in detailObject;
+    const validationReceived = hasValidationReceived
+      ? (detailObject as Record<string, unknown>).received
+      : undefined;
+    if (validationField) {
+      apiError.field = validationField;
+    }
+    if (validationReason) {
+      apiError.reason = validationReason;
+    }
+    if (validationMinimum !== undefined) {
+      apiError.minimum = validationMinimum;
+      apiError.min = validationMinimum;
+    }
+    if (validationMaximum !== undefined) {
+      apiError.maximum = validationMaximum;
+      apiError.max = validationMaximum;
+    }
+    if (hasValidationReceived) {
+      apiError.received = validationReceived;
+    }
+    const validationDetail: Record<string, unknown> = {};
+    if (validationField) {
+      validationDetail.field = validationField;
+    }
+    if (validationReason) {
+      validationDetail.reason = validationReason;
+    }
+    if (validationMinimum !== undefined) {
+      validationDetail.minimum = validationMinimum;
+    }
+    if (validationMaximum !== undefined) {
+      validationDetail.maximum = validationMaximum;
+    }
+    if (hasValidationReceived) {
+      validationDetail.received = validationReceived;
+    }
+    if (Object.keys(validationDetail).length > 0) {
+      apiError.validation = validationDetail;
+    }
+    const detailRateLimit =
+      detailObject?.rateLimit && typeof detailObject.rateLimit === 'object'
+        ? { ...detailObject.rateLimit }
+        : undefined;
+
+    const retryFromDetail = Number(detailObject?.retryAfterSeconds);
+    const parseHeaderNumber = (headerName: string): number => {
+      const rawValue = response.headers?.get?.(headerName);
+      if (rawValue == null || String(rawValue).trim() === '') {
+        return Number.NaN;
+      }
+      const parsed = Number(rawValue);
+      return Number.isFinite(parsed) ? parsed : Number.NaN;
+    };
+    const headerLimit = parseHeaderNumber('X-RateLimit-Limit');
+    const headerRemaining = parseHeaderNumber('X-RateLimit-Remaining');
+    const headerWindowSeconds = parseHeaderNumber('X-RateLimit-Window-Seconds');
+    const headerResetInSeconds = parseHeaderNumber('X-RateLimit-Reset-In-Seconds');
+    const headerResetAt = response.headers?.get?.('X-RateLimit-Reset-At');
+    if (detailRateLimit) {
+      apiError.rateLimit = detailRateLimit;
+    }
+    if (
+      Number.isFinite(headerLimit) ||
+      Number.isFinite(headerRemaining) ||
+      Number.isFinite(headerWindowSeconds) ||
+      Number.isFinite(headerResetInSeconds) ||
+      headerResetAt
+    ) {
+      apiError.rateLimit = {
+        ...(apiError.rateLimit || {}),
+      };
+      if (Number.isFinite(headerLimit)) {
+        apiError.rateLimit.limit = Math.round(headerLimit);
+      }
+      if (Number.isFinite(headerRemaining)) {
+        apiError.rateLimit.remaining = Math.max(0, Math.round(headerRemaining));
+      }
+      if (Number.isFinite(headerWindowSeconds)) {
+        apiError.rateLimit.windowSeconds = Math.max(1, Math.round(headerWindowSeconds));
+      }
+      if (Number.isFinite(headerResetInSeconds)) {
+        apiError.rateLimit.resetInSeconds = Math.max(0, Math.round(headerResetInSeconds));
+      }
+      if (typeof headerResetAt === 'string' && headerResetAt.trim()) {
+        apiError.rateLimit.resetAt = headerResetAt.trim();
+      }
+    }
+    if (Number.isFinite(retryFromDetail) && retryFromDetail > 0) {
+      apiError.retryAfterSeconds = Math.round(retryFromDetail);
+    } else {
+      const retryAfterHeader = response.headers?.get?.('Retry-After');
+      const retryFromHeader = Number(retryAfterHeader);
+      if (Number.isFinite(retryFromHeader) && retryFromHeader > 0) {
+        apiError.retryAfterSeconds = Math.round(retryFromHeader);
+      } else if (Number.isFinite(headerResetInSeconds) && headerResetInSeconds > 0) {
+        apiError.retryAfterSeconds = Math.round(headerResetInSeconds);
+      }
+    }
+    throw apiError;
   }
 
   return response.json();
@@ -271,8 +408,41 @@ export const api = {
   // Real Integrations
   getIntegrations: () => apiRequest('GET', '/api/integrations/integrations'),
   getIntegrationsHealth: () => apiRequest('GET', '/api/integrations/integrations/health'),
-  getIntegrationsTelemetrySummary: (days?: number, limit?: number) =>
-    apiRequest('GET', `/api/integrations/integrations/telemetry/summary?days=${days || 7}&limit=${limit || 1000}`),
+  getIntegrationsTelemetrySummary: (
+    days?: number,
+    limit?: number,
+    packetOnlyRecentEvents?: boolean,
+    statusFilters?: {
+      governanceStatus?: string | null;
+      packetValidationStatus?: string | null;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    query.append('days', String(days || 7));
+    query.append('limit', String(limit || 1000));
+    if (typeof packetOnlyRecentEvents === 'boolean') {
+      query.append(
+        'packet_only_recent_events',
+        packetOnlyRecentEvents ? 'true' : 'false'
+      );
+    }
+    if (typeof statusFilters?.governanceStatus === 'string' && statusFilters.governanceStatus.trim()) {
+      query.append('governance_status', statusFilters.governanceStatus.trim());
+    }
+    if (
+      typeof statusFilters?.packetValidationStatus === 'string'
+      && statusFilters.packetValidationStatus.trim()
+    ) {
+      query.append(
+        'packet_validation_status',
+        statusFilters.packetValidationStatus.trim()
+      );
+    }
+    return apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/summary?${query.toString()}`
+    );
+  },
   getIntegrationsTelemetrySnapshotGovernance: (retentionDays?: number) =>
     apiRequest(
       'GET',
@@ -283,12 +453,34 @@ export const api = {
       'GET',
       '/api/integrations/integrations/telemetry/baseline-governance'
     ),
+  getIntegrationsGovernanceReport: (days?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report?days=${days || 7}&limit=${limit || 1000}`
+    ),
+  getIntegrationsGovernanceReportExport: (days?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report/export?days=${days || 7}&limit=${limit || 1000}`
+    ),
+  getIntegrationsGovernanceReportHistory: (retentionDays?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report/history?retention_days=${retentionDays || 30}&limit=${limit || 50}`
+    ),
+  getIntegrationsGovernanceSchema: () =>
+    apiRequest(
+      'GET',
+      '/api/integrations/integrations/telemetry/governance-schema'
+    ),
   getIntegrationsSloGates: (params?: {
     days?: number;
     limit?: number;
     maxErrorRatePct?: number;
     minSchemaV2Pct?: number;
     minSchemaV2SampleCount?: number;
+    maxOrchestrationAttemptErrorCount?: number;
+    maxOrchestrationAttemptSkippedCount?: number;
   }) => {
     const query = new URLSearchParams();
     query.append('days', String(params?.days || 7));
@@ -301,6 +493,18 @@ export const api = {
     }
     if (params?.minSchemaV2SampleCount !== undefined) {
       query.append('min_schema_v2_sample_count', String(params.minSchemaV2SampleCount));
+    }
+    if (params?.maxOrchestrationAttemptErrorCount !== undefined) {
+      query.append(
+        'max_orchestration_attempt_error_count',
+        String(params.maxOrchestrationAttemptErrorCount)
+      );
+    }
+    if (params?.maxOrchestrationAttemptSkippedCount !== undefined) {
+      query.append(
+        'max_orchestration_attempt_skipped_count',
+        String(params.maxOrchestrationAttemptSkippedCount)
+      );
     }
     return apiRequest('GET', `/api/integrations/integrations/telemetry/slo-gates?${query.toString()}`);
   },
@@ -780,18 +984,44 @@ export const api = {
   // ============== SALES INTELLIGENCE ==============
   getPipelineForecast: (windowDays?: number) =>
     apiRequest('GET', `/api/sales-intelligence/forecast/pipeline${windowDays ? `?window_days=${windowDays}` : ''}`),
-  getConversationIntelligence: (limit?: number) =>
-    apiRequest('GET', `/api/sales-intelligence/conversation/intelligence${limit ? `?limit=${limit}` : ''}`),
-  getMultiChannelEngagement: () =>
-    apiRequest('GET', '/api/sales-intelligence/engagement/multi-channel'),
-  getRelationshipMap: (limit?: number) =>
-    apiRequest('GET', `/api/sales-intelligence/relationships/map${limit ? `?limit=${limit}` : ''}`),
+  getConversationIntelligence: (options?: { limit?: number; windowDays?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/conversation/intelligence${suffix}`);
+  },
+  getMultiChannelEngagement: (
+    options?: { windowDays?: number; campaignLimit?: number; abTestLimit?: number; prospectLimit?: number }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.campaignLimit) params.append('campaign_limit', options.campaignLimit.toString());
+    if (options?.abTestLimit) params.append('ab_test_limit', options.abTestLimit.toString());
+    if (options?.prospectLimit) params.append('prospect_limit', options.prospectLimit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/engagement/multi-channel${suffix}`);
+  },
+  getRelationshipMap: (options?: { windowDays?: number; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/relationships/map${suffix}`);
+  },
   getSalesCampaigns: (status?: string) =>
     apiRequest('GET', `/api/sales-intelligence/campaigns${status ? `?status=${status}` : ''}`),
   getSalesCampaign: (campaignId: string) =>
     apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}`),
-  getSalesCampaignPerformance: (campaignId: string) =>
-    apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}/performance`),
+  getSalesCampaignPerformance: (
+    campaignId: string,
+    options?: { channelLimit?: number }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.channelLimit) params.append('channel_limit', options.channelLimit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}/performance${suffix}`);
+  },
   getSalesCampaignPortfolio: (options?: { windowDays?: number; status?: string; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.windowDays) params.append('window_days', options.windowDays.toString());
