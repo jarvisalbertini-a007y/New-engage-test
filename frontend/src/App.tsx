@@ -30,6 +30,7 @@ import SelfImprovement from './pages/SelfImprovement';
 import MultiAgent from './pages/MultiAgent';
 import AICommandCenter from './pages/AICommandCenter';
 import VisualWorkflowBuilder from './pages/VisualWorkflowBuilder';
+import SalesIntelligence from './pages/SalesIntelligence';
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/activity" element={<ActivityDashboard />} />
         <Route path="/integrations" element={<Integrations />} />
+        <Route path="/sales-intelligence" element={<SalesIntelligence />} />
         <Route path="/meetings" element={<Meetings />} />
         <Route path="/autonomous" element={<AutonomousProspecting />} />
         <Route path="/email-optimization" element={<EmailOptimization />} />

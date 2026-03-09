@@ -20,6 +20,7 @@ const navItems = [
   { path: '/prospects', label: 'Prospects', icon: '🎯' },
   { path: '/meetings', label: 'Meetings', icon: '📅' },
   { path: '/integrations', label: 'Integrations', icon: '🔌' },
+  { path: '/sales-intelligence', label: 'Sales Intelligence', icon: '📈' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 

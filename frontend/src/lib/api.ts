@@ -4,10 +4,18 @@ function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
+function buildRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `req-${crypto.randomUUID()}`;
+  }
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function apiRequest(method: string, endpoint: string, data?: any) {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Request-Id': buildRequestId(),
   };
   
   if (token) {
@@ -21,8 +29,145 @@ async function apiRequest(method: string, endpoint: string, data?: any) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || error.message || 'Request failed');
+    const errorPayload = await response.json().catch(() => ({ detail: 'Request failed' }));
+    const detail = errorPayload?.detail;
+    const detailObject = detail && typeof detail === 'object' ? detail : null;
+
+    const message =
+      (typeof detail === 'string' && detail) ||
+      (typeof detailObject?.message === 'string' && detailObject.message) ||
+      (typeof detailObject?.error === 'string' && detailObject.error) ||
+      (typeof errorPayload?.message === 'string' && errorPayload.message) ||
+      'Request failed';
+
+    const apiError: any = new Error(message);
+    apiError.status = response.status;
+    apiError.payload = errorPayload;
+    if (typeof detailObject?.errorCode === 'string') {
+      apiError.errorCode = detailObject.errorCode;
+    }
+    const parseFiniteNumber = (value: unknown): number | undefined => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return undefined;
+      }
+      return parsed;
+    };
+    const validationField =
+      typeof detailObject?.field === 'string' && detailObject.field.trim()
+        ? detailObject.field.trim()
+        : undefined;
+    const validationReason =
+      typeof detailObject?.reason === 'string' && detailObject.reason.trim()
+        ? detailObject.reason.trim()
+        : undefined;
+    const validationMinimum = parseFiniteNumber(
+      detailObject?.minimum ?? detailObject?.min
+    );
+    const validationMaximum = parseFiniteNumber(
+      detailObject?.maximum ?? detailObject?.max
+    );
+    const hasValidationReceived =
+      !!detailObject && typeof detailObject === 'object' && 'received' in detailObject;
+    const validationReceived = hasValidationReceived
+      ? (detailObject as Record<string, unknown>).received
+      : undefined;
+    if (validationField) {
+      apiError.field = validationField;
+    }
+    if (validationReason) {
+      apiError.reason = validationReason;
+    }
+    if (validationMinimum !== undefined) {
+      apiError.minimum = validationMinimum;
+      apiError.min = validationMinimum;
+    }
+    if (validationMaximum !== undefined) {
+      apiError.maximum = validationMaximum;
+      apiError.max = validationMaximum;
+    }
+    if (hasValidationReceived) {
+      apiError.received = validationReceived;
+    }
+    const validationDetail: Record<string, unknown> = {};
+    if (validationField) {
+      validationDetail.field = validationField;
+    }
+    if (validationReason) {
+      validationDetail.reason = validationReason;
+    }
+    if (validationMinimum !== undefined) {
+      validationDetail.minimum = validationMinimum;
+    }
+    if (validationMaximum !== undefined) {
+      validationDetail.maximum = validationMaximum;
+    }
+    if (hasValidationReceived) {
+      validationDetail.received = validationReceived;
+    }
+    if (Object.keys(validationDetail).length > 0) {
+      apiError.validation = validationDetail;
+    }
+    const detailRateLimit =
+      detailObject?.rateLimit && typeof detailObject.rateLimit === 'object'
+        ? { ...detailObject.rateLimit }
+        : undefined;
+
+    const retryFromDetail = Number(detailObject?.retryAfterSeconds);
+    const parseHeaderNumber = (headerName: string): number => {
+      const rawValue = response.headers?.get?.(headerName);
+      if (rawValue == null || String(rawValue).trim() === '') {
+        return Number.NaN;
+      }
+      const parsed = Number(rawValue);
+      return Number.isFinite(parsed) ? parsed : Number.NaN;
+    };
+    const headerLimit = parseHeaderNumber('X-RateLimit-Limit');
+    const headerRemaining = parseHeaderNumber('X-RateLimit-Remaining');
+    const headerWindowSeconds = parseHeaderNumber('X-RateLimit-Window-Seconds');
+    const headerResetInSeconds = parseHeaderNumber('X-RateLimit-Reset-In-Seconds');
+    const headerResetAt = response.headers?.get?.('X-RateLimit-Reset-At');
+    if (detailRateLimit) {
+      apiError.rateLimit = detailRateLimit;
+    }
+    if (
+      Number.isFinite(headerLimit) ||
+      Number.isFinite(headerRemaining) ||
+      Number.isFinite(headerWindowSeconds) ||
+      Number.isFinite(headerResetInSeconds) ||
+      headerResetAt
+    ) {
+      apiError.rateLimit = {
+        ...(apiError.rateLimit || {}),
+      };
+      if (Number.isFinite(headerLimit)) {
+        apiError.rateLimit.limit = Math.round(headerLimit);
+      }
+      if (Number.isFinite(headerRemaining)) {
+        apiError.rateLimit.remaining = Math.max(0, Math.round(headerRemaining));
+      }
+      if (Number.isFinite(headerWindowSeconds)) {
+        apiError.rateLimit.windowSeconds = Math.max(1, Math.round(headerWindowSeconds));
+      }
+      if (Number.isFinite(headerResetInSeconds)) {
+        apiError.rateLimit.resetInSeconds = Math.max(0, Math.round(headerResetInSeconds));
+      }
+      if (typeof headerResetAt === 'string' && headerResetAt.trim()) {
+        apiError.rateLimit.resetAt = headerResetAt.trim();
+      }
+    }
+    if (Number.isFinite(retryFromDetail) && retryFromDetail > 0) {
+      apiError.retryAfterSeconds = Math.round(retryFromDetail);
+    } else {
+      const retryAfterHeader = response.headers?.get?.('Retry-After');
+      const retryFromHeader = Number(retryAfterHeader);
+      if (Number.isFinite(retryFromHeader) && retryFromHeader > 0) {
+        apiError.retryAfterSeconds = Math.round(retryFromHeader);
+      } else if (Number.isFinite(headerResetInSeconds) && headerResetInSeconds > 0) {
+        apiError.retryAfterSeconds = Math.round(headerResetInSeconds);
+      }
+    }
+    throw apiError;
   }
 
   return response.json();
@@ -111,6 +256,63 @@ export const api = {
 
   // Health
   healthCheck: () => apiRequest('GET', '/api/health'),
+
+  // Sales Intelligence
+  getPhraseAnalytics: (params?: { windowDays?: number; minExposure?: number; limit?: number; query?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.minExposure) query.append('min_exposure', String(params.minExposure));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.query) query.append('query', params.query);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/analytics/phrases${suffix}`);
+  },
+  getPhraseChannelSummary: (params?: {
+    windowDays?: number;
+    minExposure?: number;
+    limit?: number;
+    channels?: string[];
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.minExposure) query.append('min_exposure', String(params.minExposure));
+    if (params?.limit) query.append('limit', String(params.limit));
+    if (params?.channels?.length) query.append('channels', params.channels.join(','));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/analytics/phrases/channel-summary${suffix}`);
+  },
+  predictResponse: (data: {
+    message: string;
+    channel?: string;
+    sendTime?: string;
+    prospect?: any;
+  }) => apiRequest('POST', '/api/sales-intelligence/prediction/response', data),
+  recordPredictionFeedback: (data: {
+    predictionId?: string;
+    predictedProbability: number;
+    outcome: string;
+    channel?: string;
+    responseLatencyHours?: number;
+  }) => apiRequest('POST', '/api/sales-intelligence/prediction/feedback', data),
+  getPredictionPerformance: (params?: { windowDays?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/performance${suffix}`);
+  },
+  getPredictionPerformanceReport: (params?: { windowDays?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/performance/report${suffix}`);
+  },
+  getPredictionFeedbackHistory: (params?: { windowDays?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.windowDays) query.append('window_days', String(params.windowDays));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/prediction/feedback/history${suffix}`);
+  },
 
   // Universal Chat
   sendChatMessage: (data: { message: string; sessionId: string; context?: any }) =>
@@ -205,9 +407,151 @@ export const api = {
 
   // Real Integrations
   getIntegrations: () => apiRequest('GET', '/api/integrations/integrations'),
+  getIntegrationsHealth: () => apiRequest('GET', '/api/integrations/integrations/health'),
+  getIntegrationsTelemetrySummary: (
+    days?: number,
+    limit?: number,
+    packetOnlyRecentEvents?: boolean,
+    statusFilters?: {
+      governanceStatus?: string | null;
+      packetValidationStatus?: string | null;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    query.append('days', String(days || 7));
+    query.append('limit', String(limit || 1000));
+    if (typeof packetOnlyRecentEvents === 'boolean') {
+      query.append(
+        'packet_only_recent_events',
+        packetOnlyRecentEvents ? 'true' : 'false'
+      );
+    }
+    if (typeof statusFilters?.governanceStatus === 'string' && statusFilters.governanceStatus.trim()) {
+      query.append('governance_status', statusFilters.governanceStatus.trim());
+    }
+    if (
+      typeof statusFilters?.packetValidationStatus === 'string'
+      && statusFilters.packetValidationStatus.trim()
+    ) {
+      query.append(
+        'packet_validation_status',
+        statusFilters.packetValidationStatus.trim()
+      );
+    }
+    return apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/summary?${query.toString()}`
+    );
+  },
+  getIntegrationsTelemetrySnapshotGovernance: (retentionDays?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/snapshot-governance?retention_days=${retentionDays || 30}`
+    ),
+  getIntegrationsBaselineGovernance: () =>
+    apiRequest(
+      'GET',
+      '/api/integrations/integrations/telemetry/baseline-governance'
+    ),
+  getIntegrationsGovernanceReport: (days?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report?days=${days || 7}&limit=${limit || 1000}`
+    ),
+  getIntegrationsGovernanceReportExport: (days?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report/export?days=${days || 7}&limit=${limit || 1000}`
+    ),
+  getIntegrationsGovernanceReportHistory: (retentionDays?: number, limit?: number) =>
+    apiRequest(
+      'GET',
+      `/api/integrations/integrations/telemetry/governance-report/history?retention_days=${retentionDays || 30}&limit=${limit || 50}`
+    ),
+  getIntegrationsGovernanceSchema: () =>
+    apiRequest(
+      'GET',
+      '/api/integrations/integrations/telemetry/governance-schema'
+    ),
+  getIntegrationsSloGates: (params?: {
+    days?: number;
+    limit?: number;
+    maxErrorRatePct?: number;
+    minSchemaV2Pct?: number;
+    minSchemaV2SampleCount?: number;
+    maxOrchestrationAttemptErrorCount?: number;
+    maxOrchestrationAttemptSkippedCount?: number;
+  }) => {
+    const query = new URLSearchParams();
+    query.append('days', String(params?.days || 7));
+    query.append('limit', String(params?.limit || 2000));
+    if (params?.maxErrorRatePct !== undefined) {
+      query.append('max_error_rate_pct', String(params.maxErrorRatePct));
+    }
+    if (params?.minSchemaV2Pct !== undefined) {
+      query.append('min_schema_v2_pct', String(params.minSchemaV2Pct));
+    }
+    if (params?.minSchemaV2SampleCount !== undefined) {
+      query.append('min_schema_v2_sample_count', String(params.minSchemaV2SampleCount));
+    }
+    if (params?.maxOrchestrationAttemptErrorCount !== undefined) {
+      query.append(
+        'max_orchestration_attempt_error_count',
+        String(params.maxOrchestrationAttemptErrorCount)
+      );
+    }
+    if (params?.maxOrchestrationAttemptSkippedCount !== undefined) {
+      query.append(
+        'max_orchestration_attempt_skipped_count',
+        String(params.maxOrchestrationAttemptSkippedCount)
+      );
+    }
+    return apiRequest('GET', `/api/integrations/integrations/telemetry/slo-gates?${query.toString()}`);
+  },
   saveSendgridIntegration: (data: { api_key: string; from_email: string }) =>
     apiRequest('POST', '/api/integrations/integrations/sendgrid', data),
+  saveApolloIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/apollo', data),
+  saveClearbitIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/clearbit', data),
+  saveCrunchbaseIntegration: (data: { api_key: string }) =>
+    apiRequest('POST', '/api/integrations/integrations/crunchbase', data),
   removeSendgridIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/sendgrid'),
+  removeApolloIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/apollo'),
+  removeClearbitIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/clearbit'),
+  removeCrunchbaseIntegration: () => apiRequest('DELETE', '/api/integrations/integrations/crunchbase'),
+  apolloSearchProspects: (data: {
+    query?: string;
+    title?: string;
+    domain?: string;
+    limit?: number;
+    page?: number;
+    saveResults?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/apollo/search', data),
+  apolloEnrichCompany: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/apollo/company', data),
+  clearbitEnrichCompany: (data: {
+    domain: string;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/clearbit/company', data),
+  crunchbaseEnrichCompany: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+  }) => apiRequest('POST', '/api/integrations/providers/crunchbase/company', data),
+  orchestrateCompanyEnrichment: (data: {
+    domain?: string;
+    companyName?: string;
+    limit?: number;
+    saveResearch?: boolean;
+    stopOnFirstMatch?: boolean;
+    providerOrder?: string[];
+  }) => apiRequest('POST', '/api/integrations/providers/company-enrichment', data),
   
   // Real Lead Search
   searchRealLeads: (criteria: string, count?: number) =>
@@ -601,7 +945,7 @@ export const api = {
 
   // ============== A/B TESTING ==============
   
-  createABTest: (data: any) =>
+  createSalesABTest: (data: any) =>
     apiRequest('POST', '/api/ab-testing/tests', data),
   getABTests: (status?: string, testType?: string, limit?: number) => {
     const params = new URLSearchParams();
@@ -610,7 +954,7 @@ export const api = {
     if (limit) params.append('limit', limit.toString());
     return apiRequest('GET', `/api/ab-testing/tests?${params}`);
   },
-  getABTest: (testId: string) =>
+  getSalesABTest: (testId: string) =>
     apiRequest('GET', `/api/ab-testing/tests/${testId}`),
   startABTest: (testId: string) =>
     apiRequest('POST', `/api/ab-testing/tests/${testId}/start`, {}),
@@ -636,4 +980,60 @@ export const api = {
     apiRequest('POST', '/api/ab-testing/suggest-test', data),
   quickCreateABTest: (data: { suggestionType: string; prospectIds?: string[]; autoApplyWinner?: boolean }) =>
     apiRequest('POST', '/api/ab-testing/quick-create', data),
+
+  // ============== SALES INTELLIGENCE ==============
+  getPipelineForecast: (windowDays?: number) =>
+    apiRequest('GET', `/api/sales-intelligence/forecast/pipeline${windowDays ? `?window_days=${windowDays}` : ''}`),
+  getConversationIntelligence: (options?: { limit?: number; windowDays?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/conversation/intelligence${suffix}`);
+  },
+  getMultiChannelEngagement: (
+    options?: { windowDays?: number; campaignLimit?: number; abTestLimit?: number; prospectLimit?: number }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.campaignLimit) params.append('campaign_limit', options.campaignLimit.toString());
+    if (options?.abTestLimit) params.append('ab_test_limit', options.abTestLimit.toString());
+    if (options?.prospectLimit) params.append('prospect_limit', options.prospectLimit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/engagement/multi-channel${suffix}`);
+  },
+  getRelationshipMap: (options?: { windowDays?: number; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/relationships/map${suffix}`);
+  },
+  getSalesCampaigns: (status?: string) =>
+    apiRequest('GET', `/api/sales-intelligence/campaigns${status ? `?status=${status}` : ''}`),
+  getSalesCampaign: (campaignId: string) =>
+    apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}`),
+  getSalesCampaignPerformance: (
+    campaignId: string,
+    options?: { channelLimit?: number }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.channelLimit) params.append('channel_limit', options.channelLimit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/campaigns/${campaignId}/performance${suffix}`);
+  },
+  getSalesCampaignPortfolio: (options?: { windowDays?: number; status?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.windowDays) params.append('window_days', options.windowDays.toString());
+    if (options?.status) params.append('status', options.status);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest('GET', `/api/sales-intelligence/campaigns/performance/portfolio${suffix}`);
+  },
+  createSalesCampaign: (data: { name: string; objective?: string; targetSegment?: string; channels: string[] }) =>
+    apiRequest('POST', '/api/sales-intelligence/campaigns', data),
+  activateSalesCampaign: (campaignId: string) =>
+    apiRequest('POST', `/api/sales-intelligence/campaigns/${campaignId}/activate`, {}),
+  recordSalesCampaignMetrics: (campaignId: string, data: { channel: string; sent?: number; opened?: number; replied?: number }) =>
+    apiRequest('POST', `/api/sales-intelligence/campaigns/${campaignId}/metrics`, data),
 };

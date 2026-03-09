@@ -1,0 +1,428 @@
+from pathlib import Path
+
+
+RUNBOOK_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "runbooks"
+    / "PREDICTIVE_OPTIMIZATION_RUNBOOK.md"
+)
+
+
+def _runbook_text() -> str:
+    return RUNBOOK_PATH.read_text(encoding="utf-8")
+
+
+def test_predictive_runbook_exists():
+    assert RUNBOOK_PATH.exists()
+
+
+def test_predictive_runbook_includes_sales_dashboard_verification_commands():
+    content = _runbook_text()
+    assert "npm run verify:frontend:sales" in content
+    assert "npm run verify:smoke:frontend-sales" in content
+    assert "npm run verify:smoke:sales-dashboard" in content
+    assert "npm run verify:smoke:multi-channel-controls" in content
+    assert "npm run verify:smoke:baseline-command-aliases" in content
+    assert "npm run verify:smoke:baseline-command-aliases-artifact" in content
+    assert "npm run verify:smoke:baseline-metrics-artifact" in content
+    assert "npm run verify:smoke:connector-reliability" in content
+    assert "npm run verify:smoke:connector-orchestration" in content
+    assert "npm run verify:smoke:connector-provider-lookups" in content
+    assert "npm run verify:smoke:connector-lookups" in content
+    assert "npm run verify:smoke:connector-lookups-ui" in content
+    assert "npm run verify:smoke:connector-lookups-export" in content
+    assert "npm run verify:smoke:sales" in content
+    assert "npm run verify:smoke:workflow-contracts" in content
+    assert "npm run verify:backend:sales" in content
+    assert "npm run test" in content
+    assert "npm run typecheck" in content
+    assert "npm run verify:baseline:command-aliases" in content
+    assert "npm run verify:baseline:command-aliases:artifact:fixtures" in content
+    assert "npm run verify:baseline:metrics:artifact:fixtures" in content
+    assert "npm run verify:baseline:quick" in content
+    assert "npm run verify:ci:sales" in content
+
+
+def test_predictive_runbook_includes_dashboard_control_and_export_steps():
+    content = _runbook_text()
+    required_fragments = [
+        "Refresh Telemetry",
+        "bounded to allowed ranges",
+        "Export telemetry and prediction JSON snapshots",
+        "Export telemetry, pipeline forecast, and prediction JSON snapshots",
+        "Export Company Lookup JSON",
+        "Export Apollo Lookup JSON",
+        "exportType=connector-company-lookup",
+        "exportType=connector-apollo-lookup",
+        "Export campaign portfolio and campaign performance JSON snapshots from dashboard controls for rollout evidence.",
+        "Export conversation, multi-channel, and relationship JSON snapshots from dashboard controls for rollout evidence.",
+        "Export phrase analytics, phrase channel summary, prediction performance, and prediction feedback history JSON snapshots from dashboard controls for rollout evidence.",
+        "Refresh Portfolio",
+        "portfolio_limit: 5-100",
+        "all|active|draft|paused|completed",
+        "server-applied status filter",
+        "Refresh Campaign Performance",
+        "channel_limit: 1-20",
+        "displayed channels vs total channels",
+        "Conversation Intelligence panel is visible",
+        "Multi-Channel Health panel is visible",
+        "Relationship Map Summary panel is visible",
+        "Refresh Conversation",
+        "window_days: 14-365",
+        "event_limit: 20-1000",
+        "20-1000",
+        "Refresh Multi-Channel",
+        "campaign_limit: 10-5000",
+        "ab_test_limit: 10-10000",
+        "prospect_limit: 50-20000",
+        "Refresh Relationship Map",
+        "50-1000",
+        "Phrase Effectiveness panel is visible",
+        "Phrase Channel Summary panel is visible",
+        "Prediction Feedback Performance panel is visible",
+        "Prediction Feedback History panel is visible",
+        "Refresh Phrase Intelligence",
+        "window_days: 14-365",
+        "min_exposure: 1-50",
+        "phrase_limit: 5-100",
+        "channel_limit: 3-30",
+        "Refresh Prediction Feedback",
+        "history_limit: 10-500",
+        "Node / Edge Count",
+        "95% Confidence Band",
+        "Interval Width",
+        "Reliability Tier",
+        "Refresh Forecast",
+        "30-365",
+        "Refresh Prediction Quality",
+        "14-365",
+        "Export Governance Schema JSON",
+        "Export Baseline Governance JSON",
+        "Copy Baseline Governance Commands",
+        "Baseline governance is failing and backend recommendedCommands are missing. Using local fallback remediation commands.",
+        "Retry Audit panel is visible",
+        "Connector Input-Validation Posture panel is visible",
+        "All Events",
+        "Packet-Validation Events",
+        "Connector Credential Freshness panel is visible",
+        "Health Status",
+        "Healthy/Unhealthy",
+        "Freshness ACTION_REQUIRED",
+        "Freshness READY/UNKNOWN",
+        "credentialFreshnessStatusCountsSource",
+        "credentialFreshnessStatusCountsMismatch",
+        "credentialFreshnessStatusCountsServer",
+        "credentialFreshnessStatusCountsFallback",
+        "Freshness status-count source: server|local.",
+        "Credential freshness status-count mismatch",
+        "No connector freshness telemetry yet.",
+        "packet_only_recent_events=true",
+        "packet_only_recent_events=false",
+        "governance_status=ACTION_REQUIRED",
+        "packet_validation_status=READY",
+        "packet_only_recent_events=true&packet_validation_status=READY",
+        "recentEventsFilter",
+        "recentEventsGovernanceStatusFilter",
+        "recentEventsPacketValidationStatusFilter",
+        "recentEventsTotalCount",
+        "recentEventsFilteredCount",
+        "recentEventsPacketValidationCount",
+        "recentEventsNonPacketCount",
+        "recentEventsGovernanceStatusCounts",
+        "recentEventsPacketValidationStatusCounts",
+        "recentEventsGovernanceStatusCountsSource",
+        "recentEventsPacketValidationStatusCountsSource",
+        "recentEventsGovernanceStatusCountsMismatch",
+        "recentEventsPacketValidationStatusCountsMismatch",
+        "recentEventsGovernanceStatusCountsServer",
+        "recentEventsPacketValidationStatusCountsServer",
+        "recentEventsGovernanceStatusCountsFallback",
+        "recentEventsPacketValidationStatusCountsFallback",
+        "recentEventsGovernanceStatusCountsPosture",
+        "recentEventsPacketValidationStatusCountsPosture",
+        "recentEventsGovernanceStatusCountsPostureSeverity",
+        "recentEventsPacketValidationStatusCountsPostureSeverity",
+        "recentEventsGovernanceStatusCountsRequiresInvestigation",
+        "recentEventsPacketValidationStatusCountsRequiresInvestigation",
+        "Telemetry status-count provenance interpretation matrix:",
+        "source=server, mismatch=false",
+        "source=server, mismatch=true",
+        "source=local, mismatch=false",
+        "source=local, mismatch=true",
+        "backend forced local fallback but preserved drift evidence",
+        "When backend posture metadata is present (`recentEvents...CountsPosture*`), predictive UI posture chips and export posture fields should mirror backend metadata.",
+        "If backend posture tokens are invalid/unsupported, predictive posture chips and export posture fields must fall back to computed source+mismatch posture defaults.",
+        "Status-count posture • Governance: SERVER_CONSISTENT|SERVER_DRIFT|LOCAL_FALLBACK|LOCAL_DRIFT • Packet: SERVER_CONSISTENT|SERVER_DRIFT|LOCAL_FALLBACK|LOCAL_DRIFT.",
+        "Sales telemetry export parity for provenance matrix:",
+        "exportRecentEventsGovernanceStatusCountsSource",
+        "exportRecentEventsPacketValidationStatusCountsSource",
+        "exportRecentEventsGovernanceStatusCountsMismatch",
+        "exportRecentEventsPacketValidationStatusCountsMismatch",
+        "exportRecentEventsGovernanceStatusCountsServer",
+        "exportRecentEventsPacketValidationStatusCountsServer",
+        "exportRecentEventsGovernanceStatusCountsFallback",
+        "exportRecentEventsPacketValidationStatusCountsFallback",
+        "exportRecentEventsGovernanceStatusCountsPosture",
+        "exportRecentEventsPacketValidationStatusCountsPosture",
+        "exportRecentEventsGovernanceStatusCountsPostureSeverity",
+        "exportRecentEventsPacketValidationStatusCountsPostureSeverity",
+        "exportRecentEventsGovernanceStatusCountsRequiresInvestigation",
+        "exportRecentEventsPacketValidationStatusCountsRequiresInvestigation",
+        "governance_status` and `packet_validation_status` must be non-empty status tokens",
+        "Orchestration Audit panel is visible",
+        "orchestrationAudit.eventCount",
+        "orchestrationAudit.bySelectedProvider",
+        "orchestrationAudit.attemptStatusCounts",
+        "orchestrationAudit.reasonCodeCounts",
+        "orchestrationAudit.maxAttemptCount",
+        "orchestrationAudit.avgAttemptCount",
+        "orchestrationAudit.latestEventAt",
+        "orchestrationSelectedProvider",
+        "orchestrationAttemptCount",
+        "orchestrationAttemptSuccessCount",
+        "orchestrationAttemptSkippedCount",
+        "orchestrationAttemptErrorCount",
+        "orchestrationAttemptReasonCodes",
+        "orchestrationResultCount",
+        "connectorValidationProvider",
+        "connectorValidationEndpoint",
+        "connectorValidationField",
+        "connectorValidationReason",
+        "connectorValidationErrorCode",
+        "connectorValidationReceived",
+        "connectorValidationMinimum",
+        "connectorValidationMaximum",
+        "governanceSchemaReasonCodeParityOk",
+        "governanceSchemaRecommendedCommandParityOk",
+        "governanceSchemaHandoffParityOk",
+        "governanceSchemaAllParityOk",
+        "governanceSchemaRolloutBlocked",
+        "governanceStatus",
+        "governancePacketValidationStatus",
+        "governancePacketValidationWithinFreshness",
+        "governanceSchemaReasonCodeCount",
+        "governanceSchemaRecommendedCommandCount",
+        "Supported `recentEventsFilter` values are `all` and `packet`",
+        "fallback to local operator-selected filter",
+        "values should be normalized status tokens (`A-Z0-9` with `_` separators)",
+        "counted as `UNKNOWN` in packet-validation status rollups",
+        "If `recentEventsTotalCount` or `recentEventsFilteredCount` is malformed",
+        "Showing X of Y recent events.",
+        "If server-applied `recentEventsFilter` differs from selected UI filter",
+        "exported `exportRecentEventsFilter` matches server-applied filter",
+        "No packet-validation events in this telemetry window.",
+        "Increase Window Days or Event Limit",
+        "/api/integrations/integrations/telemetry/governance-schema",
+        "schemaMetadata.activeVersion",
+        "schemaMetadata.source",
+        "schemaMetadata.override.isSet",
+        "schemaMetadata.override.isValid",
+        "schemaContractParity.reasonCodeCount",
+        "schemaContractParity.recommendedCommandCount",
+        "schemaContractParity.reasonCodeParity.topLevelVsRolloutActions",
+        "schemaContractParity.reasonCodeParity.topLevelVsExportActions",
+        "schemaContractParity.reasonCodeParity.topLevelVsExportAlerts",
+        "schemaContractParity.reasonCodeParity.topLevelVsExportReasonCodes",
+        "schemaContractParity.recommendedCommandParity.topLevelVsExport",
+        "schemaContractParity.handoffParity.rolloutBlockedMatchesExport",
+        "schemaContractParity.handoffParity.ownerRoleMatchesExport",
+        "schemaContractParity.handoffParity.handoffActionsMatchRolloutActions",
+        "schemaContractParity.handoffParity.handoffActionCount",
+        "schemaContractParity.handoffParity.rolloutActionCount",
+        "schemaContractParity.computedAt",
+        "Schema Parity Status: PASS",
+        "Failed checks:",
+        "reason_code_parity_ok",
+        "recommended_command_parity_ok",
+        "handoff_parity_ok",
+        "governanceSchemaAudit.eventCount",
+        "governanceSchemaAudit.statusCounts",
+        "governanceSchemaAudit.reasonCodeParityPassCount",
+        "governanceSchemaAudit.reasonCodeParityFailCount",
+        "governanceSchemaAudit.recommendedCommandParityPassCount",
+        "governanceSchemaAudit.recommendedCommandParityFailCount",
+        "governanceSchemaAudit.handoffParityPassCount",
+        "governanceSchemaAudit.handoffParityFailCount",
+        "governanceSchemaAudit.allParityPassedCount",
+        "governanceSchemaAudit.allParityFailedCount",
+        "governanceSchemaAudit.rolloutBlockedCount",
+        "governanceSchemaAudit.latestEvaluatedAt",
+        "Governance Schema Audit Posture",
+        "Parity posture: PASS",
+        "Parity posture: FAIL",
+        "reasonCodes",
+        "duplicateArtifactNames",
+        "sales-conversation-intelligence-*.json",
+        "sales-campaign-portfolio-*.json",
+        "sales-campaign-performance-*.json",
+        "exportRequestedWindowDays",
+        "exportRequestedLimit",
+        "exportRequestedStatus",
+        "exportServerStatusFilter",
+        "exportPortfolioServerStatusFilter",
+        "exportSelectedCampaignId",
+        "exportRequestedChannelLimit",
+        "exportDisplayedChannelCount",
+        "channelCount",
+        "displayedChannelCount",
+        "appliedChannelLimit",
+        "channelsTruncated",
+        "exportSchemaVersion",
+        "exportRecentEventsFilter",
+        "exportRecentEventsSelectedFilter",
+        "exportRecentEventsServerFilter",
+        "exportRecentEventsServerFilterRaw",
+        "exportRecentEventsServerFilterRawTrimmed",
+        "exportRecentEventsServerFilterBlank",
+        "exportRecentEventsServerFilterUnsupported",
+        "exportRecentEventsServerFilterEvaluation",
+        "exportRecentEventsServerFilterNormalizationChanged",
+        "exportRecentEventsFilterMismatch",
+        "exportRecentEventsFilterSource",
+        "exportRecentEventsFilterResolution",
+        "should be `server` when response echoes a supported filter token",
+        "local_blank_server_filter",
+        "should be `true` when `exportRecentEventsServerFilterRaw` exists",
+        "trims to an empty token",
+        "should be `supported`, `unsupported`, or `absent`",
+        "required casing/whitespace normalization",
+        "exportRecentEventsDisplayedCount",
+        "exportRecentEventsTotalCount",
+        "exportRecentEventsPacketValidationCount",
+        "exportRecentEventsNonPacketCount",
+        "exportConnectorValidationEventCount",
+        "exportConnectorValidationLatestEventAt",
+        "exportConnectorValidationEndpointCount",
+        "exportConnectorValidationProviderCount",
+        "exportConnectorValidationFieldCount",
+        "exportConnectorValidationReasonCount",
+        "exportRecentEventsGovernanceStatusCounts",
+        "exportRecentEventsPacketValidationStatusCounts",
+        "exportRetryAuditEventCount",
+        "exportRetryAuditLatestEventAt",
+        "exportRetryAuditMaxNextDelaySeconds",
+        "exportRetryAuditAvgNextDelaySeconds",
+        "exportRetryAuditOperationCount",
+        "exportRetryAuditProviderCount",
+        "exportIntegrationHealthStatus",
+        "exportIntegrationHealthGeneratedAt",
+        "exportIntegrationHealthHealthyCount",
+        "exportIntegrationHealthUnhealthyCount",
+        "exportIntegrationHealthActionableUnhealthyProviders",
+        "exportIntegrationHealthCredentialActionRequiredProviders",
+        "exportIntegrationHealthCredentialConfiguredMaxAgeDays",
+        "exportIntegrationHealthCredentialRotationMaxAgeDays",
+        "exportIntegrationHealthCredentialFreshnessStatusCounts",
+        "exportIntegrationHealthCredentialFreshnessByProvider",
+        "exportIntegrationHealthCredentialFreshnessTotalProviders",
+        "exportIntegrationHealthCredentialFreshnessActionRequiredCount",
+        "exportIntegrationHealthCredentialFreshnessWithinPolicyCount",
+        "exportIntegrationHealthCredentialFreshnessUnknownCount",
+        "exportIntegrationHealthCredentialFreshnessStatusCountsSource",
+        "exportIntegrationHealthCredentialFreshnessStatusCountsMismatch",
+        "exportIntegrationHealthCredentialFreshnessStatusCountsServer",
+        "exportIntegrationHealthCredentialFreshnessStatusCountsFallback",
+        "exportIntegrationHealthRecommendedCommands",
+        "exportOrchestrationAuditEventCount",
+        "exportOrchestrationAuditLatestEventAt",
+        "exportOrchestrationAuditMaxAttemptCount",
+        "exportOrchestrationAuditAvgAttemptCount",
+        "exportOrchestrationAuditProviderCount",
+        "exportOrchestrationAuditReasonCodeCount",
+        "exportSchemaVersion",
+        "confidenceIntervalWidth",
+        "confidenceIntervalWidthPct",
+        "forecastReliabilityTier",
+        "forecastRecommendation",
+        "confidence_interval_width",
+        "confidence_interval_width_pct",
+        "forecast_reliability_tier",
+        "sales-pipeline-forecast-*.json",
+        "sales-prediction-report-*.json",
+        "sales-phrase-analytics-*.json",
+        "sales-phrase-channel-summary-*.json",
+        "sales-prediction-performance-*.json",
+        "sales-prediction-feedback-history-*.json",
+        "summary.trackedPhrases",
+        "channelCount",
+        "sampleSize",
+        "records",
+        "exportRequestedWindowDays",
+        "exportRequestedMinExposure",
+        "exportRequestedLimit",
+        "sales-conversation-intelligence-*.json",
+        "sales-multi-channel-health-*.json",
+        "sales-relationship-map-*.json",
+        "totals.records",
+        "topObjections",
+        "relationshipHealth",
+        "sources.chatSessions",
+        "coverageScore",
+        "channelUsage",
+        "sourceCounts",
+        "appliedLimits",
+        "stats.averageRelationshipStrength",
+        "exportGeneratedAt",
+        "exportRequestedCampaignLimit",
+        "exportRequestedAbTestLimit",
+        "exportRequestedProspectLimit",
+        "Telemetry Export Schema (Sales Intelligence)",
+        "sales-telemetry-summary-*.json",
+        "operation notice can be dismissed and auto-clears",
+        "X-Request-Id",
+        "schema_version",
+        "schemaVersion=2",
+        "gates.schemaSampleSizePassed=true",
+        "schemaCoverage.sampleCount >= schemaCoverage.minSampleCount",
+        "--min-schema-v2-sample-count 25",
+        "sloSummary.gates.schemaSampleSizePassed",
+    ]
+    for fragment in required_fragments:
+        assert fragment in content
+
+
+def test_predictive_runbook_includes_related_rollout_and_rollback_docs():
+    content = _runbook_text()
+    required_fragments = [
+        "Connector canary rollout plan",
+        "Connector rollback drill plan",
+        "Connector alert response matrix",
+        "Connector release signoff process",
+    ]
+    for fragment in required_fragments:
+        assert fragment in content
+
+
+def test_predictive_runbook_lists_rollback_evidence_artifacts():
+    content = _runbook_text()
+    required_fragments = [
+        "backend/test_reports/connector_canary_evidence.json",
+        "backend/test_reports/connector_signoff_validation.json",
+        "backend/test_reports/connector_release_gate_result.json",
+        "Incident summary with impacted sales segments/channels and mitigation timeline",
+    ]
+    for fragment in required_fragments:
+        assert fragment in content
+
+
+def test_predictive_runbook_includes_baseline_artifact_retention_guidance():
+    content = _runbook_text()
+    required_fragments = [
+        "backend/test_reports/baseline_metrics.json",
+        "Retain predictive and connector rollout evidence artifacts for at least 14 days",
+    ]
+    for fragment in required_fragments:
+        assert fragment in content
+
+
+def test_predictive_runbook_documents_sales_smoke_stage_expansion():
+    content = _runbook_text()
+    required_fragments = [
+        "includes `verify:smoke:sales-dashboard` immediately after `verify:smoke:frontend-sales`, includes `verify:smoke:multi-channel-controls` before `verify:smoke:baseline-command-aliases`, includes `verify:smoke:baseline-command-aliases` before `verify:smoke:baseline-command-aliases-artifact`, includes `verify:smoke:baseline-command-aliases-artifact` before `verify:smoke:campaign`, includes `verify:smoke:runtime-prereqs-artifact` before `verify:smoke:baseline-metrics-artifact`, and includes `verify:smoke:connector-reliability` + `verify:smoke:telemetry-quality` between credential lifecycle and telemetry event-root backfill stages.",
+        "`verify:smoke:connector-reliability` runs after `verify:smoke:credential-lifecycle` and executes `verify:smoke:connector-orchestration`, `verify:smoke:connector-provider-lookups`, `verify:smoke:connector-lookups`, `verify:smoke:sendgrid-reliability`, and `verify:smoke:credential-freshness`.",
+        "`verify:smoke:telemetry-quality` runs `verify:smoke:telemetry-status-filter`, `verify:smoke:telemetry-status-counts`, and `verify:smoke:telemetry-export-distribution`.",
+        "`verify:smoke:connector-lookups` runs after `verify:smoke:connector-provider-lookups` and executes `verify:smoke:connector-lookups-ui` then `verify:smoke:connector-lookups-export`.",
+    ]
+    for fragment in required_fragments:
+        assert fragment in content

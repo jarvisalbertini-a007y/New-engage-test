@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+PYTHON_BIN="${PYTHON_BIN:-$ROOT_DIR/.venv311/bin/python}"
+
+"$PYTHON_BIN" -m pytest -q \
+  backend/tests/test_integration_http_contract.py \
+  -k governance_schema_metadata_endpoint
+
+"$PYTHON_BIN" -m pytest -q \
+  backend/tests/test_governance_schema_parity_smoke.py

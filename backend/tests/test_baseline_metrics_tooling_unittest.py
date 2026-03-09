@@ -1,0 +1,407 @@
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+
+
+SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "scripts"
+    / "collect_baseline_metrics.py"
+)
+
+
+def _load_script_module():
+    spec = importlib.util.spec_from_file_location("collect_baseline_metrics", SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_parse_test_metrics_extracts_frontend_and_pytest_counts():
+    module = _load_script_module()
+    sample_output = """
+Test Suites: 4 passed, 4 total
+Tests:       23 passed, 23 total
+77 passed, 2 warnings in 0.77s
+"""
+    metrics = module._parse_test_metrics(sample_output)
+    assert metrics["frontendSuitesPassed"] == 4
+    assert metrics["frontendSuitesTotal"] == 4
+    assert metrics["frontendTestsPassed"] == 23
+    assert metrics["frontendTestsTotal"] == 23
+    assert metrics["pytestPassedCounts"] == [77]
+
+
+def test_default_steps_include_required_baseline_commands():
+    module = _load_script_module()
+    labels = [step["label"] for step in module.DEFAULT_STEPS]
+    assert labels == [
+        "verify_runtime_prereqs_artifact",
+        "lint",
+        "build",
+        "verify_frontend",
+        "verify_backend_sales",
+        "verify_smoke_campaign",
+        "verify_smoke_schema_gate",
+        "verify_smoke_orchestration_slo_gate",
+        "verify_smoke_release_gate",
+        "verify_release_gate_artifact_fixtures",
+        "verify_release_gate_artifact_contract",
+        "verify_smoke_health",
+    ]
+
+
+def test_extract_schema_adoption_metrics_from_evidence_payload():
+    module = _load_script_module()
+    evidence = {
+        "telemetrySummary": {
+            "bySchemaVersion": {"1": 8, "2": 14},
+            "salesIntelligence": {"bySchemaVersion": {"2": 14}},
+        },
+        "sloSummary": {
+            "gates": {"schemaCoveragePassed": True, "schemaSampleSizePassed": True},
+            "schemaCoverage": {"thresholdPct": 95, "sampleCount": 30, "minSampleCount": 25},
+        },
+    }
+    metrics = module._extract_schema_adoption(evidence)
+    assert metrics["available"] is True
+    assert metrics["overallBySchemaVersion"]["2"] == 14
+    assert metrics["salesBySchemaVersion"]["2"] == 14
+    assert metrics["salesSchemaV2Pct"] == 100.0
+    assert metrics["schemaGatePassed"] is True
+    assert metrics["schemaSampleGatePassed"] is True
+    assert metrics["schemaThresholdPct"] == 95
+    assert metrics["schemaObservedSampleCount"] == 30
+    assert metrics["schemaMinSampleCount"] == 25
+
+
+def test_extract_orchestration_gate_metrics_from_evidence_payload():
+    module = _load_script_module()
+    evidence = {
+        "sloSummary": {
+            "decision": "HOLD",
+            "gates": {
+                "orchestrationAttemptErrorPassed": False,
+                "orchestrationAttemptSkippedPassed": True,
+            },
+            "orchestrationAudit": {
+                "maxAttemptErrorCountThreshold": 1,
+                "observedAttemptErrorCount": 3,
+                "maxAttemptSkippedCountThreshold": 2,
+                "observedAttemptSkippedCount": 2,
+            },
+        }
+    }
+    metrics = module._extract_orchestration_gate(evidence)
+    assert metrics["available"] is True
+    assert metrics["decision"] == "HOLD"
+    assert metrics["attemptErrorGatePassed"] is False
+    assert metrics["attemptSkippedGatePassed"] is True
+    assert metrics["maxAttemptErrorCountThreshold"] == 1
+    assert metrics["observedAttemptErrorCount"] == 3
+    assert metrics["maxAttemptSkippedCountThreshold"] == 2
+    assert metrics["observedAttemptSkippedCount"] == 2
+
+
+def test_extract_orchestration_gate_metrics_normalizes_invalid_types():
+    module = _load_script_module()
+    evidence = {
+        "sloSummary": {
+            "decision": 7,
+            "gates": {
+                "orchestrationAttemptErrorPassed": "yes",
+                "orchestrationAttemptSkippedPassed": None,
+            },
+            "orchestrationAudit": {
+                "maxAttemptErrorCountThreshold": "bad",
+                "observedAttemptErrorCount": -1,
+                "maxAttemptSkippedCountThreshold": "2",
+                "observedAttemptSkippedCount": 3.2,
+            },
+        }
+    }
+    metrics = module._extract_orchestration_gate(evidence)
+    assert metrics["available"] is True
+    assert metrics["decision"] is None
+    assert metrics["attemptErrorGatePassed"] is None
+    assert metrics["attemptSkippedGatePassed"] is None
+    assert metrics["maxAttemptErrorCountThreshold"] is None
+    assert metrics["observedAttemptErrorCount"] is None
+    assert metrics["maxAttemptSkippedCountThreshold"] == 2
+    assert metrics["observedAttemptSkippedCount"] == 3
+
+
+def test_load_schema_adoption_metrics_handles_missing_and_valid_files():
+    module = _load_script_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        missing_path = Path(tmp) / "missing.json"
+        missing_metrics = module._load_schema_adoption_metrics(missing_path)
+        assert missing_metrics["available"] is False
+        assert missing_metrics["reason"] == "connector_canary_evidence_missing"
+
+        evidence_path = Path(tmp) / "connector_canary_evidence.json"
+        evidence_payload = {
+            "telemetrySummary": {
+                "bySchemaVersion": {"1": 2, "2": 3},
+                "salesIntelligence": {"bySchemaVersion": {"1": 1, "2": 3}},
+            },
+            "sloSummary": {
+                "gates": {"schemaCoveragePassed": False, "schemaSampleSizePassed": False},
+                "schemaCoverage": {"thresholdPct": 95, "sampleCount": 4, "minSampleCount": 25},
+            },
+        }
+        evidence_path.write_text(json.dumps(evidence_payload), encoding="utf-8")
+        loaded_metrics = module._load_schema_adoption_metrics(evidence_path)
+        assert loaded_metrics["available"] is True
+        assert loaded_metrics["source"] == str(evidence_path)
+        assert loaded_metrics["salesSchemaSampleCount"] == 4
+        assert loaded_metrics["salesSchemaV2Count"] == 3
+        assert loaded_metrics["salesSchemaV2Pct"] == 75.0
+        assert loaded_metrics["schemaSampleGatePassed"] is False
+        assert loaded_metrics["schemaObservedSampleCount"] == 4
+        assert loaded_metrics["schemaMinSampleCount"] == 25
+
+
+def test_load_orchestration_gate_metrics_handles_missing_and_valid_files():
+    module = _load_script_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        missing_path = Path(tmp) / "missing.json"
+        missing_metrics = module._load_orchestration_gate_metrics(missing_path)
+        assert missing_metrics["available"] is False
+        assert missing_metrics["reason"] == "connector_canary_evidence_missing"
+
+        evidence_path = Path(tmp) / "connector_canary_evidence.json"
+        evidence_payload = {
+            "sloSummary": {
+                "decision": "PROCEED",
+                "gates": {
+                    "orchestrationAttemptErrorPassed": True,
+                    "orchestrationAttemptSkippedPassed": False,
+                },
+                "orchestrationAudit": {
+                    "maxAttemptErrorCountThreshold": 5,
+                    "observedAttemptErrorCount": 1,
+                    "maxAttemptSkippedCountThreshold": 2,
+                    "observedAttemptSkippedCount": 3,
+                },
+            }
+        }
+        evidence_path.write_text(json.dumps(evidence_payload), encoding="utf-8")
+        loaded_metrics = module._load_orchestration_gate_metrics(evidence_path)
+        assert loaded_metrics["available"] is True
+        assert loaded_metrics["source"] == str(evidence_path)
+        assert loaded_metrics["decision"] == "PROCEED"
+        assert loaded_metrics["attemptErrorGatePassed"] is True
+        assert loaded_metrics["attemptSkippedGatePassed"] is False
+        assert loaded_metrics["maxAttemptErrorCountThreshold"] == 5
+        assert loaded_metrics["observedAttemptErrorCount"] == 1
+        assert loaded_metrics["maxAttemptSkippedCountThreshold"] == 2
+        assert loaded_metrics["observedAttemptSkippedCount"] == 3
+
+
+def test_load_release_gate_fixture_profiles_handles_missing_and_valid_files():
+    module = _load_script_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        pass_path = base / "connector_release_gate_result.json"
+        hold_path = base / "connector_release_gate_result_hold.json"
+        validation_path = base / "connector_release_gate_result_validation_fail.json"
+
+        pass_payload = {
+            "approved": True,
+            "decision": "PROCEED",
+            "checks": {"validationPassed": True},
+            "failedChecks": [],
+        }
+        hold_payload = {
+            "approved": False,
+            "decision": "HOLD",
+            "checks": {"validationPassed": True},
+            "failedChecks": ["decisionIsProceed"],
+        }
+        pass_path.write_text(json.dumps(pass_payload), encoding="utf-8")
+        hold_path.write_text(json.dumps(hold_payload), encoding="utf-8")
+
+        summary = module._load_release_gate_fixture_profiles(
+            {
+                "pass": pass_path,
+                "hold": hold_path,
+                "validation-fail": validation_path,
+            }
+        )
+
+        assert summary["profileCount"] == 3
+        assert summary["availableProfileCount"] == 2
+        assert summary["allProfilesAvailable"] is False
+        assert summary["profiles"]["pass"]["available"] is True
+        assert summary["profiles"]["pass"]["decision"] == "PROCEED"
+        assert summary["profiles"]["hold"]["available"] is True
+        assert summary["profiles"]["hold"]["failedChecks"] == ["decisionIsProceed"]
+        assert summary["profiles"]["validation-fail"]["available"] is False
+        assert summary["profiles"]["validation-fail"]["reason"] == "artifact_missing"
+
+
+def test_load_runtime_prereqs_metrics_handles_missing_and_valid_files():
+    module = _load_script_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        missing_path = Path(tmp) / "sales_runtime_prereqs.json"
+        missing_metrics = module._load_runtime_prereqs_metrics(missing_path)
+        assert missing_metrics["available"] is False
+        assert missing_metrics["passed"] is False
+        assert missing_metrics["reason"] == "runtime_prereqs_artifact_missing"
+
+        artifact_path = Path(tmp) / "sales_runtime_prereqs.json"
+        artifact_path.write_text(
+            json.dumps(
+                {
+                    "generatedAt": "2026-02-27T00:00:00+00:00",
+                    "command": "verify_sales_runtime_prereqs",
+                    "artifact": {
+                        "workspaceRoot": "/tmp/repo",
+                        "validatedAt": "2026-02-27T00:00:00+00:00",
+                        "commandChecks": {"bash": True, "git": True, "node": True, "npm": True},
+                        "workspaceChecks": {
+                            "root_exists": True,
+                            "backend_dir_exists": True,
+                            "frontend_dir_exists": True,
+                            "venv_python_exists": True,
+                        },
+                        "missingChecks": {"commands": [], "workspace": []},
+                        "recommendedCommands": [],
+                        "valid": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        loaded_metrics = module._load_runtime_prereqs_metrics(artifact_path)
+        assert loaded_metrics["available"] is True
+        assert loaded_metrics["passed"] is True
+        assert loaded_metrics["command"] == "verify_sales_runtime_prereqs"
+        assert loaded_metrics["contractValid"] is True
+        assert loaded_metrics["valid"] is True
+        assert loaded_metrics["missingCheckCount"] == 0
+        assert loaded_metrics["missingChecks"]["commands"] == []
+        assert loaded_metrics["missingChecks"]["workspace"] == []
+
+
+def test_main_writes_artifact_with_required_contract_fields():
+    module = _load_script_module()
+    with tempfile.TemporaryDirectory() as tmp:
+        output_path = Path(tmp) / "baseline_metrics.json"
+
+        class _Args:
+            output = str(output_path)
+
+        def _fake_run_step(label, command):
+            return {
+                "label": label,
+                "command": " ".join(command),
+                "startedAt": "2026-02-22T00:00:00+00:00",
+                "durationMs": 1,
+                "status": "pass",
+                "returnCode": 0,
+                "logPath": "/tmp/fake.log",
+                "metrics": {},
+            }
+
+        original_parse = module.argparse.ArgumentParser.parse_args
+        original_run_step = module._run_step
+        original_schema = module._load_schema_adoption_metrics
+        original_runtime_prereqs = module._load_runtime_prereqs_metrics
+        original_orchestration = module._load_orchestration_gate_metrics
+        original_release_fixtures = module._load_release_gate_fixture_profiles
+        try:
+            module.argparse.ArgumentParser.parse_args = lambda _self: _Args
+            module._run_step = _fake_run_step
+            module._load_schema_adoption_metrics = lambda: {
+                "available": True,
+                "source": "/tmp/fake-evidence.json",
+                "salesSchemaV2Pct": 100.0,
+            }
+            module._load_runtime_prereqs_metrics = lambda: {
+                "available": True,
+                "passed": True,
+                "source": "/tmp/sales_runtime_prereqs.json",
+                "artifactPath": "/tmp/sales_runtime_prereqs.json",
+                "generatedAt": "2026-02-22T00:00:00+00:00",
+                "validatedAt": "2026-02-22T00:00:00+00:00",
+                "command": "verify_sales_runtime_prereqs",
+                "valid": True,
+                "contractValid": True,
+                "missingChecks": {"commands": [], "workspace": []},
+                "missingCheckCount": 0,
+            }
+            module._load_orchestration_gate_metrics = lambda: {
+                "available": True,
+                "source": "/tmp/fake-evidence.json",
+                "decision": "PROCEED",
+                "attemptErrorGatePassed": True,
+                "attemptSkippedGatePassed": True,
+            }
+            module._load_release_gate_fixture_profiles = lambda: {
+                "sourceDir": "/tmp",
+                "requiredProfiles": ["pass", "hold", "validation-fail"],
+                "profileCount": 3,
+                "availableProfileCount": 3,
+                "allProfilesAvailable": True,
+                "profiles": {
+                    "pass": {"available": True, "source": "/tmp/pass.json"},
+                    "hold": {"available": True, "source": "/tmp/hold.json"},
+                    "validation-fail": {"available": True, "source": "/tmp/validation-fail.json"},
+                },
+            }
+            exit_code = module.main()
+        finally:
+            module.argparse.ArgumentParser.parse_args = original_parse
+            module._run_step = original_run_step
+            module._load_schema_adoption_metrics = original_schema
+            module._load_runtime_prereqs_metrics = original_runtime_prereqs
+            module._load_orchestration_gate_metrics = original_orchestration
+            module._load_release_gate_fixture_profiles = original_release_fixtures
+
+        assert exit_code == 0
+        assert output_path.exists()
+        artifact = json.loads(output_path.read_text(encoding="utf-8"))
+
+        required_top_level = [
+            "generatedAt",
+            "runStartedAt",
+            "durationMs",
+            "workspace",
+            "overallStatus",
+            "schemaAdoption",
+            "runtimePrereqs",
+            "orchestrationGate",
+            "releaseGateFixtures",
+            "releaseGateFixturePolicy",
+            "steps",
+        ]
+        for key in required_top_level:
+            assert key in artifact
+
+        assert artifact["overallStatus"] == "pass"
+        assert len(artifact["steps"]) == len(module.DEFAULT_STEPS)
+        assert any(step["label"] == "verify_smoke_release_gate" for step in artifact["steps"])
+        assert any(
+            step["label"] == "verify_release_gate_artifact_fixtures"
+            for step in artifact["steps"]
+        )
+        assert any(
+            step["label"] == "verify_release_gate_artifact_contract"
+            for step in artifact["steps"]
+        )
+        step_required_keys = [
+            "label",
+            "command",
+            "startedAt",
+            "durationMs",
+            "status",
+            "returnCode",
+            "logPath",
+            "metrics",
+        ]
+        for key in step_required_keys:
+            assert key in artifact["steps"][0]

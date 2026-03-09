@@ -1,0 +1,17 @@
+{
+  "name": "GrowthOps",
+  "domain": "growthops.ai",
+  "description": "Revenue workflow automation software for sales teams.",
+  "city": "San Francisco",
+  "state": "CA",
+  "country": "US",
+  "category": {
+    "industry": "SaaS"
+  },
+  "metrics": {
+    "employees": 45
+  },
+  "linkedin": {
+    "handle": "growthops"
+  }
+}
